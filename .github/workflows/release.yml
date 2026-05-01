@@ -20,14 +20,17 @@ jobs:
         include:
           - os: macos-latest
             target: aarch64-apple-darwin
+            # When `tauri build --target X` runs, cargo writes outputs
+            # under `target/X/release/...` rather than `target/release/...`,
+            # so the glob has to include the target triple.
             artifact_glob: |
-              src-tauri/target/release/bundle/dmg/*.dmg
-              src-tauri/target/release/bundle/macos/*.app
+              src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+              src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_glob: |
-              src-tauri/target/release/bundle/nsis/*.exe
-              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+              src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
 
     runs-on: ${{ matrix.os }}
 

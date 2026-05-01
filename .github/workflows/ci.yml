@@ -13,10 +13,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
-      - name: Linux deps for Tauri
+      - name: Linux deps for Tauri + serialport
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
+          # libwebkit2gtk + friends: Tauri's webview backend on Linux.
+          # libudev-dev: required by `serialport` (it links libudev-sys
+          #   to enumerate /dev/tty* via the udev hwdb on Linux).
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libsoup-3.0-dev \
+            libudev-dev
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri

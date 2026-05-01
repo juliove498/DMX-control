@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Allow rusb / libusb to claim FTDI dongles. Without this the
+         hardened runtime in a release build silently denies the call and
+         the app appears to "do nothing" when you try to open a DMX
+         output. -->
+    <key>com.apple.security.device.usb</key>
+    <true/>
+    <!-- Allow loading dynamically linked frameworks Tauri / WebKit need
+         when ad-hoc signed. -->
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <!-- Disable the library validation requirement so the app can use
+         ad-hoc signing without breaking Tauri's bundled WebView. -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- Network client (in case sACN E1.31 over UDP is used). -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <key>com.apple.security.network.server</key>
+    <true/>
+</dict>
+</plist>

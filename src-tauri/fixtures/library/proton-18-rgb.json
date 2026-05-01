@@ -1,0 +1,19 @@
+{
+  "id": "proton-18-rgb",
+  "manufacturer": "Proton",
+  "name": "18 RGB",
+  "modes": [
+    {
+      "name": "7ch",
+      "channels": [
+        { "role": "intensity" },
+        { "role": "red" },
+        { "role": "green" },
+        { "role": "blue" },
+        { "role": "strobe" },
+        { "role": { "other": "effects" } },
+        { "role": { "other": "effects_speed" } }
+      ]
+    }
+  ]
+}

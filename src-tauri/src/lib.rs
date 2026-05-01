@@ -1,0 +1,379 @@
+pub mod chaser;
+pub mod commands;
+pub mod engine;
+pub mod globals;
+pub mod midi;
+pub mod movement;
+pub mod output;
+pub mod show;
+
+use std::path::PathBuf;
+use std::sync::Mutex;
+
+use tauri::Manager;
+
+use crate::commands::{apply_outputs, OutputThreadState};
+use crate::engine::output_thread::{shared_chasers, shared_globals, shared_movement};
+use crate::engine::EngineState;
+use crate::midi::hub::shared_midi;
+use crate::midi::launchpad::shared_launchpad;
+use crate::show::library::{ensure_seeded, library_dir, load_all};
+use crate::show::session::{
+    read_autosave, read_engine_autosave, write_engine_autosave, EngineAutosave, UniverseAutosave,
+};
+use crate::show::{ShowFileV1, ShowState, ShowStateInner};
+
+/// Catch any panic before `panic = "abort"` calls `abort()`, dump the
+/// payload + backtrace to a file we can read after the fact, and also
+/// echo to stderr for terminal runs. Without this, release builds launched
+/// from Finder lose the panic message entirely (stderr goes nowhere and
+/// the non-blocking tracing writer can't flush before the process dies).
+fn install_panic_logger() {
+    use std::backtrace::Backtrace;
+    let log_dir = log_directory();
+    let _ = std::fs::create_dir_all(&log_dir);
+    let panic_path = log_dir.join("panic.log");
+    std::panic::set_hook(Box::new(move |info| {
+        let mut msg = String::new();
+        msg.push_str("=== PANIC ===\n");
+        if let Some(loc) = info.location() {
+            msg.push_str(&format!("location: {}:{}\n", loc.file(), loc.line()));
+        }
+        let payload = if let Some(s) = info.payload().downcast_ref::<&str>() {
+            (*s).to_string()
+        } else if let Some(s) = info.payload().downcast_ref::<String>() {
+            s.clone()
+        } else {
+            "<non-string panic payload>".to_string()
+        };
+        msg.push_str(&format!("payload: {}\n", payload));
+        let bt = Backtrace::force_capture();
+        msg.push_str(&format!("backtrace:\n{}\n", bt));
+        let _ = std::fs::write(&panic_path, &msg);
+        eprintln!("{}", msg);
+    }));
+}
+
+fn init_tracing() {
+    use tracing_appender::rolling::{RollingFileAppender, Rotation};
+    use tracing_subscriber::fmt;
+    use tracing_subscriber::layer::SubscriberExt;
+    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::EnvFilter;
+
+    let log_dir = log_directory();
+    if let Err(e) = std::fs::create_dir_all(&log_dir) {
+        eprintln!("could not create log dir {:?}: {}", log_dir, e);
+    }
+
+    // Probe writability before handing the dir to RollingFileAppender — if
+    // a previous run left files owned by root (sudo accident), the appender
+    // would panic in its constructor and there's no way to catch that under
+    // `panic = "abort"`. Falling back to stderr-only is much safer than
+    // refusing to boot.
+    let probe = log_dir.join(".dmx-write-probe");
+    let can_write_log = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&probe)
+        .is_ok();
+    let _ = std::fs::remove_file(&probe);
+
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,dmx=debug"));
+    let stdout_layer = fmt::layer().with_target(false);
+    let registry = tracing_subscriber::registry().with(env_filter).with(stdout_layer);
+
+    if can_write_log {
+        let file_appender =
+            RollingFileAppender::new(Rotation::DAILY, &log_dir, "dmx-control.log");
+        let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
+        Box::leak(Box::new(guard));
+        let file_layer = fmt::layer()
+            .with_writer(file_writer)
+            .with_ansi(false)
+            .with_target(true);
+        registry.with(file_layer).init();
+        tracing::info!(log_dir = ?log_dir, "tracing initialized (file + stderr)");
+    } else {
+        registry.init();
+        eprintln!(
+            "[dmx-control] log dir {:?} not writable (check ownership); falling back to stderr-only",
+            log_dir
+        );
+        tracing::warn!(
+            log_dir = ?log_dir,
+            "log dir not writable; tracing to stderr only — check ownership/permissions of the directory"
+        );
+    }
+}
+
+/// Resolve the log directory in a way that respects each platform's
+/// conventions:
+/// - macOS: `~/Library/Logs/dmx-control` (Apple's recommended path —
+///   what `Console.app` indexes by default).
+/// - Windows: `%LOCALAPPDATA%\dmx-control\logs` via `dirs::data_local_dir`.
+/// - Linux / other: `~/.local/share/dmx-control/logs` via the same.
+///
+/// The macOS branch is preserved literally so existing installs keep
+/// finding their logs in the same place after this refactor — we tested
+/// the heck out of that path and don't want to migrate it.
+fn log_directory() -> PathBuf {
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(home) = std::env::var_os("HOME").map(PathBuf::from) {
+            return home.join("Library/Logs/dmx-control");
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        if let Some(base) = dirs::data_local_dir() {
+            return base.join("dmx-control").join("logs");
+        }
+    }
+    std::env::temp_dir().join("dmx-control-logs")
+}
+
+#[cfg_attr(mobile, tauri::mobile_entry_point)]
+pub fn run() {
+    install_panic_logger();
+    init_tracing();
+
+    // Library: seed if missing, load fixtures.
+    let library = match library_dir() {
+        Some(dir) => match ensure_seeded(&dir) {
+            Ok(_) => match load_all(&dir) {
+                Ok(lib) => {
+                    tracing::info!(count = lib.len(), dir = %dir.display(), "fixture library loaded");
+                    lib
+                }
+                Err(err) => {
+                    tracing::warn!(?err, "failed to load fixture library; starting empty");
+                    Default::default()
+                }
+            },
+            Err(err) => {
+                tracing::warn!(?err, "failed to seed fixture library; starting empty");
+                Default::default()
+            }
+        },
+        None => {
+            tracing::warn!("no config dir available; fixture library will be empty");
+            Default::default()
+        }
+    };
+
+    let (initial_show, initial_path) = match read_autosave() {
+        Some((show, path)) => {
+            tracing::info!(
+                fixtures = show.fixtures.len(),
+                outputs = show.outputs.bindings.len(),
+                path = ?path,
+                "restored autosave"
+            );
+            (show, path)
+        }
+        None => (ShowFileV1::default(), None),
+    };
+
+    let show_inner = ShowStateInner {
+        show: initial_show,
+        library,
+        path: initial_path,
+        dirty: false,
+    };
+
+    let engine = EngineState::with_universes(&show_inner.show.outputs.universes());
+    // Resilience: restore the previous engine snapshot (channel values +
+    // master) so a crash/relaunch comes back to the same look the operator
+    // had on stage. Show-level config (chasers, movement, etc.) is restored
+    // separately via the show file autosave above.
+    if let Some(snap) = read_engine_autosave() {
+        let mut e = engine.write();
+        e.master = snap.master;
+        for u_snap in snap.universes {
+            if let Some(u) = e.universes.iter_mut().find(|u| u.id == u_snap.id) {
+                if u_snap.data.len() == crate::engine::DMX_CHANNELS {
+                    let bytes: [u8; crate::engine::DMX_CHANNELS] = u_snap
+                        .data
+                        .try_into()
+                        .unwrap_or([0u8; crate::engine::DMX_CHANNELS]);
+                    u.data = bytes;
+                }
+            }
+        }
+        tracing::info!("restored engine autosave");
+    }
+    let show_state = ShowState::new(show_inner);
+    let chasers_handle = shared_chasers();
+    let movement_handle = shared_movement();
+    let globals_handle = shared_globals();
+    let midi_handle = shared_midi();
+    let launchpad_handle = shared_launchpad();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
+        .manage(engine.clone())
+        .manage(show_state.clone())
+        .manage(OutputThreadState(Mutex::new(None)))
+        .manage(chasers_handle.clone())
+        .manage(movement_handle.clone())
+        .manage(globals_handle.clone())
+        .manage(midi_handle.clone())
+        .manage(launchpad_handle.clone())
+        .setup(move |app| {
+            let app_handle = app.handle().clone();
+            let engine_state: tauri::State<'_, EngineState> = app.state();
+            let show_state_st: tauri::State<'_, ShowState> = app.state();
+            let output_thread: tauri::State<'_, OutputThreadState> = app.state();
+            let chasers_st: tauri::State<'_, crate::engine::output_thread::SharedChasers> =
+                app.state();
+            let movement_st: tauri::State<'_, crate::engine::output_thread::SharedMovement> =
+                app.state();
+            let globals_st: tauri::State<'_, crate::engine::output_thread::SharedGlobals> =
+                app.state();
+
+            let outputs = show_state_st.read().show.outputs.clone();
+            if let Err(err) = apply_outputs(
+                &app_handle,
+                &engine_state,
+                &output_thread,
+                &chasers_st,
+                &movement_st,
+                &globals_st,
+                &outputs,
+            ) {
+                tracing::warn!(?err, "failed to apply initial outputs");
+            }
+            // Push the loaded show into the runtime engines so anything
+            // persisted in the file resumes on launch.
+            let (fixtures, library, chasers_list, movement_list, globals_cfg) = {
+                let s = show_state_st.read();
+                (
+                    s.show.fixtures.clone(),
+                    s.library.clone(),
+                    s.show.chasers.clone(),
+                    s.show.movements.clone(),
+                    s.show.globals.clone(),
+                )
+            };
+            {
+                let mut e = chasers_st.lock();
+                e.update_show_context(fixtures.clone(), library.clone());
+                e.replace_chasers(chasers_list);
+            }
+            {
+                let mut m = movement_st.lock();
+                m.update_show_context(fixtures.clone(), library.clone());
+                m.replace_generators(movement_list);
+            }
+            {
+                let mut g = globals_st.lock();
+                g.update_show_context(fixtures, library);
+                g.replace_config(globals_cfg);
+            }
+
+            // Background snapshot thread: every ~1.5 s we dump the live
+            // engine state (universes + master) to disk. The output thread
+            // can't do this itself without risking I/O latency in the DMX
+            // loop, so we run a separate sleeper. Cheap (a few KB) and the
+            // worst-case data loss on a crash is whatever happened in the
+            // last 1.5 s of slider movement.
+            let engine_for_snapshot = engine_state.inner().clone();
+            std::thread::Builder::new()
+                .name("dmx-engine-autosave".into())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(1500));
+                    let snap = {
+                        let g = engine_for_snapshot.read();
+                        EngineAutosave {
+                            master: g.master,
+                            universes: g
+                                .universes
+                                .iter()
+                                .map(|u| UniverseAutosave {
+                                    id: u.id,
+                                    data: u.data.to_vec(),
+                                })
+                                .collect(),
+                        }
+                    };
+                    if let Err(e) = write_engine_autosave(&snap) {
+                        tracing::warn!(error = %e, "engine autosave write failed");
+                    }
+                })
+                .expect("spawn engine autosave thread");
+
+            Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let handle_opt = window.state::<OutputThreadState>().0.lock().unwrap().take();
+                if let Some(handle) = handle_opt {
+                    tracing::info!("window close: shutting down output thread");
+                    handle.shutdown();
+                }
+            }
+        })
+        .invoke_handler(tauri::generate_handler![
+            // Direct DMX
+            commands::set_channel,
+            commands::set_master,
+            commands::blackout,
+            commands::clear_universe,
+            commands::get_universe,
+            commands::get_universe_output,
+            commands::list_universes,
+            commands::dmx_channels,
+            // Outputs
+            commands::list_serial_ports_cmd,
+            commands::list_ftdi_devices,
+            commands::get_outputs,
+            commands::set_outputs,
+            // Library + Show
+            commands::list_fixture_definitions,
+            commands::reload_library,
+            commands::get_library_dir,
+            commands::set_fixture_image,
+            commands::get_show,
+            commands::get_show_path,
+            commands::new_show,
+            commands::open_show,
+            commands::save_show,
+            // Patch
+            commands::add_fixture,
+            commands::add_fixtures,
+            commands::remove_fixture,
+            commands::update_fixture,
+            commands::move_fixture,
+            commands::validate_patch_cmd,
+            commands::set_fixture_channel,
+            commands::get_fixture_values,
+            // Ambient Chaser
+            commands::list_chasers,
+            commands::create_chaser,
+            commands::update_chaser,
+            commands::delete_chaser,
+            commands::toggle_chaser,
+            commands::add_example_chasers,
+            // Movement Generator
+            commands::list_movements,
+            commands::create_movement,
+            commands::update_movement,
+            commands::delete_movement,
+            commands::toggle_movement,
+            // Globals (Blackout + Blind)
+            commands::get_globals,
+            commands::update_globals,
+            commands::set_blackout,
+            commands::set_blind,
+            // MIDI
+            commands::list_midi_devices,
+            commands::connect_midi_device,
+            commands::disconnect_midi,
+            commands::get_midi_status,
+            commands::send_midi_raw,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}

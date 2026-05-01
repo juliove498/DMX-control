@@ -1,0 +1,71 @@
+name: Release builds
+
+# Build installers for macOS + Windows on demand. Runs on:
+#   - manual dispatch (Actions tab → "Run workflow") for ad-hoc builds
+#   - any tag matching v*  for cutting a real release
+# We don't run this on every push to keep CI minutes reasonable; the
+# regular `ci.yml` covers compile + test signal on every commit.
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_glob: |
+              src-tauri/target/release/bundle/dmg/*.dmg
+              src-tauri/target/release/bundle/macos/*.app
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_glob: |
+              src-tauri/target/release/bundle/nsis/*.exe
+              src-tauri/target/release/bundle/msi/*.msi
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      # Vendored libusb (used by `rusb`) needs pkg-config on Windows
+      # because libusb1-sys's build script tries that path first. Choco
+      # ships it; on macOS pkg-config comes with Xcode CLT.
+      - name: Install pkg-config (Windows)
+        if: matrix.os == 'windows-latest'
+        run: choco install pkgconfiglite --no-progress
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Tauri build (compile + bundle)
+        run: npx tauri build --target ${{ matrix.target }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmx-control-${{ matrix.os }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: warn

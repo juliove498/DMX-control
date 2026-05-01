@@ -1,0 +1,26 @@
+{
+  "id": "generic-rgbw-4ch",
+  "manufacturer": "Generic",
+  "name": "RGBW LED 4ch",
+  "modes": [
+    {
+      "name": "Standard",
+      "channels": [
+        { "role": "red" },
+        { "role": "green" },
+        { "role": "blue" },
+        { "role": "white" }
+      ]
+    },
+    {
+      "name": "Dimmer + RGBW",
+      "channels": [
+        { "role": "intensity", "default": 255 },
+        { "role": "red" },
+        { "role": "green" },
+        { "role": "blue" },
+        { "role": "white" }
+      ]
+    }
+  ]
+}

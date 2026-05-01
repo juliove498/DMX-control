@@ -1,0 +1,15 @@
+{
+  "id": "generic-rgb-3ch",
+  "manufacturer": "Generic",
+  "name": "RGB LED 3ch",
+  "modes": [
+    {
+      "name": "Standard",
+      "channels": [
+        { "role": "red" },
+        { "role": "green" },
+        { "role": "blue" }
+      ]
+    }
+  ]
+}

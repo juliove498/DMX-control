@@ -1,0 +1,13 @@
+{
+  "id": "generic-dimmer-1ch",
+  "manufacturer": "Generic",
+  "name": "Dimmer 1ch",
+  "modes": [
+    {
+      "name": "Standard",
+      "channels": [
+        { "role": "intensity" }
+      ]
+    }
+  ]
+}

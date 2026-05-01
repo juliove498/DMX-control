@@ -1,0 +1,52 @@
+[package]
+name = "dmx-control"
+version = "0.1.0"
+description = "DMX Controller for live shows"
+authors = ["Juliere"]
+edition = "2021"
+
+[lib]
+name = "dmx_control_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+parking_lot = "0.12"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+tracing-appender = "0.2"
+ts-rs = { version = "10", features = ["serde-compat"] }
+crossbeam-channel = "0.5"
+serialport = "4"
+dirs = "5"
+uuid = { version = "1", features = ["v4", "serde"] }
+# Direct USB access to FTDI chips for Open DMX dongles (ElectroTAS TZ-MINI etc.).
+# `vendored` builds libusb 1.0 from source and links statically — no system
+# install needed. We use rusb instead of FTDI's D2XX library because on macOS
+# D2XX cannot evict Apple's USB-Serial kext from the device, but libusb's
+# `detach_kernel_driver` can.
+rusb = { version = "0.9", features = ["vendored"] }
+# Bump the output thread to a real-time priority so the kernel doesn't preempt
+# it for UI re-renders or background work — a 50ms scheduler gap is enough to
+# make the fixture flicker.
+thread-priority = "1"
+# MIDI input/output for control surfaces (Launchpad MK2, etc.). Cross-
+# platform USB-class compliant; no separate driver needed.
+midir = "0.10"
+
+[dev-dependencies]
+hex-literal = "0.4"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

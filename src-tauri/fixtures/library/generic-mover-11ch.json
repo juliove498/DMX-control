@@ -1,0 +1,23 @@
+{
+  "id": "generic-mover-11ch",
+  "manufacturer": "Generic",
+  "name": "Mover 11ch",
+  "modes": [
+    {
+      "name": "Standard",
+      "channels": [
+        { "role": "pan" },
+        { "role": "pan_fine" },
+        { "role": "tilt" },
+        { "role": "tilt_fine" },
+        { "role": "intensity", "default": 255 },
+        { "role": "shutter", "default": 255 },
+        { "role": "red" },
+        { "role": "green" },
+        { "role": "blue" },
+        { "role": "white" },
+        { "role": "strobe" }
+      ]
+    }
+  ]
+}

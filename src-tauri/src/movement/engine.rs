@@ -14,9 +14,7 @@ use crate::engine::{empty_overlay, ChannelOverlay, DMX_CHANNELS};
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance, PanTiltRange};
 
 use super::pipeline::{evaluate_slot, map_to_dmx};
-use super::{
-    Direction, MovementGenerator, MovementSlot, Subdivision, TempoSource,
-};
+use super::{Direction, MovementGenerator, MovementSlot, Subdivision, TempoSource};
 
 /// Pre-resolved per-slot routing: which DMX channels in which universe
 /// receive pan-coarse, pan-fine, tilt-coarse and tilt-fine, plus the
@@ -201,13 +199,11 @@ fn advance_phase(runtime: &mut MovementRuntime, cfg: &MovementGenerator, now: In
     match cfg.direction {
         Direction::Forward => {
             runtime.direction_sign = 1.0;
-            runtime.global_phase =
-                (runtime.global_phase + delta * cycles_per_sec).rem_euclid(1.0);
+            runtime.global_phase = (runtime.global_phase + delta * cycles_per_sec).rem_euclid(1.0);
         }
         Direction::Reverse => {
             runtime.direction_sign = -1.0;
-            runtime.global_phase =
-                (runtime.global_phase - delta * cycles_per_sec).rem_euclid(1.0);
+            runtime.global_phase = (runtime.global_phase - delta * cycles_per_sec).rem_euclid(1.0);
         }
         Direction::PingPong => {
             // Bounce off the [0, 1] interval. We reflect once per frame —
@@ -265,9 +261,7 @@ fn set_overlay(
     if channel >= DMX_CHANNELS {
         return;
     }
-    overlay
-        .entry(universe)
-        .or_insert_with(empty_overlay)[channel] = Some(value);
+    overlay.entry(universe).or_insert_with(empty_overlay)[channel] = Some(value);
 }
 
 fn resolve_one(
@@ -279,14 +273,17 @@ fn resolve_one(
     let def = library.get(&fixture.definition_id)?;
     let mode = def.modes.get(fixture.mode_index as usize)?;
     let base = (fixture.address as usize).saturating_sub(1);
-    let pan = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Pan)
-        .map(|i| base + i);
-    let pan_fine = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::PanFine)
-        .map(|i| base + i);
-    let tilt = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Tilt)
-        .map(|i| base + i);
-    let tilt_fine = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::TiltFine)
-        .map(|i| base + i);
+    let pan =
+        role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Pan).map(|i| base + i);
+    let pan_fine =
+        role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::PanFine).map(|i| base + i);
+    let tilt =
+        role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Tilt).map(|i| base + i);
+    let tilt_fine = role_offset(
+        mode.channels.iter().map(|c| &c.role),
+        &ChannelRole::TiltFine,
+    )
+    .map(|i| base + i);
     if pan.is_none() && tilt.is_none() {
         // Nothing for movement to drive — drop the slot.
         return None;

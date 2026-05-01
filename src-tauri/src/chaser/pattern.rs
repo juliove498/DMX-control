@@ -29,7 +29,7 @@ pub fn evaluate(pattern: &Pattern, step: u64, slot: usize, total: usize) -> Slot
 
 /// Every slot blinks in unison: on at even steps, off at odd steps.
 fn all_together(step: u64) -> SlotState {
-    if step % 2 == 0 {
+    if step.is_multiple_of(2) {
         SlotState::On
     } else {
         SlotState::Off

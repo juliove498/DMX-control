@@ -16,7 +16,7 @@ pub struct SlotOutput {
     pub rgb: Option<Rgb>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ChaserRuntime {
     /// Monotonically increasing step counter. Wraps at `u64::MAX`, which at
     /// 1 ms per step would take ~580 million years.
@@ -37,16 +37,4 @@ pub struct ChaserRuntime {
     /// Snapshot of `last_emitted` taken at the moment of the last step
     /// transition. Lerp source during the fade-in.
     pub fade_from: Vec<SlotOutput>,
-}
-
-impl Default for ChaserRuntime {
-    fn default() -> Self {
-        Self {
-            current_step: 0,
-            last_step_at: None,
-            step_started_at: None,
-            last_emitted: Vec::new(),
-            fade_from: Vec::new(),
-        }
-    }
 }

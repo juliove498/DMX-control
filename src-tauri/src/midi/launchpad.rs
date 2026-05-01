@@ -72,27 +72,27 @@ pub const BLIND_NOTE: u8 = 29;
 /// (dim, bright) palette pairs for chaser pads. Off pads sit at `dim`,
 /// active pads flash between `dim` and `bright`.
 const CHASER_PAD_PALETTE: [(u8, u8); 8] = [
-    (7, 5),    // red
-    (11, 9),   // orange
-    (15, 13),  // yellow
-    (19, 17),  // green
-    (39, 37),  // cyan
-    (43, 41),  // light blue
-    (47, 45),  // blue
-    (55, 53),  // magenta
+    (7, 5),   // red
+    (11, 9),  // orange
+    (15, 13), // yellow
+    (19, 17), // green
+    (39, 37), // cyan
+    (43, 41), // light blue
+    (47, 45), // blue
+    (55, 53), // magenta
 ];
 
 /// Distinct palette for movement pads — picked so a glance at the LP
 /// instantly tells chasers (row 1) and movements (row 2) apart even
 /// when both rows are partly lit.
 const MOVEMENT_PAD_PALETTE: [(u8, u8); 8] = [
-    (96, 95), // pink
-    (82, 81), // purple
-    (85, 84), // amber
-    (74, 73), // lime
-    (34, 33), // teal
-    (50, 49), // fuchsia
-    (57, 56), // pale pink
+    (96, 95),  // pink
+    (82, 81),  // purple
+    (85, 84),  // amber
+    (74, 73),  // lime
+    (34, 33),  // teal
+    (50, 49),  // fuchsia
+    (57, 56),  // pale pink
     (100, 99), // periwinkle
 ];
 
@@ -293,12 +293,9 @@ fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
 
     if note == BLACKOUT_NOTE {
         let on = !handles.show.read().show.globals.blackout.active;
-        if let Err(err) = crate::commands::set_blackout_impl(
-            &handles.app,
-            &handles.show,
-            &handles.globals,
-            on,
-        ) {
+        if let Err(err) =
+            crate::commands::set_blackout_impl(&handles.app, &handles.show, &handles.globals, on)
+        {
             tracing::warn!(?err, "launchpad blackout dispatch failed");
         }
         return;
@@ -347,12 +344,9 @@ fn bump_active_chaser_bpm(handles: &LpHandles, delta_bpm: f32) {
         return;
     }
     chaser.tempo = crate::chaser::TempoSource::Fixed { bpm: new_bpm };
-    if let Err(err) = crate::commands::update_chaser_impl(
-        &handles.app,
-        &handles.show,
-        &handles.chasers,
-        chaser,
-    ) {
+    if let Err(err) =
+        crate::commands::update_chaser_impl(&handles.app, &handles.show, &handles.chasers, chaser)
+    {
         tracing::warn!(?err, "launchpad BPM nudge failed");
     }
 }
@@ -474,7 +468,13 @@ fn push_pad(midi: &SharedMidi, note: u8, state: PadState) {
 fn push_top_rgb(midi: &SharedMidi, cc: u8, rgb: TopRowRgb) {
     let mut hub = midi.lock();
     let _ = hub.send_raw(&[
-        0xF0, 0x00, 0x20, 0x29, 0x02, 0x18, 0x0B,
+        0xF0,
+        0x00,
+        0x20,
+        0x29,
+        0x02,
+        0x18,
+        0x0B,
         cc,
         rgb.r >> 2,
         rgb.g >> 2,

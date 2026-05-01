@@ -172,9 +172,7 @@ impl EngineInner {
                     if let Some(target) = slot {
                         let from = out[i] as f32;
                         let to = *target as f32;
-                        out[i] = (from + (to - from) * f)
-                            .round()
-                            .clamp(0.0, 255.0) as u8;
+                        out[i] = (from + (to - from) * f).round().clamp(0.0, 255.0) as u8;
                     }
                 }
             }

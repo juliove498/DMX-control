@@ -18,8 +18,7 @@ use crate::show::fixture::PanTiltRange;
 /// Derive a fixture's phase from the global phase + the slot offset.
 /// Always wraps into `[0, 1)`.
 pub fn fixture_phase(global_phase: f64, slot: &MovementSlot) -> f32 {
-    let raw = (global_phase as f32 + slot.phase_offset).rem_euclid(1.0);
-    raw
+    (global_phase as f32 + slot.phase_offset).rem_euclid(1.0)
 }
 
 /// Rotate a 2D point by `deg` degrees counter-clockwise.
@@ -80,6 +79,7 @@ pub fn transform(
 /// to the final normalised `(x, y)` ready for DMX mapping. Used by the
 /// engine; surfaced separately for tests so we can pin specific outputs
 /// with known inputs.
+#[allow(clippy::too_many_arguments)]
 pub fn evaluate_slot(
     global_phase: f64,
     slot: &MovementSlot,

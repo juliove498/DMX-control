@@ -228,6 +228,7 @@ pub fn get_outputs(show: State<'_, ShowState>) -> OutputsConfig {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn set_outputs(
     app: AppHandle,
     engine: State<'_, EngineState>,
@@ -322,6 +323,7 @@ pub fn new_show(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn open_show(
     app: AppHandle,
     engine: State<'_, EngineState>,
@@ -722,8 +724,8 @@ pub fn set_fixture_image(
             continue;
         }
         def.image = Some(relative.clone());
-        let body = serde_json::to_vec_pretty(&def)
-            .map_err(|e| CommandError::Show(e.to_string()))?;
+        let body =
+            serde_json::to_vec_pretty(&def).map_err(|e| CommandError::Show(e.to_string()))?;
         let tmp = path.with_extension("json.tmp");
         std::fs::write(&tmp, &body).map_err(|e| CommandError::Io(e.to_string()))?;
         std::fs::rename(&tmp, &path).map_err(|e| CommandError::Io(e.to_string()))?;
@@ -1092,6 +1094,7 @@ pub fn list_midi_devices() -> Vec<MidiDeviceInfo> {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn connect_midi_device(
     app: AppHandle,
     midi: State<'_, SharedMidi>,
@@ -1128,10 +1131,7 @@ pub fn connect_midi_device(
 }
 
 #[tauri::command]
-pub fn disconnect_midi(
-    midi: State<'_, SharedMidi>,
-    launchpad_state: State<'_, SharedLaunchpad>,
-) {
+pub fn disconnect_midi(midi: State<'_, SharedMidi>, launchpad_state: State<'_, SharedLaunchpad>) {
     // Stop the surface controller first so the feedback thread doesn't
     // try to push to a port that's about to be dropped.
     if let Some(prev) = launchpad_state.lock().take() {
@@ -1146,10 +1146,7 @@ pub fn get_midi_status(midi: State<'_, SharedMidi>) -> MidiStatus {
 }
 
 #[tauri::command]
-pub fn send_midi_raw(
-    midi: State<'_, SharedMidi>,
-    bytes: Vec<u8>,
-) -> Result<(), CommandError> {
+pub fn send_midi_raw(midi: State<'_, SharedMidi>, bytes: Vec<u8>) -> Result<(), CommandError> {
     midi.lock().send_raw(&bytes).map_err(CommandError::Other)
 }
 

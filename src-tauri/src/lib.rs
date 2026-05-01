@@ -82,11 +82,12 @@ fn init_tracing() {
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,dmx=debug"));
     let stdout_layer = fmt::layer().with_target(false);
-    let registry = tracing_subscriber::registry().with(env_filter).with(stdout_layer);
+    let registry = tracing_subscriber::registry()
+        .with(env_filter)
+        .with(stdout_layer);
 
     if can_write_log {
-        let file_appender =
-            RollingFileAppender::new(Rotation::DAILY, &log_dir, "dmx-control.log");
+        let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "dmx-control.log");
         let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
         Box::leak(Box::new(guard));
         let file_layer = fmt::layer()

@@ -16,15 +16,14 @@ pub fn evaluate(shape: &Shape, phase: f32) -> (f32, f32) {
     match shape {
         Shape::Circle => circle(phase),
         Shape::Polygon { sides } => polygon(phase, (*sides).max(3)),
-        Shape::Star { points, inner_ratio } => {
-            star(phase, (*points).max(3), inner_ratio.clamp(0.05, 0.95))
-        }
+        Shape::Star {
+            points,
+            inner_ratio,
+        } => star(phase, (*points).max(3), inner_ratio.clamp(0.05, 0.95)),
         Shape::FigureEight => figure_eight(phase),
         Shape::LineHorizontal => line_horizontal(phase),
         Shape::LineVertical => line_vertical(phase),
-        Shape::SineCombo { pan, tilt } => {
-            (evaluate_wave(pan, phase), evaluate_wave(tilt, phase))
-        }
+        Shape::SineCombo { pan, tilt } => (evaluate_wave(pan, phase), evaluate_wave(tilt, phase)),
     }
 }
 
@@ -60,8 +59,16 @@ pub fn star(phase: f32, points: u32, inner_ratio: f32) -> (f32, f32) {
     let local = scaled - scaled.floor();
     let angle_a = (segment as f32 / total_segments) * TAU;
     let angle_b = ((segment + 1) as f32 / total_segments) * TAU;
-    let radius_a = if segment % 2 == 0 { 1.0 } else { inner_ratio };
-    let radius_b = if segment % 2 == 0 { inner_ratio } else { 1.0 };
+    let radius_a = if segment.is_multiple_of(2) {
+        1.0
+    } else {
+        inner_ratio
+    };
+    let radius_b = if segment.is_multiple_of(2) {
+        inner_ratio
+    } else {
+        1.0
+    };
     let xa = angle_a.cos() * radius_a;
     let ya = angle_a.sin() * radius_a;
     let xb = angle_b.cos() * radius_b;

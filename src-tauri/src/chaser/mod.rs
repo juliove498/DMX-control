@@ -127,10 +127,7 @@ pub enum ColorMode {
     /// Continuous spectrum, with `speed` controlling the hue advance per step
     /// (degrees) and `spread` the hue offset between adjacent slots
     /// (1.0 = a full wheel evenly spread across all slots).
-    Rainbow {
-        speed: f32,
-        spread: f32,
-    },
+    Rainbow { speed: f32, spread: f32 },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq)]

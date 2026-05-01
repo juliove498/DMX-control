@@ -156,11 +156,7 @@ fn advance_step(runtime: &mut ChaserRuntime, config: &AmbientChaser, now: Instan
     }
 }
 
-fn apply_chaser(
-    entry: &mut ChaserEntry,
-    overlay: &mut HashMap<u16, ChannelOverlay>,
-    now: Instant,
-) {
+fn apply_chaser(entry: &mut ChaserEntry, overlay: &mut HashMap<u16, ChannelOverlay>, now: Instant) {
     let total = entry.resolved.len();
     if total == 0 {
         return;
@@ -333,9 +329,7 @@ fn set_overlay(
     if channel >= DMX_CHANNELS {
         return;
     }
-    overlay
-        .entry(universe)
-        .or_insert_with(empty_overlay)[channel] = Some(value);
+    overlay.entry(universe).or_insert_with(empty_overlay)[channel] = Some(value);
 }
 
 fn resolve_slots(
@@ -355,8 +349,11 @@ fn resolve_slots(
             continue;
         };
         let base = (fixture.address as usize).saturating_sub(1);
-        let intensity_offset = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Intensity)
-            .map(|i| base + i);
+        let intensity_offset = role_offset(
+            mode.channels.iter().map(|c| &c.role),
+            &ChannelRole::Intensity,
+        )
+        .map(|i| base + i);
         let r = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Red);
         let g = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Green);
         let b = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Blue);
@@ -604,7 +601,7 @@ mod tests {
 
         let t0 = Instant::now();
         engine.tick(t0); // step 0 → 255 cached as last_emitted
-        // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
+                         // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
         let ov_at_transition = engine.tick(t0 + Duration::from_millis(510));
         // At t=510 we are 0 ms into the fade → still ~255 (linear curve, t=0).
         assert!(
@@ -615,10 +612,7 @@ mod tests {
         // Halfway through the 250 ms fade → ~127.
         let ov_mid = engine.tick(t0 + Duration::from_millis(510 + 125));
         let v = ov_mid.get(&0).unwrap()[0].unwrap();
-        assert!(
-            (90..=160).contains(&(v as i32)),
-            "expected ~127, got {v}"
-        );
+        assert!((90..=160).contains(&(v as i32)), "expected ~127, got {v}");
         // Past the fade end → 0.
         let ov_done = engine.tick(t0 + Duration::from_millis(510 + 260));
         assert_eq!(ov_done.get(&0).unwrap()[0], Some(0));
@@ -656,7 +650,7 @@ mod tests {
 
         let t0 = Instant::now();
         engine.tick(t0); // step 0
-                        // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
+                         // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
         let ov = engine.tick(t0 + Duration::from_millis(5_001));
         assert_eq!(ov.get(&0).unwrap()[0], Some(255));
     }

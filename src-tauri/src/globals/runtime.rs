@@ -105,7 +105,12 @@ impl GlobalsRuntime {
         if self.blind_factor <= 0.0001 || self.config.blind.fixtures.is_empty() {
             return HashMap::new();
         }
-        build_blind_overlay(&self.config.blind, self.blind_factor, &self.fixtures, &self.library)
+        build_blind_overlay(
+            &self.config.blind,
+            self.blind_factor,
+            &self.fixtures,
+            &self.library,
+        )
     }
 }
 
@@ -177,8 +182,10 @@ fn write_halogen_default(
     factor: f32,
 ) {
     let chrom = halogen_chromaticity(factor);
-    let intensity_off =
-        role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Intensity);
+    let intensity_off = role_offset(
+        mode.channels.iter().map(|c| &c.role),
+        &ChannelRole::Intensity,
+    );
     let r_off = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Red);
     let g_off = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Green);
     let b_off = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Blue);
@@ -239,9 +246,7 @@ fn set_overlay(
     if channel >= DMX_CHANNELS {
         return;
     }
-    overlay
-        .entry(universe)
-        .or_insert_with(empty_overlay)[channel] = Some(value);
+    overlay.entry(universe).or_insert_with(empty_overlay)[channel] = Some(value);
 }
 
 fn role_offset<'a, I>(iter: I, role: &ChannelRole) -> Option<usize>

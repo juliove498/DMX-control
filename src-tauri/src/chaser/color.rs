@@ -6,12 +6,7 @@
 
 use super::{Cadence, ColorMode, PaletteRotation, Rgb};
 
-pub fn color_for_slot(
-    mode: &ColorMode,
-    step: u64,
-    slot: usize,
-    total: usize,
-) -> Option<Rgb> {
+pub fn color_for_slot(mode: &ColorMode, step: u64, slot: usize, total: usize) -> Option<Rgb> {
     match mode {
         ColorMode::Disabled => None,
         ColorMode::Single { color } => Some(*color),
@@ -41,20 +36,20 @@ pub fn color_for_slot(
 
 fn pick_a(cadence: &Cadence, step: u64, slot: usize, total: usize) -> bool {
     match cadence {
-        Cadence::EveryStep => step % 2 == 0,
+        Cadence::EveryStep => step.is_multiple_of(2),
         Cadence::EveryNSteps { n } => {
             let n = (*n).max(1) as u64;
-            (step / n) % 2 == 0
+            (step / n).is_multiple_of(2)
         }
         Cadence::PerSlot => {
             // First half (rounded up) of the slots get A, the rest get B.
             let half = total.div_ceil(2);
             slot < half
         }
-        Cadence::AlternateSlots => slot % 2 == 0,
+        Cadence::AlternateSlots => slot.is_multiple_of(2),
         Cadence::ChasePerColor => {
             let cycle = (total.max(1)) as u64;
-            (step / cycle) % 2 == 0
+            (step / cycle).is_multiple_of(2)
         }
     }
 }
@@ -127,7 +122,9 @@ mod tests {
 
     #[test]
     fn single_returns_constant_color() {
-        let c = ColorMode::Single { color: rgb(10, 20, 30) };
+        let c = ColorMode::Single {
+            color: rgb(10, 20, 30),
+        };
         for step in 0..10u64 {
             for slot in 0..4 {
                 assert_eq!(color_for_slot(&c, step, slot, 4), Some(rgb(10, 20, 30)));
@@ -156,10 +153,18 @@ mod tests {
         };
         // 4 steps red, 4 steps blue.
         for s in 0..4 {
-            assert_eq!(color_for_slot(&c, s, 0, 1), Some(rgb(255, 0, 0)), "step {s}");
+            assert_eq!(
+                color_for_slot(&c, s, 0, 1),
+                Some(rgb(255, 0, 0)),
+                "step {s}"
+            );
         }
         for s in 4..8 {
-            assert_eq!(color_for_slot(&c, s, 0, 1), Some(rgb(0, 0, 255)), "step {s}");
+            assert_eq!(
+                color_for_slot(&c, s, 0, 1),
+                Some(rgb(0, 0, 255)),
+                "step {s}"
+            );
         }
     }
 
@@ -284,7 +289,10 @@ mod tests {
 
     #[test]
     fn rainbow_advances_with_step() {
-        let c = ColorMode::Rainbow { speed: 60.0, spread: 0.0 };
+        let c = ColorMode::Rainbow {
+            speed: 60.0,
+            spread: 0.0,
+        };
         // speed=60 deg/step, spread=0 (all slots same hue).
         // step 0 → 0 deg = red; step 2 → 120 deg = green; step 4 → 240 deg = blue.
         assert_eq!(color_for_slot(&c, 0, 0, 1), Some(rgb(255, 0, 0)));
@@ -294,11 +302,14 @@ mod tests {
 
     #[test]
     fn rainbow_spreads_across_slots() {
-        let c = ColorMode::Rainbow { speed: 0.0, spread: 1.0 };
+        let c = ColorMode::Rainbow {
+            speed: 0.0,
+            spread: 1.0,
+        };
         // step=0, spread=1 → slot 0 hue 0, slot 1 hue 90, slot 2 hue 180, slot 3 hue 270 (4 slots).
         let total = 4;
-        assert_eq!(color_for_slot(&c, 0, 0, total), Some(rgb(255, 0, 0)));   // 0deg
-        // 90deg: yellow-green
+        assert_eq!(color_for_slot(&c, 0, 0, total), Some(rgb(255, 0, 0))); // 0deg
+                                                                           // 90deg: yellow-green
         let s1 = color_for_slot(&c, 0, 1, total).unwrap();
         assert!(s1.r > 100 && s1.g == 255 && s1.b == 0, "got {:?}", s1);
         // 180deg: cyan

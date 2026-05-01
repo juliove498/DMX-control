@@ -23,6 +23,7 @@ pub type InputRouter = Arc<dyn Fn(&MidiMessage) + Send + Sync + 'static>;
 
 pub type SharedMidi = Arc<Mutex<MidiHub>>;
 
+#[derive(Default)]
 pub struct MidiHub {
     /// Held to keep the input callback alive; we don't read from it.
     input_conn: Option<MidiInputConnection<()>>,
@@ -30,18 +31,6 @@ pub struct MidiHub {
     connected_name: Option<String>,
     last_event: Option<MidiMessage>,
     input_router: Option<InputRouter>,
-}
-
-impl Default for MidiHub {
-    fn default() -> Self {
-        Self {
-            input_conn: None,
-            output_conn: None,
-            connected_name: None,
-            last_event: None,
-            input_router: None,
-        }
-    }
 }
 
 pub fn shared_midi() -> SharedMidi {
@@ -176,9 +165,7 @@ impl MidiHub {
         }
 
         if self.input_conn.is_none() && self.output_conn.is_none() {
-            return Err(format!(
-                "no input or output port found with name {name}"
-            ));
+            return Err(format!("no input or output port found with name {name}"));
         }
 
         self.connected_name = Some(name.to_string());

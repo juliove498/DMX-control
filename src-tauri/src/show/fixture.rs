@@ -127,11 +127,15 @@ impl FixtureMode {
     }
 
     pub fn pan_range_or_default(&self) -> PanTiltRange {
-        self.pan_range.clone().unwrap_or_else(PanTiltRange::default_pan)
+        self.pan_range
+            .clone()
+            .unwrap_or_else(PanTiltRange::default_pan)
     }
 
     pub fn tilt_range_or_default(&self) -> PanTiltRange {
-        self.tilt_range.clone().unwrap_or_else(PanTiltRange::default_tilt)
+        self.tilt_range
+            .clone()
+            .unwrap_or_else(PanTiltRange::default_tilt)
     }
 }
 

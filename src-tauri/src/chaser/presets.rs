@@ -56,8 +56,16 @@ pub fn example_chasers(fixtures: &[FixtureInstance]) -> Vec<AmbientChaser> {
             slots: slots.clone(),
             pattern: Pattern::AllTogether,
             color_mode: ColorMode::TwoColorCadence {
-                color_a: Rgb { r: 0, g: 200, b: 255 },
-                color_b: Rgb { r: 255, g: 0, b: 200 },
+                color_a: Rgb {
+                    r: 0,
+                    g: 200,
+                    b: 255,
+                },
+                color_b: Rgb {
+                    r: 255,
+                    g: 0,
+                    b: 200,
+                },
                 cadence: Cadence::EveryStep,
             },
             tempo: TempoSource::Fixed { bpm: 128.0 },
@@ -97,11 +105,23 @@ pub fn example_chasers(fixtures: &[FixtureInstance]) -> Vec<AmbientChaser> {
             color_mode: ColorMode::Palette {
                 colors: vec![
                     Rgb { r: 255, g: 0, b: 0 },
-                    Rgb { r: 255, g: 0, b: 200 },
+                    Rgb {
+                        r: 255,
+                        g: 0,
+                        b: 200,
+                    },
                     Rgb { r: 0, g: 0, b: 255 },
-                    Rgb { r: 0, g: 255, b: 255 },
+                    Rgb {
+                        r: 0,
+                        g: 255,
+                        b: 255,
+                    },
                     Rgb { r: 0, g: 255, b: 0 },
-                    Rgb { r: 255, g: 255, b: 0 },
+                    Rgb {
+                        r: 255,
+                        g: 255,
+                        b: 0,
+                    },
                 ],
                 rotation: PaletteRotation::PerCycle,
             },
@@ -121,8 +141,16 @@ pub fn example_chasers(fixtures: &[FixtureInstance]) -> Vec<AmbientChaser> {
             slots: slots.clone(),
             pattern: Pattern::Chase,
             color_mode: ColorMode::TwoColorCadence {
-                color_a: Rgb { r: 255, g: 200, b: 80 },
-                color_b: Rgb { r: 255, g: 230, b: 200 },
+                color_a: Rgb {
+                    r: 255,
+                    g: 200,
+                    b: 80,
+                },
+                color_b: Rgb {
+                    r: 255,
+                    g: 230,
+                    b: 200,
+                },
                 cadence: Cadence::ChasePerColor,
             },
             tempo: TempoSource::Fixed { bpm: 110.0 },

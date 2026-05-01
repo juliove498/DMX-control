@@ -223,7 +223,7 @@ pub fn apply_spread(slots: &mut [MovementSlot], mode: SpreadMode) {
             // Mirror from the centre. For 6 slots the offsets ramp
             // 0, 1/6, 2/6, 2/6, 1/6, 0 — fixtures equidistant from the
             // ends share an offset.
-            let half = (n + 1) / 2;
+            let half = n.div_ceil(2);
             let denom = (2 * half) as f32;
             for (i, s) in slots.iter_mut().enumerate() {
                 let pair = i.min(n - 1 - i);
@@ -233,7 +233,7 @@ pub fn apply_spread(slots: &mut [MovementSlot], mode: SpreadMode) {
         SpreadMode::Pairs => {
             // Two-by-two: [0, 0, 1/k, 1/k, 2/k, 2/k, …] where k =
             // ceil(n / 2). For odd n the last slot pairs with itself.
-            let pair_count = ((n + 1) / 2) as f32;
+            let pair_count = n.div_ceil(2) as f32;
             for (i, s) in slots.iter_mut().enumerate() {
                 let pair_idx = (i / 2) as f32;
                 s.phase_offset = pair_idx / pair_count;
@@ -301,14 +301,7 @@ mod tests {
         let mut slots = make_slots(6);
         apply_spread(&mut slots, SpreadMode::Symmetric);
         // half = (6+1)/2 = 3, denom = 6 → pair_idx 0,1,2,2,1,0 / 6
-        let expected = [
-            0.0,
-            1.0 / 6.0,
-            2.0 / 6.0,
-            2.0 / 6.0,
-            1.0 / 6.0,
-            0.0,
-        ];
+        let expected = [0.0, 1.0 / 6.0, 2.0 / 6.0, 2.0 / 6.0, 1.0 / 6.0, 0.0];
         for (i, s) in slots.iter().enumerate() {
             assert!(
                 close(s.phase_offset, expected[i]),

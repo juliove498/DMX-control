@@ -40,3 +40,8 @@ src-tauri/icons/icon-master.png
 
 # Claude Code local environment
 .claude/
+
+# Show file rotating backups (created at runtime by save())
+*.bak.1
+*.bak.2
+*.bak.3

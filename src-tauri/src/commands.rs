@@ -23,7 +23,7 @@ use crate::output::discovery::{list_serial_ports, SerialPortInfo};
 use crate::programmer::{ProgrammerStatus, SharedProgrammer};
 use crate::show::file::{load as load_show_file, save as save_show_file, ShowError, ShowFileV1};
 use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, PatchReport};
-use crate::show::library::{ensure_seeded, library_dir, load_all};
+use crate::show::library::{ensure_seeded, library_dir, load_all, save_def};
 use crate::show::scene::{Scene, SceneChannel, SceneFixture, SceneFxState, SceneStep};
 use crate::show::ShowState;
 
@@ -397,11 +397,34 @@ pub fn open_show(
         s.dirty = false;
         // Merge the bundled defs into the runtime library so fixtures
         // referencing definitions the local install doesn't have still
-        // resolve. We copy in (overwriting same-id entries from disk),
-        // but we DON'T write them back to the on-disk library — that
-        // would leak show-specific fixture defs into every other show.
-        for def in bundled_defs {
-            s.library.insert(def.id.clone(), def);
+        // resolve. Same-id entries from disk get overwritten — the show
+        // file is treated as authoritative for any fixture it bundles.
+        for def in &bundled_defs {
+            s.library.insert(def.id.clone(), def.clone());
+        }
+    }
+    // Persist the bundled defs to the on-disk library so they survive a
+    // restart. Done outside the lock to keep disk I/O off the hot path.
+    // Best-effort: if a write fails, the runtime still has the def for
+    // this session and we just log a warning.
+    if !bundled_defs.is_empty() {
+        if let Some(lib_dir) = library_dir() {
+            for def in &bundled_defs {
+                if let Err(e) = save_def(&lib_dir, def) {
+                    tracing::warn!(
+                        target: "dmx::library",
+                        id = %def.id,
+                        error = %e,
+                        "could not persist bundled definition; runtime still has it"
+                    );
+                } else {
+                    tracing::info!(
+                        target: "dmx::library",
+                        id = %def.id,
+                        "bundled definition persisted to library"
+                    );
+                }
+            }
         }
     }
     scenes.lock().release(std::time::Instant::now());

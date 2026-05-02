@@ -55,6 +55,51 @@ pub fn ensure_seeded(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Persist a single fixture definition into the library directory. If a
+/// file already contains a definition with the same `id` (regardless of
+/// the filename), overwrite that file in place. Otherwise create
+/// `<dir>/<id>.json`. Atomic on POSIX/Windows via tmp + rename.
+///
+/// Used by `open_show` to ingest the `library` array bundled inside a
+/// `.json` show file: that's how a show's fixture defs become permanent
+/// in the user's library and survive a restart.
+pub fn save_def(dir: &Path, def: &FixtureDefinition) -> Result<PathBuf, ShowError> {
+    fs::create_dir_all(dir)?;
+    let mut target: Option<PathBuf> = None;
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let bytes = match fs::read(&path) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        if let Ok(existing) = serde_json::from_slice::<FixtureDefinition>(&bytes) {
+            if existing.id == def.id {
+                target = Some(path);
+                break;
+            }
+        }
+    }
+    let path = target.unwrap_or_else(|| dir.join(format!("{}.json", sanitize_filename(&def.id))));
+    let body = serde_json::to_vec_pretty(def)?;
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, &body)?;
+    fs::rename(&tmp, &path)?;
+    Ok(path)
+}
+
+fn sanitize_filename(s: &str) -> String {
+    s.chars()
+        .map(|c| match c {
+            '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|' => '_',
+            _ => c,
+        })
+        .collect()
+}
+
 pub fn load_all(dir: &Path) -> Result<HashMap<String, FixtureDefinition>, ShowError> {
     let mut out = HashMap::new();
     if !dir.exists() {

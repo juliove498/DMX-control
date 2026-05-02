@@ -27,3 +27,16 @@ src-tauri/gen
 *.njsproj
 *.sln
 *.sw?
+
+# Linux FTDI driver build artifacts (binary blobs, not source)
+Drivers Linux/build/
+Drivers Linux/**/*.o
+Drivers Linux/**/*.a
+Drivers Linux/**/*.so*
+
+# Icon working files (only the SVG source and final icon set are versioned)
+src-tauri/icons/preview-*.png
+src-tauri/icons/icon-master.png
+
+# Claude Code local environment
+.claude/

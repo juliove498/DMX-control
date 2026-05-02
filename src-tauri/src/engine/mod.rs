@@ -1,4 +1,5 @@
 pub mod output_thread;
+pub mod scene_playback;
 
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};

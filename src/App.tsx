@@ -4,13 +4,15 @@ import "./App.css";
 import { ChaserView } from "./components/ChaserView";
 import { ConfigView } from "./components/ConfigView";
 import { MovementView } from "./components/MovementView";
+import { ScenesView } from "./components/ScenesView";
 import { StageView } from "./components/StageView";
 import { useShowStore } from "./stores/show";
 
-type Tab = "stage" | "chaser" | "movement" | "config";
+type Tab = "stage" | "scenes" | "chaser" | "movement" | "config";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "stage", label: "Stage" },
+  { id: "scenes", label: "Scenes" },
   { id: "chaser", label: "Chaser" },
   { id: "movement", label: "Movement" },
   { id: "config", label: "Config" },
@@ -206,6 +208,7 @@ function App() {
       </nav>
       <div className="tab-body">
         {tab === "stage" && <StageView />}
+        {tab === "scenes" && <ScenesView />}
         {tab === "chaser" && <ChaserView />}
         {tab === "movement" && <MovementView />}
         {tab === "config" && <ConfigView />}

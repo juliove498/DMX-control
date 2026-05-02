@@ -5,6 +5,7 @@ pub mod globals;
 pub mod midi;
 pub mod movement;
 pub mod output;
+pub mod programmer;
 pub mod show;
 
 use std::path::PathBuf;
@@ -14,9 +15,11 @@ use tauri::Manager;
 
 use crate::commands::{apply_outputs, OutputThreadState};
 use crate::engine::output_thread::{shared_chasers, shared_globals, shared_movement};
+use crate::engine::scene_playback::{shared_scene_playback, SharedScenePlayback};
 use crate::engine::EngineState;
 use crate::midi::hub::{shared_midi, SharedMidi};
 use crate::midi::launchpad::{shared_launchpad, SharedLaunchpad};
+use crate::programmer::shared_programmer;
 use crate::show::library::{ensure_seeded, library_dir, load_all};
 use crate::show::session::{
     read_autosave, read_engine_autosave, write_engine_autosave, EngineAutosave, UniverseAutosave,
@@ -211,6 +214,8 @@ pub fn run() {
     let globals_handle = shared_globals();
     let midi_handle = shared_midi();
     let launchpad_handle = shared_launchpad();
+    let scene_playback_handle = shared_scene_playback();
+    let programmer_handle = shared_programmer();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -222,6 +227,8 @@ pub fn run() {
         .manage(globals_handle.clone())
         .manage(midi_handle.clone())
         .manage(launchpad_handle.clone())
+        .manage(scene_playback_handle.clone())
+        .manage(programmer_handle.clone())
         .setup(move |app| {
             let app_handle = app.handle().clone();
             let engine_state: tauri::State<'_, EngineState> = app.state();
@@ -233,6 +240,7 @@ pub fn run() {
                 app.state();
             let globals_st: tauri::State<'_, crate::engine::output_thread::SharedGlobals> =
                 app.state();
+            let scenes_st: tauri::State<'_, SharedScenePlayback> = app.state();
 
             let outputs = show_state_st.read().show.outputs.clone();
             if let Err(err) = apply_outputs(
@@ -242,6 +250,7 @@ pub fn run() {
                 &chasers_st,
                 &movement_st,
                 &globals_st,
+                &scenes_st,
                 &outputs,
             ) {
                 tracing::warn!(?err, "failed to apply initial outputs");
@@ -299,6 +308,8 @@ pub fn run() {
                             chasers_st.inner().clone(),
                             movement_st.inner().clone(),
                             globals_st.inner().clone(),
+                            scenes_st.inner().clone(),
+                            engine_state.inner().clone(),
                             show_state_st.inner().clone(),
                         );
                         *lp_st.lock() = Some(controller);
@@ -338,6 +349,33 @@ pub fn run() {
                     }
                 })
                 .expect("spawn engine autosave thread");
+
+            // Scene FX consumer: drains the channel that ScenePlayback
+            // pushes to whenever it crosses a step boundary or fires a
+            // release-restore. Living off the output thread keeps the
+            // chaser/movement persist + emit machinery from blocking
+            // DMX frames. Idle until a recall happens; cheap.
+            let (fx_tx, fx_rx) =
+                crossbeam_channel::unbounded::<crate::engine::scene_playback::SceneFxApply>();
+            scene_playback_handle.lock().set_fx_sender(fx_tx);
+            let app_for_fx = app_handle.clone();
+            let show_for_fx = show_state_st.inner().clone();
+            let chasers_for_fx = chasers_st.inner().clone();
+            let movement_for_fx = movement_st.inner().clone();
+            std::thread::Builder::new()
+                .name("dmx-scene-fx".into())
+                .spawn(move || {
+                    for req in fx_rx.iter() {
+                        commands::apply_scene_fx_request(
+                            &app_for_fx,
+                            &show_for_fx,
+                            &chasers_for_fx,
+                            &movement_for_fx,
+                            &req,
+                        );
+                    }
+                })
+                .expect("spawn scene FX consumer thread");
 
             Ok(())
         })
@@ -416,6 +454,20 @@ pub fn run() {
             commands::update_movement,
             commands::delete_movement,
             commands::toggle_movement,
+            // Scenes (Phase 4)
+            commands::list_scenes,
+            commands::create_scene_from_state,
+            commands::add_scene_step,
+            commands::remove_scene_step,
+            commands::update_scene_step_from_state,
+            commands::update_scene,
+            commands::delete_scene,
+            commands::recall_scene,
+            commands::release_scene,
+            commands::active_scene_id,
+            commands::active_scene_step,
+            commands::programmer_status,
+            commands::programmer_clear,
             // Globals (Blackout + Blind)
             commands::get_globals,
             commands::update_globals,

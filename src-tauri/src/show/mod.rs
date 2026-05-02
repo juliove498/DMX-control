@@ -1,6 +1,7 @@
 pub mod file;
 pub mod fixture;
 pub mod library;
+pub mod scene;
 pub mod session;
 pub mod state;
 

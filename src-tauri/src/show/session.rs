@@ -77,7 +77,7 @@ fn read_from(target: &Path) -> Option<(ShowFileV1, Option<PathBuf>)> {
         return None;
     }
     let mut show = blob.show;
-    show.migrate_legacy_movement();
+    show.migrate_legacy();
     Some((show, blob.path))
 }
 

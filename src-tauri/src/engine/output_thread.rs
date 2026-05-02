@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 use crate::chaser::engine::ChaserEngine;
+use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::{merge_overlays, EngineState, EngineStats, DMX_CHANNELS};
 use crate::globals::runtime::GlobalsRuntime;
 use crate::movement::engine::MovementEngine;
@@ -103,12 +104,14 @@ impl Drop for OutputThreadHandle {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn spawn<F>(
     engine: EngineState,
     bindings: SharedBindings,
     chasers: SharedChasers,
     movement: SharedMovement,
     globals: SharedGlobals,
+    scenes: SharedScenePlayback,
     on_stats: F,
 ) -> OutputThreadHandle
 where
@@ -120,6 +123,7 @@ where
     let chasers_thread = chasers.clone();
     let movement_thread = movement.clone();
     let globals_thread = globals.clone();
+    let scenes_thread = scenes.clone();
 
     let join = thread::Builder::new()
         .name("dmx-output".into())
@@ -160,6 +164,18 @@ where
                 }
 
                 let frame_start = Instant::now();
+                // Scene playback runs first because it writes directly
+                // into Universe.data (the base layer). Effects + blind
+                // + master + blackout will compose on top of that.
+                {
+                    let updates = scenes_thread.lock().tick(frame_start);
+                    if !updates.is_empty() {
+                        let mut e = engine.write();
+                        for ((u, ch), v) in updates {
+                            let _ = e.set_channel(u, ch, v);
+                        }
+                    }
+                }
                 // Tick the effect modules + the globals runtime, then push
                 // their outputs into the engine before we snapshot. Each
                 // tick is a few arithmetic ops per slot so locks are
@@ -379,6 +395,7 @@ mod tests {
             shared_chasers(),
             shared_movement(),
             shared_globals(),
+            crate::engine::scene_playback::shared_scene_playback(),
             |_| {},
         );
         thread::sleep(Duration::from_millis(400));
@@ -412,6 +429,7 @@ mod tests {
             shared_chasers(),
             shared_movement(),
             shared_globals(),
+            crate::engine::scene_playback::shared_scene_playback(),
             |_| {},
         );
 

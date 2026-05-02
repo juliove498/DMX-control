@@ -36,6 +36,8 @@ use tauri::AppHandle;
 use crate::chaser::runtime::SlotOutput;
 use crate::chaser::Rgb;
 use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
+use crate::engine::scene_playback::SharedScenePlayback;
+use crate::engine::EngineState;
 use crate::midi::hub::SharedMidi;
 use crate::midi::MidiMessage;
 use crate::show::ShowState;
@@ -45,6 +47,10 @@ pub const CHASER_PAD_NOTES: [u8; 8] = [11, 12, 13, 14, 15, 16, 17, 18];
 
 /// MK2 row-2 pad notes. Each maps to a movement generator slot.
 pub const MOVEMENT_PAD_NOTES: [u8; 8] = [21, 22, 23, 24, 25, 26, 27, 28];
+
+/// MK2 row-3 pad notes. Each maps to one of the first 8 scenes; press
+/// triggers a recall with the scene's recorded fade time.
+pub const SCENE_PAD_NOTES: [u8; 8] = [31, 32, 33, 34, 35, 36, 37, 38];
 
 /// Top row of round buttons (CC numbers, not notes). The MK2 lays them
 /// out as Up, Down, Left, Right, Session, User1, User2, Mixer. We treat
@@ -96,6 +102,20 @@ const MOVEMENT_PAD_PALETTE: [(u8, u8); 8] = [
     (100, 99), // periwinkle
 ];
 
+/// Yet another distinct palette for scene pads — using the cool side of
+/// the wheel (blues, violets, teals, whites) so chasers/movements/
+/// scenes are all visually separable.
+const SCENE_PAD_PALETTE: [(u8, u8); 8] = [
+    (1, 3),     // white
+    (43, 41),   // light blue
+    (47, 45),   // blue
+    (78, 79),   // sea-green
+    (44, 117),  // pale teal
+    (115, 116), // pastel rose
+    (113, 114), // pastel violet
+    (60, 61),   // mint
+];
+
 const BLACKOUT_PALETTE: (u8, u8) = (7, 5); // dim red / bright red
 const BLIND_PALETTE: (u8, u8) = (1, 3); // dim white / bright white
 
@@ -126,6 +146,7 @@ struct TopRowRgb {
 struct LedTargets {
     chasers: [PadState; 8],
     movements: [PadState; 8],
+    scenes: [PadState; 8],
     /// Top row of round buttons. Each entry is the live RGB the matching
     /// chaser slot is being driven to right now (after intensity scaling).
     /// All zeros means dark — either no chaser is enabled or that slot is
@@ -140,6 +161,7 @@ impl LedTargets {
         Self {
             chasers: [PadState::Empty; 8],
             movements: [PadState::Empty; 8],
+            scenes: [PadState::Empty; 8],
             top_row: [TopRowRgb::default(); 8],
             blackout: PadState::Empty,
             blind: PadState::Empty,
@@ -165,6 +187,8 @@ struct LpHandles {
     chasers: SharedChasers,
     movement: SharedMovement,
     globals: SharedGlobals,
+    scenes: SharedScenePlayback,
+    engine: EngineState,
     show: ShowState,
     blind_held: Arc<AtomicBool>,
 }
@@ -205,12 +229,15 @@ pub fn is_launchpad(name: &str) -> bool {
 /// Install the input router and start the LED feedback thread. Returns
 /// the controller; store it so [`LaunchpadController::shutdown`] can be
 /// called on disconnect.
+#[allow(clippy::too_many_arguments)]
 pub fn start(
     app: AppHandle,
     midi: SharedMidi,
     chasers: SharedChasers,
     movement: SharedMovement,
     globals: SharedGlobals,
+    scenes: SharedScenePlayback,
+    engine: EngineState,
     show: ShowState,
 ) -> LaunchpadController {
     let blind_held = Arc::new(AtomicBool::new(false));
@@ -220,6 +247,8 @@ pub fn start(
         chasers,
         movement,
         globals: globals.clone(),
+        scenes,
+        engine,
         show,
         blind_held: blind_held.clone(),
     };
@@ -308,6 +337,11 @@ fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
 
     if let Some(pad_idx) = MOVEMENT_PAD_NOTES.iter().position(|&n| n == note) {
         handle_movement_press(pad_idx, handles);
+        return;
+    }
+
+    if let Some(pad_idx) = SCENE_PAD_NOTES.iter().position(|&n| n == note) {
+        handle_scene_press(pad_idx, handles);
     }
 }
 
@@ -354,14 +388,20 @@ fn bump_active_chaser_bpm(handles: &LpHandles, delta_bpm: f32) {
 fn compute_targets(handles: &LpHandles) -> LedTargets {
     let mut out = LedTargets::empty();
 
-    let (chasers_snapshot, movements_snapshot, blackout_active) = {
+    let (chasers_snapshot, movements_snapshot, scenes_snapshot, blackout_active) = {
         let s = handles.show.read();
         (
             s.show.chasers.clone(),
             s.show.movements.clone(),
+            s.show.scenes.clone(),
             s.show.globals.blackout.active,
         )
     };
+    let active_scene_id = handles
+        .scenes
+        .lock()
+        .active_scene_id()
+        .map(|s| s.to_string());
 
     // Chasers --------------------------------------------------------------
     for (i, ch) in chasers_snapshot.iter().take(8).enumerate() {
@@ -388,6 +428,16 @@ fn compute_targets(handles: &LpHandles) -> LedTargets {
     for (i, m) in movements_snapshot.iter().take(8).enumerate() {
         let (dim, bright) = MOVEMENT_PAD_PALETTE[i];
         out.movements[i] = if m.enabled {
+            PadState::OnFlash { dim, bright }
+        } else {
+            PadState::OffDim(dim)
+        };
+    }
+
+    // Scenes (row 3) -------------------------------------------------------
+    for (i, scene) in scenes_snapshot.iter().take(8).enumerate() {
+        let (dim, bright) = SCENE_PAD_PALETTE[i];
+        out.scenes[i] = if active_scene_id.as_deref() == Some(scene.id.as_str()) {
             PadState::OnFlash { dim, bright }
         } else {
             PadState::OffDim(dim)
@@ -426,6 +476,9 @@ fn diff_and_push(midi: &SharedMidi, last: &LedTargets, target: &LedTargets) {
         }
         if target.movements[i] != last.movements[i] {
             push_pad(midi, MOVEMENT_PAD_NOTES[i], target.movements[i]);
+        }
+        if target.scenes[i] != last.scenes[i] {
+            push_pad(midi, SCENE_PAD_NOTES[i], target.scenes[i]);
         }
         if target.top_row[i] != last.top_row[i] {
             push_top_rgb(midi, TOP_ROW_CCS[i], target.top_row[i]);
@@ -487,6 +540,7 @@ fn push_all(midi: &SharedMidi, target: &LedTargets) {
     for i in 0..8 {
         push_pad(midi, CHASER_PAD_NOTES[i], target.chasers[i]);
         push_pad(midi, MOVEMENT_PAD_NOTES[i], target.movements[i]);
+        push_pad(midi, SCENE_PAD_NOTES[i], target.scenes[i]);
         push_top_rgb(midi, TOP_ROW_CCS[i], target.top_row[i]);
     }
     push_pad(midi, BLACKOUT_NOTE, target.blackout);
@@ -499,6 +553,9 @@ fn clear_all_pads(midi: &SharedMidi) {
         let _ = hub.send_raw(&[0x90, n, 0]);
     }
     for &n in &MOVEMENT_PAD_NOTES {
+        let _ = hub.send_raw(&[0x90, n, 0]);
+    }
+    for &n in &SCENE_PAD_NOTES {
         let _ = hub.send_raw(&[0x90, n, 0]);
     }
     for &cc in &TOP_ROW_CCS {
@@ -555,6 +612,48 @@ fn handle_chaser_press(pad_idx: usize, handles: &LpHandles) {
     }
 }
 
+/// Toggle the n-th scene from the show: pressing the pad of the
+/// currently-active scene **releases** it (restoring the pre-recall FX
+/// context); pressing any other scene's pad recalls it. Routes through
+/// `recall_scene_impl` so the launchpad respects the same multi-step
+/// playback + FX capture activation as the UI's GO button.
+fn handle_scene_press(pad_idx: usize, handles: &LpHandles) {
+    let scene_id = {
+        let s = handles.show.read();
+        s.show.scenes.get(pad_idx).map(|c| c.id.clone())
+    };
+    let Some(scene_id) = scene_id else {
+        return;
+    };
+    // Snapshot the currently-active scene id and drop the lock before
+    // calling release/recall — both internally take the same lock.
+    let active_id = handles
+        .scenes
+        .lock()
+        .active_scene_id()
+        .map(|s| s.to_string());
+    if active_id.as_deref() == Some(scene_id.as_str()) {
+        // Same scene that's already playing → toggle off. release()
+        // also fires the pre-recall FX restoration request through the
+        // playback's channel, so chasers/movements come back to the
+        // pre-recall state.
+        handles.scenes.lock().release(std::time::Instant::now());
+        tracing::info!(scene = %scene_id, "launchpad released active scene");
+        return;
+    }
+    if let Err(err) = crate::commands::recall_scene_impl(
+        &handles.app,
+        &handles.engine,
+        &handles.show,
+        &handles.chasers,
+        &handles.movement,
+        &handles.scenes,
+        &scene_id,
+    ) {
+        tracing::warn!(?err, "launchpad scene recall failed");
+    }
+}
+
 fn handle_movement_press(pad_idx: usize, handles: &LpHandles) {
     let target = {
         let s = handles.show.read();
@@ -587,14 +686,25 @@ mod tests {
         // pad — guard the table size matches the note row.
         assert_eq!(CHASER_PAD_NOTES.len(), 8);
         assert_eq!(CHASER_PAD_PALETTE.len(), 8);
+        assert_eq!(MOVEMENT_PAD_NOTES.len(), 8);
+        assert_eq!(MOVEMENT_PAD_PALETTE.len(), 8);
+        assert_eq!(SCENE_PAD_NOTES.len(), 8);
+        assert_eq!(SCENE_PAD_PALETTE.len(), 8);
     }
 
     #[test]
-    fn scene_button_notes_are_distinct_from_chaser_pads() {
-        // Catch a layout drift before it fights for the same note.
-        assert!(!CHASER_PAD_NOTES.contains(&BLACKOUT_NOTE));
-        assert!(!CHASER_PAD_NOTES.contains(&BLIND_NOTE));
-        assert_ne!(BLACKOUT_NOTE, BLIND_NOTE);
+    fn pad_layout_is_disjoint() {
+        // Catch a layout drift before two different roles fight for
+        // the same note. Scene buttons + chaser/movement pads + the
+        // two scene-column notes should all be distinct.
+        let mut all = Vec::new();
+        all.extend_from_slice(&CHASER_PAD_NOTES);
+        all.extend_from_slice(&MOVEMENT_PAD_NOTES);
+        all.extend_from_slice(&SCENE_PAD_NOTES);
+        all.push(BLACKOUT_NOTE);
+        all.push(BLIND_NOTE);
+        let unique: std::collections::HashSet<_> = all.iter().copied().collect();
+        assert_eq!(all.len(), unique.len(), "duplicate pad note in layout");
     }
 
     #[test]

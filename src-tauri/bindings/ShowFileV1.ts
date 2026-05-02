@@ -5,6 +5,7 @@ import type { FixtureInstance } from "./FixtureInstance";
 import type { GlobalsConfig } from "./GlobalsConfig";
 import type { MovementGenerator } from "./MovementGenerator";
 import type { OutputsConfig } from "./OutputsConfig";
+import type { Scene } from "./Scene";
 
 export type ShowFileV1 = { 
 /**
@@ -35,6 +36,12 @@ movements: Array<MovementGenerator>,
  * times and blinder fixture list survive a restart.
  */
 globals: GlobalsConfig, 
+/**
+ * Recorded scenes — Phase 4 MVP. Each entry is a per-fixture
+ * per-channel snapshot the operator can recall with a fade. No
+ * cuelist sequencing yet; that's Phase 5.
+ */
+scenes: Array<Scene>, 
 /**
  * Snapshot of the fixture definitions referenced by this show.
  * Saved alongside `fixtures` so a `.json` is portable across

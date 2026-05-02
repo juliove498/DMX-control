@@ -6,6 +6,7 @@ import type { GlobalsConfig } from "@bindings/GlobalsConfig";
 import type { MovementGenerator } from "@bindings/MovementGenerator";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { PatchReport } from "@bindings/PatchReport";
+import type { Scene } from "@bindings/Scene";
 import type { SerialPortInfo } from "@bindings/SerialPortInfo";
 import type { ShowFileV1 } from "@bindings/ShowFileV1";
 import { invoke } from "@tauri-apps/api/core";
@@ -53,6 +54,36 @@ interface ShowStoreState {
   updateMovement: (gen: MovementGenerator) => Promise<void>;
   deleteMovement: (id: string) => Promise<void>;
   toggleMovement: (id: string, enabled: boolean) => Promise<void>;
+
+  createSceneFromState: (
+    name: string,
+    fixtureIds: string[],
+    fadeInMs: number,
+    restrictToTouched: boolean,
+    captureChaser: boolean,
+    captureMovement: boolean,
+  ) => Promise<Scene>;
+  addSceneStep: (
+    sceneId: string,
+    fixtureIds: string[],
+    fadeInMs: number,
+    holdMs: number,
+    restrictToTouched: boolean,
+  ) => Promise<Scene>;
+  removeSceneStep: (sceneId: string, stepId: string) => Promise<Scene>;
+  updateSceneStepFromState: (
+    sceneId: string,
+    stepId: string,
+    restrictToTouched: boolean,
+  ) => Promise<Scene>;
+  updateScene: (scene: Scene) => Promise<void>;
+  deleteScene: (id: string) => Promise<void>;
+  recallScene: (id: string) => Promise<void>;
+  releaseScene: () => Promise<void>;
+  activeSceneId: () => Promise<string | null>;
+  activeSceneStep: () => Promise<number | null>;
+  programmerStatus: () => Promise<{ touched: string[] }>;
+  programmerClear: () => Promise<void>;
 
   setBlackout: (active: boolean) => Promise<void>;
   setBlind: (pressed: boolean) => Promise<void>;
@@ -244,6 +275,88 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   async toggleMovement(id, enabled) {
     await invoke("toggle_movement", { id, enabled });
     await get().refresh();
+  },
+
+  async createSceneFromState(
+    name,
+    fixtureIds,
+    fadeInMs,
+    restrictToTouched,
+    captureChaser,
+    captureMovement,
+  ) {
+    const s = await invoke<Scene>("create_scene_from_state", {
+      name,
+      fixtureIds,
+      fadeInMs,
+      restrictToTouched,
+      captureChaser,
+      captureMovement,
+    });
+    await get().refresh();
+    return s;
+  },
+
+  async addSceneStep(sceneId, fixtureIds, fadeInMs, holdMs, restrictToTouched) {
+    const s = await invoke<Scene>("add_scene_step", {
+      sceneId,
+      fixtureIds,
+      fadeInMs,
+      holdMs,
+      restrictToTouched,
+    });
+    await get().refresh();
+    return s;
+  },
+
+  async removeSceneStep(sceneId, stepId) {
+    const s = await invoke<Scene>("remove_scene_step", { sceneId, stepId });
+    await get().refresh();
+    return s;
+  },
+
+  async updateSceneStepFromState(sceneId, stepId, restrictToTouched) {
+    const s = await invoke<Scene>("update_scene_step_from_state", {
+      sceneId,
+      stepId,
+      restrictToTouched,
+    });
+    await get().refresh();
+    return s;
+  },
+
+  async updateScene(scene) {
+    await invoke("update_scene", { scene });
+    await get().refresh();
+  },
+
+  async programmerStatus() {
+    return invoke<{ touched: string[] }>("programmer_status");
+  },
+
+  async programmerClear() {
+    await invoke("programmer_clear");
+  },
+
+  async deleteScene(id) {
+    await invoke("delete_scene", { id });
+    await get().refresh();
+  },
+
+  async recallScene(id) {
+    await invoke("recall_scene", { id });
+  },
+
+  async releaseScene() {
+    await invoke("release_scene");
+  },
+
+  async activeSceneId() {
+    return invoke<string | null>("active_scene_id");
+  },
+
+  async activeSceneStep() {
+    return invoke<number | null>("active_scene_step");
   },
 
   async setBlackout(active) {

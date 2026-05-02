@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::fixture::{FixtureDefinition, FixtureInstance};
+use super::scene::Scene;
 use crate::chaser::AmbientChaser;
 use crate::globals::GlobalsConfig;
 use crate::movement::MovementGenerator;
@@ -43,6 +44,11 @@ pub struct ShowFileV1 {
     /// times and blinder fixture list survive a restart.
     #[serde(default)]
     pub globals: GlobalsConfig,
+    /// Recorded scenes — Phase 4 MVP. Each entry is a per-fixture
+    /// per-channel snapshot the operator can recall with a fade. No
+    /// cuelist sequencing yet; that's Phase 5.
+    #[serde(default)]
+    pub scenes: Vec<Scene>,
     /// Snapshot of the fixture definitions referenced by this show.
     /// Saved alongside `fixtures` so a `.json` is portable across
     /// machines: open the file on a fresh install and the rig appears
@@ -66,12 +72,23 @@ impl Default for ShowFileV1 {
             movement: None,
             movements: Vec::new(),
             globals: GlobalsConfig::default(),
+            scenes: Vec::new(),
             library: Vec::new(),
         }
     }
 }
 
 impl ShowFileV1 {
+    /// Run every per-field migration in one go. The loader calls this
+    /// on every show that lands from disk so old saves work without a
+    /// schema bump.
+    pub fn migrate_legacy(&mut self) {
+        self.migrate_legacy_movement();
+        for scene in &mut self.scenes {
+            scene.migrate_legacy();
+        }
+    }
+
     /// Lift the legacy single `movement` field into `movements[0]` and
     /// clear it. Idempotent: a no-op when `movement` is `None`. Called
     /// from every load path so old show files come through with the
@@ -102,7 +119,7 @@ pub fn load(path: &Path) -> Result<ShowFileV1, ShowError> {
     if show.version != SHOW_FILE_VERSION {
         return Err(ShowError::UnsupportedVersion(show.version));
     }
-    show.migrate_legacy_movement();
+    show.migrate_legacy();
     Ok(show)
 }
 

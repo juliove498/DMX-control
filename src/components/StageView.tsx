@@ -132,6 +132,70 @@ function findRoleIndex(channels: { role: unknown }[], role: string): number {
   return channels.findIndex((c) => c.role === role);
 }
 
+/// Hex tones for the most common color-wheel labels we see in
+/// Freestyler-imported profiles. Lookup is normalised: lowercased,
+/// whitespace-trimmed, "color " prefix stripped, then we try an exact
+/// match first and fall back to substring containment so labels like
+/// "Pale Yellow" still resolve to the yellow tone. Returns `null` for
+/// labels we don't recognise — the caller falls back to a grey ramp.
+const WHEEL_COLOR_MAP: Record<string, string> = {
+  white: "#ffffff",
+  open: "#ffffff",
+  none: "#ffffff",
+  off: "#000000",
+  black: "#000000",
+  red: "#ff2020",
+  yellow: "#ffe000",
+  green: "#20ff20",
+  cyan: "#20ffff",
+  blue: "#2060ff",
+  magenta: "#ff20ff",
+  purple: "#a040ff",
+  violet: "#9040ff",
+  pink: "#ff80c0",
+  orange: "#ff8020",
+  amber: "#ffaa00",
+  uv: "#8040ff",
+  lime: "#a0ff20",
+  teal: "#20a0a0",
+};
+
+function normalizeWheelLabel(label: string): string {
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/^color\s+/, "");
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const s = hex.replace("#", "");
+  return {
+    r: Number.parseInt(s.slice(0, 2), 16),
+    g: Number.parseInt(s.slice(2, 4), 16),
+    b: Number.parseInt(s.slice(4, 6), 16),
+  };
+}
+
+type ChannelLike = {
+  ranges?: { from: number; to: number; label: string }[] | null;
+};
+
+function wheelColorAt(
+  channel: ChannelLike,
+  dmxValue: number,
+): { r: number; g: number; b: number } | null {
+  const ranges = channel.ranges ?? [];
+  const range = ranges.find((r) => dmxValue >= r.from && dmxValue <= r.to);
+  if (!range) return null;
+  const norm = normalizeWheelLabel(range.label);
+  const direct = WHEEL_COLOR_MAP[norm];
+  if (direct) return hexToRgb(direct);
+  for (const [key, color] of Object.entries(WHEEL_COLOR_MAP)) {
+    if (norm.includes(key)) return hexToRgb(color);
+  }
+  return null;
+}
+
 /// Display name for a `ChannelRole`. Standard variants come through as
 /// snake_case strings ("red", "pan_fine", …) and pass through as-is.
 /// Custom roles arrive as `{ other: "function_speed" }` and we surface the
@@ -747,17 +811,80 @@ function clampSideWidth(n: number): number {
 /// Quick-toggle dashboard for FX layers. Always visible at the bottom of
 /// the Stage so the operator can flip chasers / the movement generator
 /// on/off without leaving the canvas.
-function StageFxBar() {
+function StageFxBar({
+  scenePopupOpen,
+  onToggleScenePopup,
+  activeSceneId,
+  activeStepIdx,
+}: {
+  scenePopupOpen: boolean;
+  onToggleScenePopup: () => void;
+  activeSceneId: string | null;
+  activeStepIdx: number | null;
+}) {
   const show = useShowStore((s) => s.show);
   const toggleChaser = useShowStore((s) => s.toggleChaser);
   const toggleMovement = useShowStore((s) => s.toggleMovement);
+  const recallScene = useShowStore((s) => s.recallScene);
+  const releaseScene = useShowStore((s) => s.releaseScene);
   const chasers = show?.chasers ?? [];
   const movements = show?.movements ?? [];
+  const scenes = show?.scenes ?? [];
+  const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null;
+  const activeStepLabel = (() => {
+    if (!activeScene || activeStepIdx === null) return null;
+    const step = activeScene.steps[activeStepIdx];
+    if (!step) return `paso ${activeStepIdx + 1}`;
+    return step.name && step.name.trim() !== ""
+      ? `${step.name}`
+      : `paso ${activeStepIdx + 1}/${activeScene.steps.length}`;
+  })();
 
-  if (chasers.length === 0 && movements.length === 0) return null;
+  if (chasers.length === 0 && movements.length === 0 && scenes.length === 0) return null;
 
   return (
     <footer className="stage-fx-bar" aria-label="Active effects">
+      {scenes.length > 0 ? (
+        <div className="stage-fx-section stage-fx-scenes">
+          <span className="stage-fx-label">Escenas</span>
+          {activeScene ? (
+            <button
+              type="button"
+              className="stage-fx-toggle scene-active on"
+              onClick={() => releaseScene()}
+              title="Liberar — la rig queda en su estado actual"
+            >
+              <span className="stage-fx-led active-pulse" aria-hidden="true" />
+              <span className="stage-fx-name">{activeScene.name}</span>
+              {activeStepLabel ? <span className="stage-fx-meta">{activeStepLabel}</span> : null}
+            </button>
+          ) : (
+            <span className="stage-fx-idle-hint">— sin escena activa</span>
+          )}
+          <button
+            type="button"
+            className={`stage-fx-scenes-btn${scenePopupOpen ? " open" : ""}`}
+            onClick={onToggleScenePopup}
+            title={scenePopupOpen ? "Cerrar panel de escenas" : "Abrir panel de escenas"}
+          >
+            {scenePopupOpen ? "Cerrar" : "Escenas…"}
+          </button>
+          {scenes.slice(0, 6).map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              className={`stage-fx-scene-pill${s.id === activeSceneId ? " active" : ""}`}
+              onClick={() => recallScene(s.id)}
+              title={`▶ ${s.name} (${s.steps.length} step${s.steps.length === 1 ? "" : "s"})`}
+            >
+              ▶ {s.name}
+            </button>
+          ))}
+          {scenes.length > 6 ? (
+            <span className="stage-fx-meta">+{scenes.length - 6} más</span>
+          ) : null}
+        </div>
+      ) : null}
       {movements.length > 0 ? (
         <div className="stage-fx-section">
           <span className="stage-fx-label">Movements</span>
@@ -843,6 +970,446 @@ function StageFxBar() {
 
 type Marquee = { x0: number; y0: number; x1: number; y1: number };
 type ContextMenuState = { x: number; y: number; fixtureId: string };
+
+function stringifyError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null && "message" in e) {
+    return String((e as { message: unknown }).message);
+  }
+  return JSON.stringify(e);
+}
+
+/// Floating overlay panel for quick scene work without leaving Stage.
+///
+/// Lists every scene with a ▶ GO button (active one highlighted), then
+/// for the *currently active* scene shows its step list with per-step
+/// fade/hold edits and a one-click "⟳ overwrite from current state"
+/// per step plus a "+ New step from current" footer. The whole thing
+/// is draggable from its title bar so the operator can park it where
+/// it doesn't cover the fixtures they're tuning.
+function SceneQuickPanel({
+  activeSceneId,
+  activeStepIdx,
+  onClose,
+}: {
+  activeSceneId: string | null;
+  activeStepIdx: number | null;
+  onClose: () => void;
+}) {
+  const show = useShowStore((s) => s.show);
+  const recallScene = useShowStore((s) => s.recallScene);
+  const releaseScene = useShowStore((s) => s.releaseScene);
+  const createScene = useShowStore((s) => s.createSceneFromState);
+  const addStep = useShowStore((s) => s.addSceneStep);
+  const updateStepFromState = useShowStore((s) => s.updateSceneStepFromState);
+  const removeStep = useShowStore((s) => s.removeSceneStep);
+  const updateScene = useShowStore((s) => s.updateScene);
+  const programmerStatus = useShowStore((s) => s.programmerStatus);
+  const programmerClear = useShowStore((s) => s.programmerClear);
+
+  const [touched, setTouched] = useState<string[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  // Step capture form state. Sticky across re-records so the operator
+  // can hammer "+ Add" with the same fade/hold while building a chase.
+  const [fade, setFade] = useState(800);
+  const [hold, setHold] = useState(1500);
+  const [touchedOnly, setTouchedOnly] = useState(false);
+
+  // Which scene is currently being *edited* in the panel — distinct
+  // from the *active* (playing) scene. The panel originally only
+  // surfaced the active scene's steps, but the natural workflow is the
+  // opposite: stop the scene first, then edit its steps. Once the
+  // operator manually picks a scene, we stop following the active id
+  // and stay on their selection until they pick another one.
+  const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
+  const [manualSelection, setManualSelection] = useState(false);
+
+  // Drag-to-position. Default sits in the bottom-right of the canvas
+  // so it doesn't cover the typical "first row of fixtures" zone.
+  const [pos, setPos] = useState<{ x: number; y: number }>(() => {
+    if (typeof window === "undefined") return { x: 80, y: 80 };
+    return { x: Math.max(40, window.innerWidth - 460), y: 120 };
+  });
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  // Auto-follow: while the operator hasn't picked a scene manually,
+  // the panel mirrors whatever's active so opening it on a running
+  // show "just shows the right thing". On a stopped show with no
+  // active scene, it falls back to the first scene in the list. Once
+  // the operator clicks a row, `manualSelection` flips and we stop
+  // following — they keep editing what they picked even if a different
+  // scene starts playing.
+  useEffect(() => {
+    if (manualSelection) return;
+    const list = (show?.scenes ?? []).map((s) => s.id);
+    if (activeSceneId && list.includes(activeSceneId)) {
+      setSelectedSceneId(activeSceneId);
+    } else if (list.length > 0) {
+      setSelectedSceneId(list[0]);
+    } else {
+      setSelectedSceneId(null);
+    }
+  }, [activeSceneId, manualSelection, show?.scenes]);
+
+  // If the user's manual selection got deleted from elsewhere, drop
+  // the manual flag so we resume auto-follow on the next render.
+  useEffect(() => {
+    if (!manualSelection) return;
+    const list = (show?.scenes ?? []).map((s) => s.id);
+    if (selectedSceneId && !list.includes(selectedSceneId)) {
+      setManualSelection(false);
+      setSelectedSceneId(null);
+    }
+  }, [selectedSceneId, manualSelection, show?.scenes]);
+
+  // Poll the programmer's touched set so the "Touched only" toggle has
+  // a live count and the row chips highlight what's about to be
+  // captured.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      programmerStatus()
+        .then((s) => {
+          if (!cancelled) setTouched(s.touched);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [programmerStatus]);
+
+  // Escape to close keeps the panel out of the operator's way during
+  // sound check; matches the context-menu and rename-input behaviour.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const onTitlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    const onMove = (ev: PointerEvent) => {
+      if (!dragRef.current) return;
+      const W = 420;
+      const H = 480;
+      const nx = Math.max(0, Math.min(window.innerWidth - W, ev.clientX - dragRef.current.dx));
+      const ny = Math.max(0, Math.min(window.innerHeight - H, ev.clientY - dragRef.current.dy));
+      setPos({ x: nx, y: ny });
+    };
+    const onUp = () => {
+      dragRef.current = null;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  };
+
+  if (!show) return null;
+  const scenes = show.scenes ?? [];
+  const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null;
+  const selectedScene = scenes.find((s) => s.id === selectedSceneId) ?? null;
+  const isSelectedActive = !!selectedScene && selectedScene.id === activeSceneId;
+
+  const onAddStep = async () => {
+    setError(null);
+    if (!selectedScene) {
+      // Quick-record a new scene (with one initial step) when none is
+      // active. Default to capturing FX state — that's the operator's
+      // expectation when "I want to save this look" includes whatever
+      // chasers/movements were running.
+      try {
+        const s = await createScene("", [], fade, touchedOnly, true, true);
+        await recallScene(s.id);
+      } catch (e) {
+        setError(`No se pudo grabar: ${stringifyError(e)}`);
+      }
+      return;
+    }
+    if (touchedOnly && touched.length === 0) {
+      setError("No hay fixtures tocados; movés un slider para marcarlos.");
+      return;
+    }
+    try {
+      await addStep(selectedScene.id, [], fade, hold, touchedOnly);
+    } catch (e) {
+      setError(`No se pudo agregar el step: ${stringifyError(e)}`);
+    }
+  };
+
+  const onCreateNew = async () => {
+    setError(null);
+    try {
+      const s = await createScene("", [], fade, touchedOnly, true, true);
+      await recallScene(s.id);
+    } catch (e) {
+      setError(`No se pudo crear: ${stringifyError(e)}`);
+    }
+  };
+
+  return (
+    <div
+      className="scene-quick-panel"
+      style={{ left: pos.x, top: pos.y }}
+      aria-label="Panel de escenas"
+    >
+      <div className="sqp-title" onPointerDown={onTitlePointerDown}>
+        <span className="sqp-grip" aria-hidden="true">
+          ⠿
+        </span>
+        <strong>Escenas</strong>
+        <span className="sqp-meta">
+          {scenes.length} · {touched.length} touched
+        </span>
+        <button type="button" className="sqp-close" onClick={onClose} aria-label="Cerrar">
+          ×
+        </button>
+      </div>
+
+      {error ? (
+        <output className="sqp-error" aria-live="polite">
+          {error}
+        </output>
+      ) : null}
+
+      <div className="sqp-section">
+        <div className="sqp-section-head">
+          <span>Lista</span>
+          <button type="button" className="sqp-btn primary" onClick={onCreateNew}>
+            + Nueva
+          </button>
+        </div>
+        {scenes.length === 0 ? (
+          <p className="sqp-empty">
+            Sin escenas. Armá un look y tocá <strong>+ Nueva</strong> para grabarlo.
+          </p>
+        ) : (
+          <ul className="sqp-scene-list">
+            {scenes.map((s) => {
+              const isSel = s.id === selectedSceneId;
+              const isAct = s.id === activeSceneId;
+              return (
+                <li
+                  key={s.id}
+                  className={`sqp-scene-row${isAct ? " active" : ""}${isSel ? " selected" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="sqp-go"
+                    onClick={() => recallScene(s.id)}
+                    title={`Recall (${s.steps.length} step${s.steps.length === 1 ? "" : "s"})`}
+                  >
+                    ▶
+                  </button>
+                  <button
+                    type="button"
+                    className="sqp-scene-body"
+                    onClick={() => {
+                      setSelectedSceneId(s.id);
+                      setManualSelection(true);
+                    }}
+                    title="Editar steps de esta escena"
+                  >
+                    <span className="sqp-scene-name">{s.name}</span>
+                    <span className="sqp-scene-meta">
+                      {s.steps.length} step{s.steps.length === 1 ? "" : "s"}
+                      {isAct ? " · live" : ""}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+        {activeScene ? (
+          <button type="button" className="sqp-btn ghost full" onClick={() => releaseScene()}>
+            Liberar escena activa
+          </button>
+        ) : null}
+      </div>
+
+      {selectedScene ? (
+        <div className="sqp-section">
+          <div className="sqp-section-head">
+            <span>
+              Steps de <strong>{selectedScene.name}</strong>
+              {isSelectedActive ? (
+                <span className="sqp-section-tag live">EN VIVO</span>
+              ) : (
+                <span className="sqp-section-tag">FRENADA</span>
+              )}
+            </span>
+            {manualSelection && !isSelectedActive ? (
+              <button
+                type="button"
+                className="sqp-mini"
+                onClick={() => setManualSelection(false)}
+                title="Volver a seguir la escena activa"
+              >
+                Seguir activa
+              </button>
+            ) : null}
+          </div>
+          <ul className="sqp-step-list">
+            {selectedScene.steps.map((step, i) => (
+              <li
+                key={step.id}
+                className={`sqp-step-row${isSelectedActive && i === activeStepIdx ? " live" : ""}`}
+              >
+                <span className="sqp-step-num">{i + 1}</span>
+                <input
+                  className="sqp-step-name"
+                  placeholder={`Step ${i + 1}`}
+                  defaultValue={step.name ?? ""}
+                  onBlur={(e) => {
+                    const next = e.currentTarget.value.trim();
+                    if ((step.name ?? "") === next) return;
+                    updateScene({
+                      ...selectedScene,
+                      steps: selectedScene.steps.map((st, j) =>
+                        j === i ? { ...st, name: next || null } : st,
+                      ),
+                    });
+                  }}
+                />
+                <input
+                  className="sqp-step-time"
+                  type="number"
+                  min={0}
+                  step={50}
+                  defaultValue={step.fade_in_ms}
+                  onBlur={(e) => {
+                    const v = Math.max(0, Number(e.currentTarget.value));
+                    if (v === step.fade_in_ms) return;
+                    updateScene({
+                      ...selectedScene,
+                      steps: selectedScene.steps.map((st, j) =>
+                        j === i ? { ...st, fade_in_ms: v } : st,
+                      ),
+                    });
+                  }}
+                  title="Fade in (ms)"
+                />
+                <input
+                  className="sqp-step-time"
+                  type="number"
+                  min={0}
+                  step={50}
+                  defaultValue={step.hold_ms}
+                  onBlur={(e) => {
+                    const v = Math.max(0, Number(e.currentTarget.value));
+                    if (v === step.hold_ms) return;
+                    updateScene({
+                      ...selectedScene,
+                      steps: selectedScene.steps.map((st, j) =>
+                        j === i ? { ...st, hold_ms: v } : st,
+                      ),
+                    });
+                  }}
+                  title="Hold (ms)"
+                />
+                <button
+                  type="button"
+                  className="sqp-mini"
+                  onClick={() => updateStepFromState(selectedScene.id, step.id, false)}
+                  title="Sobreescribir este step con el estado actual del rig"
+                >
+                  ⟳
+                </button>
+                <button
+                  type="button"
+                  className="sqp-mini touched"
+                  onClick={() => updateStepFromState(selectedScene.id, step.id, true)}
+                  disabled={touched.length === 0}
+                  title="Sobreescribir solo los fixtures touched"
+                >
+                  ⟳T
+                </button>
+                <button
+                  type="button"
+                  className="sqp-mini danger"
+                  onClick={() => removeStep(selectedScene.id, step.id)}
+                  disabled={selectedScene.steps.length <= 1}
+                  title={
+                    selectedScene.steps.length <= 1
+                      ? "No se puede eliminar el único step"
+                      : "Eliminar step"
+                  }
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
+      <div className="sqp-section sqp-record">
+        <div className="sqp-section-head">
+          <span>
+            {selectedScene ? `Agregar step a "${selectedScene.name}"` : "Grabar nueva escena"}
+          </span>
+        </div>
+        <div className="sqp-record-row">
+          <label>
+            Fade
+            <input
+              type="number"
+              min={0}
+              step={50}
+              value={fade}
+              onChange={(e) => setFade(Math.max(0, Number(e.currentTarget.value)))}
+            />
+            ms
+          </label>
+          <label>
+            Hold
+            <input
+              type="number"
+              min={0}
+              step={50}
+              value={hold}
+              onChange={(e) => setHold(Math.max(0, Number(e.currentTarget.value)))}
+            />
+            ms
+          </label>
+          <label className="sqp-touched-toggle">
+            <input
+              type="checkbox"
+              checked={touchedOnly}
+              onChange={(e) => setTouchedOnly(e.currentTarget.checked)}
+            />
+            Solo touched ({touched.length})
+          </label>
+        </div>
+        <div className="sqp-record-actions">
+          <button
+            type="button"
+            className="sqp-btn primary"
+            onClick={onAddStep}
+            disabled={touchedOnly && touched.length === 0}
+          >
+            {selectedScene ? "+ Add step" : "● Record"}
+          </button>
+          {touched.length > 0 ? (
+            <button type="button" className="sqp-btn ghost" onClick={() => programmerClear()}>
+              Clear PROG
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /// Right-click menu for one or more fixtures. Closes on outside click and
 /// on Escape — both handled via window listeners installed while it's
@@ -944,6 +1511,37 @@ export function StageView() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+
+  // Floating scene panel: opt-in overlay over Stage so the operator can
+  // record / overwrite steps without context-switching to the Scenes
+  // tab. State lives here so the FX bar button can toggle it and the
+  // panel itself can close on Escape.
+  const [scenePopupOpen, setScenePopupOpen] = useState(false);
+  const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
+  const [activeStepIdx, setActiveStepIdx] = useState<number | null>(null);
+  const activeSceneIdQuery = useShowStore((s) => s.activeSceneId);
+  const activeSceneStepQuery = useShowStore((s) => s.activeSceneStep);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      activeSceneIdQuery()
+        .then((id) => {
+          if (!cancelled) setActiveSceneId(id ?? null);
+        })
+        .catch(() => {});
+      activeSceneStepQuery()
+        .then((idx) => {
+          if (!cancelled) setActiveStepIdx(idx ?? null);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const interval = window.setInterval(tick, 200);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeSceneIdQuery, activeSceneStepQuery]);
 
   // Right-panel width is user-resizable via the splitter and persisted across
   // sessions. Bounded so the canvas never disappears entirely.
@@ -1116,11 +1714,13 @@ export function StageView() {
   }, [universesKey]);
 
   // Compute the color string shown in each fixture's top bar from the polled
-  // universe snapshot. RGB is multiplied by intensity (master/dimmer) when
-  // present so the bar reflects the actual output, not just the picker state.
-  // Fixtures without RGB fall back to a grey ramp driven by intensity. Returns
-  // `null` when there's nothing meaningful to show (e.g. mode without color or
-  // intensity channels).
+  // universe snapshot. Three paths, preferred in order:
+  //   1. RGB roles → multiply by intensity if present.
+  //   2. No RGB but a `color_wheel` channel exists → look up the active
+  //      DMX value in the channel's ranges and map the range label
+  //      ("Red", "Cyan", …) to an RGB. Multiply by intensity too so a
+  //      dimmed mover reads as a darker version of the wheel colour.
+  //   3. Neither RGB nor wheel → grey ramp from intensity, or null.
   const barColorByFixture = useMemo(() => {
     const out: Record<string, string | null> = {};
     if (!show) return out;
@@ -1138,15 +1738,37 @@ export function StageView() {
       const gi = findRoleIndex(mode.channels, "green");
       const bi = findRoleIndex(mode.channels, "blue");
       const ii = findRoleIndex(mode.channels, "intensity");
-      const hasColor = ri >= 0 || gi >= 0 || bi >= 0;
-      if (!hasColor && ii < 0) {
+      const cwi = findRoleIndex(mode.channels, "color_wheel");
+      const hasRgb = ri >= 0 || gi >= 0 || bi >= 0;
+
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let baseFound = false;
+
+      if (hasRgb) {
+        r = ri >= 0 ? (slice[ri] ?? 0) : 0;
+        g = gi >= 0 ? (slice[gi] ?? 0) : 0;
+        b = bi >= 0 ? (slice[bi] ?? 0) : 0;
+        baseFound = true;
+      } else if (cwi >= 0) {
+        const wheelValue = slice[cwi] ?? 0;
+        const wheel = wheelColorAt(mode.channels[cwi], wheelValue);
+        if (wheel) {
+          r = wheel.r;
+          g = wheel.g;
+          b = wheel.b;
+          baseFound = true;
+        }
+      }
+
+      if (!baseFound && ii < 0) {
         out[f.id] = null;
         continue;
       }
-      let r = ri >= 0 ? (slice[ri] ?? 0) : 0;
-      let g = gi >= 0 ? (slice[gi] ?? 0) : 0;
-      let b = bi >= 0 ? (slice[bi] ?? 0) : 0;
-      if (!hasColor) {
+      if (!baseFound) {
+        // Intensity-only fixture (PAR with single dimmer channel) →
+        // grey ramp.
         const v = slice[ii] ?? 0;
         r = g = b = v;
       } else if (ii >= 0) {
@@ -1498,7 +2120,19 @@ export function StageView() {
           )}
         </aside>
       </div>
-      <StageFxBar />
+      <StageFxBar
+        scenePopupOpen={scenePopupOpen}
+        onToggleScenePopup={() => setScenePopupOpen((v) => !v)}
+        activeSceneId={activeSceneId}
+        activeStepIdx={activeStepIdx}
+      />
+      {scenePopupOpen ? (
+        <SceneQuickPanel
+          activeSceneId={activeSceneId}
+          activeStepIdx={activeStepIdx}
+          onClose={() => setScenePopupOpen(false)}
+        />
+      ) : null}
     </main>
   );
 }

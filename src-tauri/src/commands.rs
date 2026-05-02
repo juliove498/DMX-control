@@ -21,7 +21,7 @@ use crate::output::d2xx::{list_devices as list_d2xx_devices, D2xxDeviceInfo};
 use crate::output::discovery::{list_serial_ports, SerialPortInfo};
 use crate::show::file::{load as load_show_file, save as save_show_file, ShowError, ShowFileV1};
 use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, PatchReport};
-use crate::show::library::{ensure_seeded, image_dir, library_dir, load_all};
+use crate::show::library::{ensure_seeded, library_dir, load_all};
 use crate::show::ShowState;
 
 pub const STATS_EVENT: &str = "engine:stats";
@@ -280,6 +280,48 @@ pub fn get_show(show: State<'_, ShowState>) -> ShowFileV1 {
     show.read().show.clone()
 }
 
+/// Inline rename of the current show. Doesn't touch the file path —
+/// that only changes via Save As. Persisted through the normal autosave
+/// path so the new name survives a restart even if the user never hits
+/// Save explicitly.
+#[tauri::command]
+pub fn rename_show(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    name: String,
+) -> Result<(), CommandError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Err(CommandError::Other("show name cannot be empty".into()));
+    }
+    {
+        let mut s = show.write();
+        s.show.name = trimmed.to_string();
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Pick the fixture definitions actually referenced by the show's
+/// patched fixtures, preserving each one only once. Iterates fixtures
+/// in order so a stable bundle order means stable diffs across saves.
+fn bundle_used_definitions(show: &ShowState) -> Vec<FixtureDefinition> {
+    let s = show.read();
+    let mut seen: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    let mut out: Vec<FixtureDefinition> = Vec::new();
+    for f in &s.show.fixtures {
+        if !seen.insert(f.definition_id.as_str()) {
+            continue;
+        }
+        if let Some(def) = s.library.get(&f.definition_id) {
+            out.push(def.clone());
+        }
+    }
+    out
+}
+
 #[tauri::command]
 pub fn get_show_path(show: State<'_, ShowState>) -> Option<String> {
     show.read()
@@ -337,11 +379,20 @@ pub fn open_show(
     let p = PathBuf::from(&path);
     let loaded = load_show_file(&p).map_err(CommandError::from)?;
     let outputs = loaded.outputs.clone();
+    let bundled_defs = loaded.library.clone();
     {
         let mut s = show.write();
         s.show = loaded;
         s.path = Some(p);
         s.dirty = false;
+        // Merge the bundled defs into the runtime library so fixtures
+        // referencing definitions the local install doesn't have still
+        // resolve. We copy in (overwriting same-id entries from disk),
+        // but we DON'T write them back to the on-disk library — that
+        // would leak show-specific fixture defs into every other show.
+        for def in bundled_defs {
+            s.library.insert(def.id.clone(), def);
+        }
     }
     apply_outputs(
         &app,
@@ -375,7 +426,29 @@ pub fn save_show(
                 .ok_or_else(|| CommandError::Other("no path; provide one".into()))?
         }
     };
-    let snapshot = show.read().show.clone();
+    // "Save As" with a fresh path → take the filename stem as the new
+    // show name, but only if the user hasn't already given the show a
+    // name they care about. "Untitled" is the default; if it's still
+    // sitting on that, the filename is a better label.
+    let was_unnamed = {
+        let s = show.read();
+        s.show.name.is_empty() || s.show.name == "Untitled"
+    };
+    if was_unnamed {
+        if let Some(stem) = target_path.file_stem().and_then(|s| s.to_str()) {
+            show.write().show.name = stem.to_string();
+        }
+    }
+
+    // Snapshot the show, then bundle into it just the fixture defs that
+    // its `fixtures` reference. Saving the whole installed library would
+    // bloat the file with dozens of unrelated definitions; saving only
+    // the in-use ones keeps the file portable + small. The on-disk
+    // library JSONs are NOT modified here — bundling is purely a copy
+    // into the show file.
+    let mut snapshot = show.read().show.clone();
+    snapshot.library = bundle_used_definitions(&show);
+
     save_show_file(&target_path, &snapshot).map_err(CommandError::from)?;
     {
         let mut s = show.write();
@@ -390,14 +463,17 @@ pub fn save_show(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn add_fixture(
     app: AppHandle,
+    engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
     chasers: State<'_, SharedChasers>,
     movement: State<'_, SharedMovement>,
     globals: State<'_, SharedGlobals>,
     fixture: FixtureInstance,
 ) -> Result<(), CommandError> {
+    let new_ids;
     {
         let mut s = show.write();
         if s.show.fixtures.iter().any(|f| f.id == fixture.id) {
@@ -406,9 +482,11 @@ pub fn add_fixture(
                 fixture.id
             )));
         }
+        new_ids = vec![fixture.id.clone()];
         s.show.fixtures.push(fixture);
         s.dirty = true;
     }
+    apply_channel_defaults(&engine, &show, &new_ids);
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
     sync_globals(&show, &globals);
@@ -421,8 +499,10 @@ pub fn add_fixture(
 /// fixtures or with each other before pushing any, so a malformed batch leaves
 /// the patch untouched.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn add_fixtures(
     app: AppHandle,
+    engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
     chasers: State<'_, SharedChasers>,
     movement: State<'_, SharedMovement>,
@@ -432,6 +512,7 @@ pub fn add_fixtures(
     if fixtures.is_empty() {
         return Ok(());
     }
+    let new_ids: Vec<String>;
     {
         let mut s = show.write();
         let mut seen: std::collections::HashSet<&str> =
@@ -444,15 +525,50 @@ pub fn add_fixtures(
                 )));
             }
         }
+        new_ids = fixtures.iter().map(|f| f.id.clone()).collect();
         s.show.fixtures.extend(fixtures);
         s.dirty = true;
     }
+    apply_channel_defaults(&engine, &show, &new_ids);
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
     sync_globals(&show, &globals);
     persist_show(&show, &app)?;
     let _ = app.emit(SHOW_EVENT, ());
     Ok(())
+}
+
+/// Park the listed fixtures at their per-channel `default` values. Used
+/// when patching new fixtures so a moving head lands at home (typically
+/// pan/tilt 127 = centre) instead of at DMX 0 — saves the operator from
+/// having to "unpark" every new fixture by hand. Silently skips fixtures
+/// that don't resolve (unknown definition / mode / out-of-range address).
+fn apply_channel_defaults(engine: &EngineState, show: &ShowState, ids: &[String]) {
+    let s = show.read();
+    let mut g = engine.write();
+    for id in ids {
+        let Some(inst) = s.show.fixtures.iter().find(|f| &f.id == id) else {
+            continue;
+        };
+        let Some(def) = s.library.get(&inst.definition_id) else {
+            continue;
+        };
+        let Some(mode) = def.mode(inst.mode_index as usize) else {
+            continue;
+        };
+        for (offset, ch) in mode.channels.iter().enumerate() {
+            // `offset` is 0-indexed; address is 1-indexed in DMX-land,
+            // but `set_channel` itself takes 0-indexed too — see
+            // `engine::EngineInner::set_channel`.
+            let channel = (inst.address as usize + offset).saturating_sub(1) as u16;
+            if let Err(err) = g.set_channel(inst.universe, channel, ch.default) {
+                tracing::warn!(
+                    %id, channel, error = %err,
+                    "couldn't park fixture channel at default"
+                );
+            }
+        }
+    }
 }
 
 #[tauri::command]
@@ -480,7 +596,15 @@ pub fn remove_fixture(
         if let Some(m) = s.show.movement.as_mut() {
             m.fixtures.retain(|slot| slot.fixture_id != id);
         }
+        for m in &mut s.show.movements {
+            m.fixtures.retain(|slot| slot.fixture_id != id);
+        }
         s.show.globals.blind.fixtures.retain(|f| f.fixture_id != id);
+        s.show
+            .globals
+            .blackout
+            .fixtures
+            .retain(|f| f.fixture_id != id);
         s.dirty = true;
     }
     sync_chasers(&show, &chasers);
@@ -642,20 +766,31 @@ pub fn get_library_dir() -> Option<String> {
     library_dir().map(|p| p.to_string_lossy().to_string())
 }
 
-/// Copy a user-picked image into the library's `images/` subdirectory and
-/// patch the matching fixture-definition JSON file with its new relative
-/// `image` path. Returns the absolute path of the stored copy so the UI can
-/// display it immediately without waiting for the library reload.
+/// Maximum source image size we'll accept. Big enough to fit a high-res
+/// product photo without us caring, small enough that the resulting
+/// definition JSON loads fast and stays portable. base64 inflates by
+/// ~33% so the JSON ends up under ~3 MB even at the cap.
+const MAX_FIXTURE_IMAGE_BYTES: usize = 2 * 1024 * 1024;
+
+/// Encode a user-picked image as a `data:image/...;base64,...` URL and
+/// inline it into the matching fixture-definition JSON. Storing the
+/// bytes inside the same file the user edits / copies makes the
+/// definition fully portable: send one .json across machines and the
+/// picture goes with it, no `images/` sidecar to remember.
+///
+/// Returns the data URL itself so the UI can drop it straight into an
+/// `<img src>` without round-tripping through `convertFileSrc`.
 #[tauri::command]
 pub fn set_fixture_image(
     show: State<'_, ShowState>,
     definition_id: String,
     source_path: String,
 ) -> Result<String, CommandError> {
+    use base64::engine::general_purpose::STANDARD as B64;
+    use base64::Engine;
+
     tracing::info!(target: "dmx::library", %definition_id, source = %source_path, "set_fixture_image start");
     let lib_dir = library_dir().ok_or_else(|| CommandError::Other("no config dir".into()))?;
-    let img_dir = image_dir().ok_or_else(|| CommandError::Other("no config dir".into()))?;
-    std::fs::create_dir_all(&img_dir).map_err(|e| CommandError::Io(e.to_string()))?;
 
     {
         let s = show.read();
@@ -677,43 +812,36 @@ pub fn set_fixture_image(
         .and_then(|e| e.to_str())
         .map(|s| s.to_ascii_lowercase())
         .unwrap_or_else(|| "png".to_string());
-    let target_name = format!("{definition_id}.{ext}");
-    let target_abs = img_dir.join(&target_name);
-    let relative = format!("images/{target_name}");
+    let mime = mime_for_extension(&ext);
 
-    // Replace any pre-existing copy with a different extension so we don't
-    // leave stale files behind.
-    if let Ok(entries) = std::fs::read_dir(&img_dir) {
-        for entry in entries.flatten() {
-            let p = entry.path();
-            if p.file_stem().and_then(|s| s.to_str()) == Some(definition_id.as_str())
-                && p != target_abs
-            {
-                let _ = std::fs::remove_file(p);
-            }
-        }
+    let bytes = std::fs::read(&src).map_err(|e| {
+        tracing::warn!(target: "dmx::library", error = %e, source = %source_path, "image read failed");
+        CommandError::Io(format!("read {source_path}: {e}"))
+    })?;
+    if bytes.len() > MAX_FIXTURE_IMAGE_BYTES {
+        return Err(CommandError::Other(format!(
+            "image is {} KB; please use one under {} KB so the fixture JSON stays portable",
+            bytes.len() / 1024,
+            MAX_FIXTURE_IMAGE_BYTES / 1024
+        )));
     }
 
-    std::fs::copy(&src, &target_abs).map_err(|e| {
-        tracing::warn!(target: "dmx::library", error = %e, target = %target_abs.display(), "image copy failed");
-        CommandError::Io(format!("copy {} -> {}: {}", source_path, target_abs.display(), e))
-    })?;
-    tracing::info!(target: "dmx::library", target = %target_abs.display(), "image copied");
+    let data_url = format!("data:{};base64,{}", mime, B64.encode(&bytes));
 
     // Patch the matching JSON definition file. Scan because the filename on
     // disk is not necessarily `<id>.json`.
-    let mut patched = false;
+    let mut patched_path: Option<PathBuf> = None;
     for entry in std::fs::read_dir(&lib_dir).map_err(|e| CommandError::Io(e.to_string()))? {
         let entry = entry.map_err(|e| CommandError::Io(e.to_string()))?;
         let path = entry.path();
         if path.extension().and_then(|s| s.to_str()) != Some("json") {
             continue;
         }
-        let bytes = match std::fs::read(&path) {
+        let raw = match std::fs::read(&path) {
             Ok(b) => b,
             Err(_) => continue,
         };
-        let mut def: FixtureDefinition = match serde_json::from_slice(&bytes) {
+        let mut def: FixtureDefinition = match serde_json::from_slice(&raw) {
             Ok(d) => d,
             Err(e) => {
                 tracing::warn!(target: "dmx::library", path = %path.display(), error = %e, "skipping invalid definition file");
@@ -723,17 +851,22 @@ pub fn set_fixture_image(
         if def.id != definition_id {
             continue;
         }
-        def.image = Some(relative.clone());
+        def.image = Some(data_url.clone());
         let body =
             serde_json::to_vec_pretty(&def).map_err(|e| CommandError::Show(e.to_string()))?;
         let tmp = path.with_extension("json.tmp");
         std::fs::write(&tmp, &body).map_err(|e| CommandError::Io(e.to_string()))?;
         std::fs::rename(&tmp, &path).map_err(|e| CommandError::Io(e.to_string()))?;
-        tracing::info!(target: "dmx::library", path = %path.display(), image = %relative, "definition patched");
-        patched = true;
+        tracing::info!(
+            target: "dmx::library",
+            path = %path.display(),
+            bytes = bytes.len(),
+            "definition patched with inline image"
+        );
+        patched_path = Some(path);
         break;
     }
-    if !patched {
+    if patched_path.is_none() {
         return Err(CommandError::Other(format!(
             "no library file matched definition {definition_id}"
         )));
@@ -745,7 +878,20 @@ pub fn set_fixture_image(
     show.write().library = lib;
     tracing::info!(target: "dmx::library", "library reloaded after image change");
 
-    Ok(target_abs.to_string_lossy().to_string())
+    Ok(data_url)
+}
+
+fn mime_for_extension(ext: &str) -> &'static str {
+    match ext {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "gif" => "image/gif",
+        "svg" => "image/svg+xml",
+        // Fall back to PNG — browsers usually sniff the actual format
+        // anyway, and this keeps the URL syntactically valid.
+        _ => "image/png",
+    }
 }
 
 // ---- Ambient Chaser ------------------------------------------------------

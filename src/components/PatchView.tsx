@@ -1,7 +1,7 @@
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useState } from "react";
+import { fixtureImageSrc } from "../lib/fixtureImage";
 import { useShowStore } from "../stores/show";
 
 const STAGE_COLS = 6;
@@ -196,9 +196,9 @@ export function PatchView() {
 
   const imageUrlByDef = useMemo(() => {
     const m: Record<string, string> = {};
-    if (!libraryDir) return m;
     for (const d of library) {
-      if (d.image) m[d.id] = convertFileSrc(`${libraryDir}/${d.image}`);
+      const url = fixtureImageSrc(d.image, libraryDir);
+      if (url) m[d.id] = url;
     }
     return m;
   }, [library, libraryDir]);

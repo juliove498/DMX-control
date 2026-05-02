@@ -1,6 +1,6 @@
-import { convertFileSrc } from "@tauri-apps/api/core";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
+import { fixtureImageSrc } from "../lib/fixtureImage";
 import { useShowStore } from "../stores/show";
 
 export function LibraryView() {
@@ -78,8 +78,7 @@ export function LibraryView() {
       ) : null}
       <div className="lib-list">
         {filtered.map((d) => {
-          const imageUrl =
-            d.image && libraryDir ? convertFileSrc(`${libraryDir}/${d.image}`) : null;
+          const imageUrl = fixtureImageSrc(d.image, libraryDir);
           return (
             <div key={d.id} className="lib-item">
               <div className="lib-thumb">

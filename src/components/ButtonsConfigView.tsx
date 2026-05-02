@@ -1,10 +1,11 @@
+import type { BlackoutFixture } from "@bindings/BlackoutFixture";
 import type { BlindFixture } from "@bindings/BlindFixture";
 import type { ChannelRole } from "@bindings/ChannelRole";
 import type { GlobalsConfig } from "@bindings/GlobalsConfig";
 import { useShowStore } from "../stores/show";
 
 const DEFAULT_GLOBALS: GlobalsConfig = {
-  blackout: { active: false, fade_in_ms: 200, fade_out_ms: 800 },
+  blackout: { active: false, fade_in_ms: 200, fade_out_ms: 800, fixtures: [] },
   blind: { fade_in_ms: 80, fade_out_ms: 1500, fixtures: [] },
 };
 
@@ -42,6 +43,31 @@ export function ButtonsConfigView() {
       ...cfg,
       blind: { ...cfg.blind, [key]: Math.max(0, value) },
     });
+  // Blackout: fixture/channel selection. Empty fixtures list = "auto"
+  // (every patched fixture, intensity-or-RGB + strobe). Otherwise only
+  // the listed fixtures' listed channels go to 0; per-fixture empty
+  // `channels_to_zero` means "auto for this fixture".
+  const isBlackoutAssigned = (id: string) => cfg.blackout.fixtures.some((f) => f.fixture_id === id);
+  const setBlackoutFixtures = (next: BlackoutFixture[]) =>
+    updateGlobals({ ...cfg, blackout: { ...cfg.blackout, fixtures: next } });
+  const toggleBlackoutFixture = (id: string) => {
+    if (isBlackoutAssigned(id)) {
+      setBlackoutFixtures(cfg.blackout.fixtures.filter((f) => f.fixture_id !== id));
+    } else {
+      setBlackoutFixtures([...cfg.blackout.fixtures, { fixture_id: id, channels_to_zero: [] }]);
+    }
+  };
+  const toggleBlackoutChannel = (fixtureId: string, role: string) => {
+    setBlackoutFixtures(
+      cfg.blackout.fixtures.map((f) => {
+        if (f.fixture_id !== fixtureId) return f;
+        const next = f.channels_to_zero.includes(role)
+          ? f.channels_to_zero.filter((r) => r !== role)
+          : [...f.channels_to_zero, role];
+        return { ...f, channels_to_zero: next };
+      }),
+    );
+  };
   const isAssigned = (id: string) => cfg.blind.fixtures.some((f) => f.fixture_id === id);
   const setBlindFixtures = (next: BlindFixture[]) =>
     updateGlobals({ ...cfg, blind: { ...cfg.blind, fixtures: next } });
@@ -74,8 +100,12 @@ export function ButtonsConfigView() {
       <section className="config-section">
         <h3>Blackout</h3>
         <p className="hint">
-          Apaga toda la salida con fade configurable. <em>In</em> = ms para llegar a negro,
-          <em> Out</em> = ms para volver al show.
+          Apaga (con cross-fade) los canales que elijas de cada fixture.{" "}
+          <em>Sin fixtures asignados</em> = modo automático: todos los fixtures patcheados apagan
+          intensidad (o RGB si no tienen dimmer) + strobe; pan/tilt/zoom no se tocan para que los
+          cabezales no salten al piso. Si querés algo específico (matar solo intensity, o también un
+          canal de macro custom), agregá los fixtures abajo y tildá los canales que tienen que ir a
+          0.
         </p>
         <div className="config-grid">
           <label>
@@ -101,6 +131,67 @@ export function ButtonsConfigView() {
             />
           </label>
         </div>
+        <h4>
+          Fixtures asignados al Blackout (
+          {cfg.blackout.fixtures.length === 0
+            ? `auto · ${fixtures.length}`
+            : cfg.blackout.fixtures.length}
+          )
+        </h4>
+        {fixtures.length === 0 ? (
+          <p className="empty">Patcheá fixtures primero para poder asignarlos al blackout.</p>
+        ) : (
+          <ul className="blind-fixture-list">
+            {fixtures.map((f) => {
+              const assigned = cfg.blackout.fixtures.find((b) => b.fixture_id === f.id);
+              const def = libraryById[f.definition_id];
+              const mode = def?.modes[f.mode_index];
+              return (
+                <li key={f.id} className={assigned ? "assigned" : ""}>
+                  <label className="blind-fixture-head">
+                    <input
+                      type="checkbox"
+                      checked={!!assigned}
+                      onChange={() => toggleBlackoutFixture(f.id)}
+                    />
+                    <span className="blind-fixture-name">{f.label ?? f.id}</span>
+                    <span className="blind-fixture-meta">
+                      U{f.universe} · {f.address}
+                    </span>
+                  </label>
+                  {assigned && mode ? (
+                    <div className="blind-fixture-channels">
+                      <span className="blind-channels-hint">
+                        {assigned.channels_to_zero.length === 0
+                          ? "Auto: intensity (o RGB si no hay) + strobe → 0. Pan/tilt intactos."
+                          : "Solo estos canales se llevan a 0."}
+                      </span>
+                      <div className="blind-channels-chips">
+                        {mode.channels.map((ch, i) => {
+                          const role = roleLabel(ch.role);
+                          const active = assigned.channels_to_zero.includes(role);
+                          return (
+                            <label
+                              key={`${f.id}-${i}-${role}`}
+                              className={`blind-channel-chip${active ? " active" : ""}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={active}
+                                onChange={() => toggleBlackoutChannel(f.id, role)}
+                              />
+                              {role}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
 
       <section className="config-section">

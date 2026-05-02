@@ -1,5 +1,5 @@
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { ChaserView } from "./components/ChaserView";
 import { ConfigView } from "./components/ConfigView";
@@ -23,11 +23,31 @@ function App() {
   const newShow = useShowStore((s) => s.newShow);
   const openShow = useShowStore((s) => s.openShow);
   const saveShow = useShowStore((s) => s.saveShow);
+  const renameShow = useShowStore((s) => s.renameShow);
   const showPath = useShowStore((s) => s.showPath);
   const showName = useShowStore((s) => s.show?.name ?? "Untitled");
   const blackoutActive = useShowStore((s) => s.show?.globals?.blackout.active ?? false);
   const setBlackout = useShowStore((s) => s.setBlackout);
   const setBlind = useShowStore((s) => s.setBlind);
+
+  const [renaming, setRenaming] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
+  const renameInputRef = useRef<HTMLInputElement | null>(null);
+  // Focus the rename input on entry. Using a ref + effect instead of
+  // the JSX `autoFocus` attribute (biome a11y rule: autoFocus can
+  // hijack focus from screen-reader users) keeps the same UX while
+  // staying lint-clean.
+  useEffect(() => {
+    if (renaming) renameInputRef.current?.focus();
+  }, [renaming]);
+  // Transient toast for "saved to /path"; cleared by a timer so the
+  // message disappears on its own without ceremony.
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (toast === null) return;
+    const id = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(id);
+  }, [toast]);
 
   useEffect(() => {
     refresh();
@@ -66,16 +86,36 @@ function App() {
   };
 
   const onSave = async () => {
-    if (showPath) {
-      await saveShow();
-      return;
+    try {
+      let saved: string;
+      if (showPath) {
+        saved = await saveShow();
+      } else {
+        const picked = await saveDialog({
+          filters: [{ name: "DMX Show", extensions: ["json"] }],
+          defaultPath: `${showName || "show"}.json`,
+        });
+        if (typeof picked !== "string") return; // user cancelled
+        saved = await saveShow(picked);
+      }
+      setToast(`Guardado en ${saved}`);
+    } catch (e) {
+      setToast(`Error al guardar: ${e instanceof Error ? e.message : String(e)}`);
     }
-    const picked = await saveDialog({
-      filters: [{ name: "DMX Show", extensions: ["json"] }],
-      defaultPath: `${showName || "show"}.json`,
-    });
-    if (typeof picked === "string") {
-      await saveShow(picked);
+  };
+
+  const startRename = () => {
+    setRenameDraft(showName);
+    setRenaming(true);
+  };
+  const commitRename = async () => {
+    setRenaming(false);
+    const next = renameDraft.trim();
+    if (next === "" || next === showName) return;
+    try {
+      await renameShow(next);
+    } catch (e) {
+      setToast(`No se pudo renombrar: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
@@ -126,10 +166,33 @@ function App() {
           </button>
         </div>
         <div className="tabs-right">
-          <span className="show-name selectable" title={showPath ?? "(unsaved)"}>
-            {showName}
-            {showPath ? "" : " *"}
-          </span>
+          {renaming ? (
+            <input
+              ref={renameInputRef}
+              className="show-name-input"
+              value={renameDraft}
+              onChange={(e) => setRenameDraft(e.currentTarget.value)}
+              onBlur={commitRename}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitRename();
+                else if (e.key === "Escape") setRenaming(false);
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              className="show-name selectable"
+              title={
+                showPath
+                  ? `${showPath} · click para renombrar`
+                  : "(sin guardar) · click para renombrar"
+              }
+              onClick={startRename}
+            >
+              {showName}
+              {showPath ? "" : " *"}
+            </button>
+          )}
           <button type="button" onClick={() => newShow()}>
             New
           </button>
@@ -147,6 +210,12 @@ function App() {
         {tab === "movement" && <MovementView />}
         {tab === "config" && <ConfigView />}
       </div>
+      {toast ? (
+        // <output> is the semantic element for transient status text;
+        // matches what biome's a11y rule wants instead of `role="status"`
+        // on a generic <div>.
+        <output className="app-toast">{toast}</output>
+      ) : null}
     </div>
   );
 }

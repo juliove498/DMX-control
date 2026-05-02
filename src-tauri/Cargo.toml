@@ -40,6 +40,10 @@ thread-priority = "1"
 # MIDI input/output for control surfaces (Launchpad MK2, etc.). Cross-
 # platform USB-class compliant; no separate driver needed.
 midir = "0.10"
+# Used to inline fixture preview images as data URLs inside their JSON
+# definitions. Keeps each fixture self-contained for portability — copy
+# one .json file across machines and the picture goes with it.
+base64 = "0.22"
 
 [dev-dependencies]
 hex-literal = "0.4"

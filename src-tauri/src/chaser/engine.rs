@@ -397,18 +397,9 @@ mod tests {
                 pan_range: None,
                 tilt_range: None,
                 channels: vec![
-                    ChannelDefinition {
-                        role: ChannelRole::Red,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::Green,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::Blue,
-                        default: 0,
-                    },
+                    ChannelDefinition::new(ChannelRole::Red, 0),
+                    ChannelDefinition::new(ChannelRole::Green, 0),
+                    ChannelDefinition::new(ChannelRole::Blue, 0),
                 ],
             }],
         }
@@ -424,10 +415,7 @@ mod tests {
                 name: "1ch".into(),
                 pan_range: None,
                 tilt_range: None,
-                channels: vec![ChannelDefinition {
-                    role: ChannelRole::Intensity,
-                    default: 0,
-                }],
+                channels: vec![ChannelDefinition::new(ChannelRole::Intensity, 0)],
             }],
         }
     }

@@ -70,8 +70,57 @@ impl ChannelRole {
 #[ts(export, export_to = "../bindings/")]
 pub struct ChannelDefinition {
     pub role: ChannelRole,
+    /// Human-friendly label shown in the UI when present (e.g.
+    /// "Color Wheel", "Strobe / Shutter"). Falls back to `role.label()`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// Tooltip / longer explanation, e.g. "Speed lento (0) → rápido (255)".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// DMX value ranges this channel accepts, each tagged with a label
+    /// and an optional thumbnail. Manufacturers describe color wheels,
+    /// gobo wheels, strobe modes etc. as ranges; we surface them as
+    /// click-to-set buttons in the editor instead of forcing the user
+    /// to dial a slider to the right value.
+    /// Empty (or missing) → channel is purely continuous, slider only.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ranges: Vec<ChannelRange>,
     #[serde(default)]
     pub default: u8,
+}
+
+/// One labelled segment of a channel's DMX value space (Freestyler-style).
+/// Inclusive on both ends. The optional `image` is a base64 data URL or
+/// a legacy filesystem path (resolved by the same helper as the fixture
+/// thumbnail), shown as a thumbnail on the range button.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct ChannelRange {
+    pub from: u8,
+    pub to: u8,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    /// Original on-disk path of the image when imported from another
+    /// app (Freestyler etc.). Informational; the UI renders `image`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_path: Option<String>,
+}
+
+impl ChannelDefinition {
+    /// Lightweight constructor for tests + simple definitions: just a role
+    /// and a default DMX value, with no UI metadata. Real fixture defs
+    /// loaded from JSON go through serde and pick up `name`/`description`
+    /// /`ranges` from the file.
+    pub fn new(role: ChannelRole, default: u8) -> Self {
+        Self {
+            role,
+            name: None,
+            description: None,
+            ranges: Vec::new(),
+            default,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
@@ -301,18 +350,9 @@ mod tests {
                 pan_range: None,
                 tilt_range: None,
                 channels: vec![
-                    ChannelDefinition {
-                        role: ChannelRole::Red,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::Green,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::Blue,
-                        default: 0,
-                    },
+                    ChannelDefinition::new(ChannelRole::Red, 0),
+                    ChannelDefinition::new(ChannelRole::Green, 0),
+                    ChannelDefinition::new(ChannelRole::Blue, 0),
                 ],
             }],
         }

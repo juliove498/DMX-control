@@ -324,22 +324,10 @@ mod tests {
                 pan_range: None,
                 tilt_range: None,
                 channels: vec![
-                    ChannelDefinition {
-                        role: ChannelRole::Pan,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::PanFine,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::Tilt,
-                        default: 0,
-                    },
-                    ChannelDefinition {
-                        role: ChannelRole::TiltFine,
-                        default: 0,
-                    },
+                    ChannelDefinition::new(ChannelRole::Pan, 0),
+                    ChannelDefinition::new(ChannelRole::PanFine, 0),
+                    ChannelDefinition::new(ChannelRole::Tilt, 0),
+                    ChannelDefinition::new(ChannelRole::TiltFine, 0),
                 ],
             }],
         }
@@ -447,10 +435,7 @@ mod tests {
     fn fixture_without_pan_tilt_drops_slot() {
         // RGB-only fixture; movement has nothing to drive.
         let mut def = mover_def();
-        def.modes[0].channels = vec![ChannelDefinition {
-            role: ChannelRole::Red,
-            default: 0,
-        }];
+        def.modes[0].channels = vec![ChannelDefinition::new(ChannelRole::Red, 0)];
         let mut lib = HashMap::new();
         lib.insert("mover".into(), def);
 

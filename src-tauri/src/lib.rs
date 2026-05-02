@@ -15,8 +15,8 @@ use tauri::Manager;
 use crate::commands::{apply_outputs, OutputThreadState};
 use crate::engine::output_thread::{shared_chasers, shared_globals, shared_movement};
 use crate::engine::EngineState;
-use crate::midi::hub::shared_midi;
-use crate::midi::launchpad::shared_launchpad;
+use crate::midi::hub::{shared_midi, SharedMidi};
+use crate::midi::launchpad::{shared_launchpad, SharedLaunchpad};
 use crate::show::library::{ensure_seeded, library_dir, load_all};
 use crate::show::session::{
     read_autosave, read_engine_autosave, write_engine_autosave, EngineAutosave, UniverseAutosave,
@@ -274,6 +274,40 @@ pub fn run() {
                 g.replace_config(globals_cfg);
             }
 
+            // Auto-connect: if a Launchpad is already plugged in at
+            // launch, fire it up without waiting for the user to open
+            // the MIDI tab and click Connect. We pick the first device
+            // whose name looks Launchpad-y; multi-LP rigs are rare
+            // enough that "first match wins" is fine for now.
+            let midi_st: tauri::State<'_, SharedMidi> = app.state();
+            let lp_st: tauri::State<'_, SharedLaunchpad> = app.state();
+            if let Some(name) = midi::hub::list_devices()
+                .into_iter()
+                .find(|d| midi::launchpad::is_launchpad(&d.name))
+                .map(|d| d.name)
+            {
+                let shared_midi_inner = midi_st.inner().clone();
+                let connect_result =
+                    midi_st
+                        .lock()
+                        .connect(&name, app_handle.clone(), shared_midi_inner.clone());
+                match connect_result {
+                    Ok(()) => {
+                        let controller = midi::launchpad::start(
+                            app_handle.clone(),
+                            shared_midi_inner,
+                            chasers_st.inner().clone(),
+                            movement_st.inner().clone(),
+                            globals_st.inner().clone(),
+                            show_state_st.inner().clone(),
+                        );
+                        *lp_st.lock() = Some(controller);
+                        tracing::info!(%name, "auto-connected MIDI surface at launch");
+                    }
+                    Err(err) => tracing::warn!(%name, %err, "auto-connect failed"),
+                }
+            }
+
             // Background snapshot thread: every ~1.5 s we dump the live
             // engine state (universes + master) to disk. The output thread
             // can't do this itself without risking I/O latency in the DMX
@@ -309,6 +343,24 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
+                // Order matters here:
+                //   1. Stop the Launchpad feedback thread first so it
+                //      blanks every pad and clears the input router
+                //      cleanly. Doing this BEFORE dropping the MIDI
+                //      hub means the final SysEx (turn-everything-off)
+                //      actually reaches the device.
+                //   2. Disconnect the MIDI hub — drops `midir`'s input
+                //      callback and the output port. After this the
+                //      controller is no longer talking to the OS.
+                //   3. Stop the DMX output thread last. Killing it
+                //      first would leave its `OutputDriver` open while
+                //      the LP teardown is still trying to send SysEx,
+                //      which is fine but makes the logs noisy.
+                if let Some(lp) = window.state::<SharedLaunchpad>().lock().take() {
+                    tracing::info!("window close: shutting down launchpad controller");
+                    lp.shutdown();
+                }
+                window.state::<SharedMidi>().lock().disconnect();
                 let handle_opt = window.state::<OutputThreadState>().0.lock().unwrap().take();
                 if let Some(handle) = handle_opt {
                     tracing::info!("window close: shutting down output thread");
@@ -341,6 +393,7 @@ pub fn run() {
             commands::new_show,
             commands::open_show,
             commands::save_show,
+            commands::rename_show,
             // Patch
             commands::add_fixture,
             commands::add_fixtures,

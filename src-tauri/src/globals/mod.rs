@@ -25,6 +25,26 @@ pub struct BlackoutConfig {
     pub fade_in_ms: u32,
     /// Fade-from-black time when the user toggles blackout *off*. ms.
     pub fade_out_ms: u32,
+    /// Fixtures affected by blackout, with the specific channel roles
+    /// that should be driven to 0 when the button is engaged. Empty
+    /// list = "auto mode": every patched fixture in the show gets the
+    /// sensible default (intensity → 0, or RGB → 0 for fixtures without
+    /// an intensity channel, plus strobe → 0). Pan/tilt/zoom etc. are
+    /// never touched by auto mode — a moving head should stay parked
+    /// where it was, just dark.
+    #[serde(default)]
+    pub fixtures: Vec<BlackoutFixture>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct BlackoutFixture {
+    pub fixture_id: String,
+    /// Role labels (`"intensity"`, `"red"`, `"strobe"`, …) that should
+    /// be lerped to 0 when blackout is on. Empty list = auto behaviour
+    /// for this fixture (intensity-or-RGB + strobe).
+    #[serde(default)]
+    pub channels_to_zero: Vec<String>,
 }
 
 impl Default for BlackoutConfig {
@@ -33,6 +53,7 @@ impl Default for BlackoutConfig {
             active: false,
             fade_in_ms: 200,
             fade_out_ms: 800,
+            fixtures: Vec::new(),
         }
     }
 }

@@ -681,6 +681,7 @@ dependencies = [
 name = "dmx-control"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "crossbeam-channel",
  "dirs 5.0.1",
  "hex-literal",

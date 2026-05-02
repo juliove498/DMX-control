@@ -13,7 +13,7 @@ use std::time::Instant;
 use crate::engine::{empty_overlay, ChannelOverlay, DMX_CHANNELS};
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance};
 
-use super::{BlindConfig, GlobalsConfig};
+use super::{BlackoutConfig, BlindConfig, GlobalsConfig};
 
 /// Halogen "cold" tip — what blinders look like just as they wake.
 const HALOGEN_AMBER: (f32, f32, f32) = (255.0, 80.0, 0.0);
@@ -77,10 +77,11 @@ impl GlobalsRuntime {
         self.blind_target = if pressed { 1.0 } else { 0.0 };
     }
 
-    /// Per-frame update. Returns the rendered blind overlay so the output
-    /// thread can hand it to the engine. The blackout factor is read off
-    /// `self.blackout_factor` afterwards.
-    pub fn tick(&mut self, now: Instant) -> HashMap<u16, ChannelOverlay> {
+    /// Per-frame update. Returns the blind + blackout overlays so the
+    /// output thread can hand them to the engine. Each overlay's
+    /// visibility is animated by its respective `*_factor` (which the
+    /// engine reads off this struct directly).
+    pub fn tick(&mut self, now: Instant) -> GlobalsTickOutput {
         let delta_ms = match self.last_update {
             Some(prev) => now.saturating_duration_since(prev).as_secs_f32() * 1000.0,
             None => 0.0,
@@ -102,16 +103,32 @@ impl GlobalsRuntime {
             delta_ms,
         );
 
-        if self.blind_factor <= 0.0001 || self.config.blind.fixtures.is_empty() {
-            return HashMap::new();
-        }
-        build_blind_overlay(
-            &self.config.blind,
-            self.blind_factor,
-            &self.fixtures,
-            &self.library,
-        )
+        let blind = if self.blind_factor <= 0.0001 || self.config.blind.fixtures.is_empty() {
+            HashMap::new()
+        } else {
+            build_blind_overlay(
+                &self.config.blind,
+                self.blind_factor,
+                &self.fixtures,
+                &self.library,
+            )
+        };
+        let blackout = if self.blackout_factor <= 0.0001 {
+            HashMap::new()
+        } else {
+            build_blackout_overlay(&self.config.blackout, &self.fixtures, &self.library)
+        };
+        GlobalsTickOutput { blind, blackout }
     }
+}
+
+/// Output of one tick of the globals runtime: separate overlays for
+/// blind (warm halogen punch) and blackout (channels driven to 0).
+/// Both are crossfaded against the underlying base + effects state by
+/// the engine using `blind_factor` / `blackout_factor`.
+pub struct GlobalsTickOutput {
+    pub blind: HashMap<u16, ChannelOverlay>,
+    pub blackout: HashMap<u16, ChannelOverlay>,
 }
 
 /// Advance `current` toward `target` by `delta_ms`. Picks `fade_in_ms`
@@ -199,6 +216,104 @@ fn write_halogen_default(
         set_overlay(overlay, fixture.universe, base + r, r_byte);
         set_overlay(overlay, fixture.universe, base + g, g_byte);
         set_overlay(overlay, fixture.universe, base + b, b_byte);
+    }
+}
+
+/// Build the blackout overlay. Targets are *zero* — the engine lerps
+/// the underlying state down to zero on the listed channels, leaving
+/// pan/tilt/zoom etc. untouched (a moving head goes dark but stays
+/// parked where it was).
+///
+/// Two modes:
+/// - `cfg.fixtures` is empty → auto: every patched fixture gets its
+///   intensity (or RGB if no intensity) plus strobe lerped to 0. This
+///   is what the operator expects from a global blackout button.
+/// - `cfg.fixtures` is non-empty → user mode: only the listed fixtures'
+///   listed channels get zeroed. Per-fixture `channels_to_zero` empty
+///   means "use the auto channel set for THIS fixture".
+fn build_blackout_overlay(
+    cfg: &BlackoutConfig,
+    fixtures: &[FixtureInstance],
+    library: &HashMap<String, FixtureDefinition>,
+) -> HashMap<u16, ChannelOverlay> {
+    let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
+    if cfg.fixtures.is_empty() {
+        for fixture in fixtures {
+            let Some(def) = library.get(&fixture.definition_id) else {
+                continue;
+            };
+            let Some(mode) = def.modes.get(fixture.mode_index as usize) else {
+                continue;
+            };
+            let base = (fixture.address as usize).saturating_sub(1);
+            write_blackout_auto(&mut overlay, fixture, mode, base);
+        }
+    } else {
+        for entry in &cfg.fixtures {
+            let Some(fixture) = fixtures.iter().find(|f| f.id == entry.fixture_id) else {
+                continue;
+            };
+            let Some(def) = library.get(&fixture.definition_id) else {
+                continue;
+            };
+            let Some(mode) = def.modes.get(fixture.mode_index as usize) else {
+                continue;
+            };
+            let base = (fixture.address as usize).saturating_sub(1);
+            if entry.channels_to_zero.is_empty() {
+                write_blackout_auto(&mut overlay, fixture, mode, base);
+            } else {
+                write_blackout_listed(&mut overlay, fixture, mode, base, &entry.channels_to_zero);
+            }
+        }
+    }
+    overlay
+}
+
+/// Auto blackout for one fixture: kill intensity (or R/G/B if there's
+/// no intensity channel) and strobe. Everything else passes through —
+/// pan/tilt should keep their position so the rig doesn't "snap home"
+/// when the operator hits blackout mid-show.
+fn write_blackout_auto(
+    overlay: &mut HashMap<u16, ChannelOverlay>,
+    fixture: &FixtureInstance,
+    mode: &crate::show::fixture::FixtureMode,
+    base: usize,
+) {
+    let intensity_off = role_offset(
+        mode.channels.iter().map(|c| &c.role),
+        &ChannelRole::Intensity,
+    );
+    if let Some(off) = intensity_off {
+        set_overlay(overlay, fixture.universe, base + off, 0);
+    } else {
+        // No master dimmer — kill the colour channels so the fixture
+        // goes dark.
+        for role in [ChannelRole::Red, ChannelRole::Green, ChannelRole::Blue] {
+            if let Some(off) = role_offset(mode.channels.iter().map(|c| &c.role), &role) {
+                set_overlay(overlay, fixture.universe, base + off, 0);
+            }
+        }
+    }
+    if let Some(off) = role_offset(mode.channels.iter().map(|c| &c.role), &ChannelRole::Strobe) {
+        set_overlay(overlay, fixture.universe, base + off, 0);
+    }
+}
+
+/// User-listed channels for blackout: drive each named role to 0.
+fn write_blackout_listed(
+    overlay: &mut HashMap<u16, ChannelOverlay>,
+    fixture: &FixtureInstance,
+    mode: &crate::show::fixture::FixtureMode,
+    base: usize,
+    channels: &[String],
+) {
+    for role_name in channels {
+        for (i, ch) in mode.channels.iter().enumerate() {
+            if ch.role.label() == role_name.as_str() {
+                set_overlay(overlay, fixture.universe, base + i, 0);
+            }
+        }
     }
 }
 
@@ -314,7 +429,7 @@ mod tests {
         let mut r = fade_runtime();
         r.set_blind(true);
         let ov = r.tick(Instant::now() + Duration::from_millis(60));
-        assert!(ov.is_empty());
+        assert!(ov.blind.is_empty());
     }
 
     #[test]

@@ -8,14 +8,22 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { fixtureImageSrc } from "../lib/fixtureImage";
 import { chaserColor, movementColor } from "../lib/launchpadColors";
 import { useShowStore } from "../stores/show";
 import { ColorPicker2D } from "./ColorPicker2D";
 import { PanTiltPad } from "./PanTiltPad";
 
 const GRID_SIZE = 32;
+/// Fixed footprint of `.stage-fixture` in the CSS — the box is sized
+/// rigidly so the marquee hit-test, drag-snap, and auto-grid layout
+/// agree. If you change these, update the matching values in App.css.
+const FIXTURE_W = 100;
+const FIXTURE_H = 120;
+
+type FxHit = { kind: "chaser" | "movement"; index: number; name: string; color: string };
 
 function StageFixture({
   fixture,
@@ -23,14 +31,18 @@ function StageFixture({
   imageUrl,
   barColor,
   selected,
+  effects,
   onSelect,
+  onContextMenu,
 }: {
   fixture: FixtureInstance;
   def: FixtureDefinition | undefined;
   imageUrl: string | null;
   barColor: string | null;
   selected: boolean;
+  effects: FxHit[];
   onSelect: (e: React.MouseEvent) => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: fixture.id,
@@ -45,6 +57,7 @@ function StageFixture({
       type="button"
       className={`stage-fixture${selected ? " selected" : ""}${isDragging ? " dragging" : ""}${imageUrl ? " has-image" : ""}`}
       onClick={(e) => onSelect(e)}
+      onContextMenu={onContextMenu}
       style={{
         left: x,
         top: y,
@@ -61,6 +74,18 @@ function StageFixture({
       <div className="meta">
         U{fixture.universe} · {fixture.address}
       </div>
+      {effects.length > 0 ? (
+        <div className="fixture-fx-strip" aria-hidden="true">
+          {effects.map((e) => (
+            <span
+              key={`${e.kind}-${e.index}`}
+              className={`fixture-fx-dot ${e.kind}`}
+              style={{ background: e.color }}
+              title={`${e.kind === "chaser" ? "Chaser" : "Movement"}: ${e.name}`}
+            />
+          ))}
+        </div>
+      ) : null}
     </button>
   );
 }
@@ -247,12 +272,15 @@ function resolveCtx(
 function FixtureChannelEditor({
   fixtures,
   libraryById,
+  effectsByFixture,
 }: {
   fixtures: FixtureInstance[];
   libraryById: Record<string, FixtureDefinition>;
+  effectsByFixture: Record<string, FxHit[]>;
 }) {
   const setFixtureChannel = useShowStore((s) => s.setFixtureChannel);
   const getFixtureValues = useShowStore((s) => s.getFixtureValues);
+  const libraryDir = useShowStore((s) => s.libraryDir);
 
   const ctxs = useMemo<FixtureCtx[]>(() => {
     const out: FixtureCtx[] = [];
@@ -269,19 +297,32 @@ function FixtureChannelEditor({
     (primary?.mode.channels ?? []).map((c) => c.default ?? 0),
   );
 
-  // Re-hydrate display values from the engine when the primary fixture
-  // changes. The cancellation flag avoids out-of-order responses when the
-  // user click-storms through different selections.
+  // Poll the engine for the live post-merge channel snapshot while the
+  // editor is open. We need this (not just a one-shot read on selection)
+  // because the chaser + movement engines animate the output behind our
+  // back — a moving head dragged into a circle should *show* the circle
+  // in the pan/tilt pad, not freeze at the user's last manual write.
+  // 80 ms ≈ 12 Hz, plenty for visual smoothness without flooding IPC.
   useEffect(() => {
     if (!primary) return;
     let cancelled = false;
-    getFixtureValues(primary.fixture.id)
-      .then((vs) => {
-        if (!cancelled) setPrimaryValues(vs);
-      })
-      .catch(() => {});
+    let timer: number | null = null;
+    const poll = () => {
+      getFixtureValues(primary.fixture.id)
+        .then((vs) => {
+          if (!cancelled) setPrimaryValues(vs);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!cancelled) {
+            timer = window.setTimeout(poll, 80);
+          }
+        });
+    };
+    poll();
     return () => {
       cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [primary, getFixtureValues]);
 
@@ -389,27 +430,70 @@ function FixtureChannelEditor({
       !COLOR_ROLES.has(roleLabel(c.channel.role)),
   );
 
-  const renderChannelSlider = (entry: ChannelEntry) => {
+  /// Pick the DMX value to send when the user clicks a range button.
+  /// Manufacturers usually treat the midpoint of each range as the
+  /// "canonical" value for that step (e.g. for "Red: 13–25" the wheel
+  /// definitely sits on red at 19). Using that instead of `from` avoids
+  /// landing on a transition edge between two ranges.
+  const valueForRange = (r: { from: number; to: number }): number =>
+    Math.round((r.from + r.to) / 2);
+
+  const renderChannelControl = (entry: ChannelEntry) => {
     const iconColor = roleIconColor(entry.channel.role);
+    const value = primaryValues[entry.index] ?? 0;
+    const ranges = entry.channel.ranges ?? [];
+    const hasRanges = ranges.length > 0;
+    const displayName = entry.channel.name ?? roleLabel(entry.channel.role);
     return (
-      <label key={`${primary.fixture.id}-${entry.index}`} className="ch">
-        <span
-          className="role-icon"
-          style={iconColor ? { color: iconColor } : undefined}
-          aria-hidden="true"
-        >
-          {roleIcon(entry.channel.role)}
-        </span>
-        <span className="role">{roleLabel(entry.channel.role)}</span>
-        <input
-          type="range"
-          min={0}
-          max={255}
-          value={primaryValues[entry.index] ?? 0}
-          onChange={(e) => writeChannel(entry.index, Number(e.currentTarget.value))}
-        />
-        <span className="val">{primaryValues[entry.index] ?? 0}</span>
-      </label>
+      <div key={`${primary.fixture.id}-${entry.index}`} className="ch-block">
+        <label className="ch">
+          <span
+            className="role-icon"
+            style={iconColor ? { color: iconColor } : undefined}
+            aria-hidden="true"
+          >
+            {roleIcon(entry.channel.role)}
+          </span>
+          <span className="role" title={entry.channel.description ?? undefined}>
+            {displayName}
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={255}
+            value={value}
+            onChange={(e) => writeChannel(entry.index, Number(e.currentTarget.value))}
+          />
+          <span className="val">{value}</span>
+        </label>
+        {hasRanges ? (
+          <div className="range-buttons">
+            {ranges.map((r) => {
+              const target = valueForRange(r);
+              const active = value >= r.from && value <= r.to;
+              const thumb = fixtureImageSrc(r.image, libraryDir);
+              return (
+                <button
+                  key={`${entry.index}-${r.from}-${r.to}`}
+                  type="button"
+                  className={`range-btn${active ? " active" : ""}${thumb ? "" : " no-thumb"}`}
+                  title={`${r.label} (${r.from}–${r.to})`}
+                  onClick={() => writeChannel(entry.index, target)}
+                >
+                  {thumb ? (
+                    <img src={thumb} alt="" />
+                  ) : (
+                    <span className="range-btn-fallback" aria-hidden="true">
+                      {r.label.slice(0, 2)}
+                    </span>
+                  )}
+                  <span className="range-btn-label">{r.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
+      </div>
     );
   };
   const showIntStrobeSection = hasIntensity || hasStrobe || intStrobeChannels.length > 0;
@@ -478,6 +562,51 @@ function FixtureChannelEditor({
           Mostrando solo los controles comunes a todas las unidades seleccionadas.
         </p>
       ) : null}
+
+      {(() => {
+        // Aggregate every distinct effect (chaser/movement) currently
+        // driving any selected fixture. We dedupe by `kind+index` so a
+        // chaser that drives 5 of the selected pars only shows up once;
+        // the count below the chip tells you how many of the selection
+        // it touches.
+        const seen = new Map<string, { hit: FxHit; touches: number }>();
+        for (const f of fixtures) {
+          for (const h of effectsByFixture[f.id] ?? []) {
+            const k = `${h.kind}-${h.index}`;
+            const prev = seen.get(k);
+            if (prev) prev.touches += 1;
+            else seen.set(k, { hit: h, touches: 1 });
+          }
+        }
+        const entries = Array.from(seen.values());
+        if (entries.length === 0) return null;
+        return (
+          <section className="editor-active-fx">
+            <h5>Efectos activos</h5>
+            <div className="editor-active-fx-list">
+              {entries.map(({ hit, touches }) => (
+                <span
+                  key={`${hit.kind}-${hit.index}`}
+                  className={`editor-fx-chip ${hit.kind}`}
+                  style={{ borderColor: hit.color }}
+                  title={`${hit.kind === "chaser" ? "Chaser" : "Movement"}: ${hit.name} · afecta ${touches}/${fixtures.length}`}
+                >
+                  <span className="editor-fx-chip-dot" style={{ background: hit.color }} />
+                  <span className="editor-fx-chip-kind">
+                    {hit.kind === "chaser" ? "Chaser" : "Move"}
+                  </span>
+                  <span className="editor-fx-chip-name">{hit.name}</span>
+                  {fixtures.length > 1 ? (
+                    <span className="editor-fx-chip-count">
+                      {touches}/{fixtures.length}
+                    </span>
+                  ) : null}
+                </span>
+              ))}
+            </div>
+          </section>
+        );
+      })()}
 
       {hasPanTilt || (hasColor && primaryRGB) ? (
         <div className="editor-grid">
@@ -584,22 +713,22 @@ function FixtureChannelEditor({
                 <span className="val">{primaryStrobe}</span>
               </label>
             ) : null}
-            {intStrobeChannels.map(renderChannelSlider)}
+            {intStrobeChannels.map(renderChannelControl)}
           </div>
         </section>
       ) : null}
 
       {colorChannels.length > 0 ? (
         <section className="editor-subsection">
-          <h5>Color (canales sueltos)</h5>
-          <div className="editor-channels">{colorChannels.map(renderChannelSlider)}</div>
+          <h5>Color</h5>
+          <div className="editor-channels">{colorChannels.map(renderChannelControl)}</div>
         </section>
       ) : null}
 
       {extrasChannels.length > 0 ? (
         <section className="editor-subsection">
           <h5>Extras</h5>
-          <div className="editor-channels">{extrasChannels.map(renderChannelSlider)}</div>
+          <div className="editor-channels">{extrasChannels.map(renderChannelControl)}</div>
         </section>
       ) : null}
     </div>
@@ -712,13 +841,109 @@ function StageFxBar() {
   );
 }
 
+type Marquee = { x0: number; y0: number; x1: number; y1: number };
+type ContextMenuState = { x: number; y: number; fixtureId: string };
+
+/// Right-click menu for one or more fixtures. Closes on outside click and
+/// on Escape — both handled via window listeners installed while it's
+/// mounted. Position is in viewport (clientX/Y) coords, then nudged left
+/// or up if it would clip the screen edge.
+function FixtureContextMenu({
+  x,
+  y,
+  multi,
+  count,
+  onClose,
+  onCenterPanTilt,
+  onPark,
+  onFullIntensity,
+  onBlackout,
+  onRename,
+  onDuplicate,
+  onRemove,
+}: {
+  x: number;
+  y: number;
+  multi: boolean;
+  count: number;
+  onClose: () => void;
+  onCenterPanTilt: () => void;
+  onPark: () => void;
+  onFullIntensity: () => void;
+  onBlackout: () => void;
+  onRename: () => void;
+  onDuplicate: () => void;
+  onRemove: () => void;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const onDocPointerDown = (e: PointerEvent) => {
+      if (!ref.current) return;
+      if (!ref.current.contains(e.target as Node)) onClose();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("pointerdown", onDocPointerDown, true);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDocPointerDown, true);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  // Estimate menu size to keep it on-screen. Real measurement would
+  // require a layout pass; this rough cap matches the CSS max-width.
+  const W = 220;
+  const H = 280;
+  const left = Math.min(x, window.innerWidth - W - 4);
+  const top = Math.min(y, window.innerHeight - H - 4);
+
+  return (
+    <div ref={ref} className="fixture-context-menu" style={{ left, top }} role="menu">
+      <div className="fcm-header">{multi ? `${count} fixtures` : "Fixture"}</div>
+      <button type="button" className="fcm-item" onClick={onCenterPanTilt}>
+        Centrar Pan/Tilt
+      </button>
+      <button type="button" className="fcm-item" onClick={onPark}>
+        Park (defaults)
+      </button>
+      <div className="fcm-sep" aria-hidden="true" />
+      <button type="button" className="fcm-item" onClick={onFullIntensity}>
+        Intensidad al máximo
+      </button>
+      <button type="button" className="fcm-item" onClick={onBlackout}>
+        Blackout (intensity 0)
+      </button>
+      <div className="fcm-sep" aria-hidden="true" />
+      {!multi ? (
+        <button type="button" className="fcm-item" onClick={onRename}>
+          Renombrar…
+        </button>
+      ) : null}
+      <button type="button" className="fcm-item" onClick={onDuplicate}>
+        Duplicar{multi ? ` (×${count})` : ""}
+      </button>
+      <button type="button" className="fcm-item danger" onClick={onRemove}>
+        Eliminar{multi ? ` (×${count})` : ""}
+      </button>
+    </div>
+  );
+}
+
 export function StageView() {
   const show = useShowStore((s) => s.show);
   const library = useShowStore((s) => s.library);
   const libraryDir = useShowStore((s) => s.libraryDir);
   const moveFixture = useShowStore((s) => s.moveFixture);
+  const setFixtureChannel = useShowStore((s) => s.setFixtureChannel);
+  const removeFixture = useShowStore((s) => s.removeFixture);
+  const updateFixture = useShowStore((s) => s.updateFixture);
+  const addFixtures = useShowStore((s) => s.addFixtures);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [marquee, setMarquee] = useState<Marquee | null>(null);
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
 
   // Right-panel width is user-resizable via the splitter and persisted across
   // sessions. Bounded so the canvas never disappears entirely.
@@ -770,11 +995,9 @@ export function StageView() {
 
   const imageUrlByDef = useMemo(() => {
     const m: Record<string, string> = {};
-    if (!libraryDir) return m;
     for (const d of library) {
-      if (d.image) {
-        m[d.id] = convertFileSrc(`${libraryDir}/${d.image}`);
-      }
+      const url = fixtureImageSrc(d.image, libraryDir);
+      if (url) m[d.id] = url;
     }
     return m;
   }, [library, libraryDir]);
@@ -807,6 +1030,43 @@ export function StageView() {
     if (!show) return [];
     return show.fixtures.filter((f) => selectedIds.has(f.id));
   }, [show, selectedIds]);
+
+  // Index "this fixture is being driven by these enabled effects, in
+  // these colours". Cheap to recompute on every store update — at most
+  // a few dozen chasers/movements × a few slots each. Keeping this in
+  // one place (instead of two filter passes per fixture) means the
+  // stage badges and the editor "Active effects" panel share the same
+  // numbering, so the colours always match.
+  const effectsByFixture = useMemo(() => {
+    type Hit = { kind: "chaser" | "movement"; index: number; name: string; color: string };
+    const out: Record<string, Hit[]> = {};
+    if (!show) return out;
+    show.chasers.forEach((c, i) => {
+      if (!c.enabled) return;
+      for (const slot of c.slots) {
+        if (!out[slot.fixture_id]) out[slot.fixture_id] = [];
+        out[slot.fixture_id].push({
+          kind: "chaser",
+          index: i,
+          name: c.name,
+          color: chaserColor(i),
+        });
+      }
+    });
+    show.movements.forEach((m, i) => {
+      if (!m.enabled) return;
+      for (const slot of m.fixtures) {
+        if (!out[slot.fixture_id]) out[slot.fixture_id] = [];
+        out[slot.fixture_id].push({
+          kind: "movement",
+          index: i,
+          name: m.name,
+          color: movementColor(i),
+        });
+      }
+    });
+    return out;
+  }, [show]);
 
   // Universes that need polling for the per-fixture color bar. Stable under
   // fixture-position drags (which don't change the universe set).
@@ -946,6 +1206,201 @@ export function StageView() {
   // any selection change (single → group, group → single, group A → group B).
   const editorKey = Array.from(selectedIds).sort().join(",");
 
+  // ---- Marquee selection ------------------------------------------------
+  // Pointerdown on the empty canvas (not on a fixture) starts a drag
+  // rectangle. We deliberately attach pointermove/pointerup to `window`
+  // for the duration of the drag — pointer-capture on the React
+  // synthetic event would race with dnd-kit's PointerSensor and was
+  // dropping events when the cursor crossed a fixture mid-drag.
+  // Window listeners + a closure over `start` keep the geometry stable
+  // and never fight the draggables.
+  const onCanvasPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    if (e.target !== e.currentTarget) return; // bubbled from a fixture/etc.
+    const canvas = e.currentTarget;
+    const rect = canvas.getBoundingClientRect();
+    const toLocal = (cx: number, cy: number) => ({
+      x: cx - rect.left + canvas.scrollLeft,
+      y: cy - rect.top + canvas.scrollTop,
+    });
+    const start = toLocal(e.clientX, e.clientY);
+    const additive = e.shiftKey;
+    setMarquee({ x0: start.x, y0: start.y, x1: start.x, y1: start.y });
+
+    const onMove = (ev: PointerEvent) => {
+      const p = toLocal(ev.clientX, ev.clientY);
+      setMarquee((m) => (m ? { ...m, x1: p.x, y1: p.y } : m));
+    };
+    const onUp = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      const end = toLocal(ev.clientX, ev.clientY);
+      const minX = Math.min(start.x, end.x);
+      const maxX = Math.max(start.x, end.x);
+      const minY = Math.min(start.y, end.y);
+      const maxY = Math.max(start.y, end.y);
+      // Tiny click-drag (< 4px) → treat as a click on empty canvas:
+      // clear selection unless additive. Avoids losing a selection just
+      // because the user clicked a stray spot.
+      if (maxX - minX < 4 && maxY - minY < 4) {
+        if (!additive) setSelectedIds(new Set());
+        setMarquee(null);
+        return;
+      }
+      const hits = new Set<string>();
+      for (const f of show?.fixtures ?? []) {
+        // Hit-test against the fixture's actual rendered footprint
+        // (defined as constants alongside the CSS) so the marquee
+        // catches everything visually inside the rectangle.
+        const fx0 = f.position[0];
+        const fy0 = f.position[1];
+        const fx1 = fx0 + FIXTURE_W;
+        const fy1 = fy0 + FIXTURE_H;
+        const overlap = fx0 <= maxX && fx1 >= minX && fy0 <= maxY && fy1 >= minY;
+        if (overlap) hits.add(f.id);
+      }
+      setSelectedIds((prev) => {
+        if (additive) {
+          const next = new Set(prev);
+          for (const id of hits) next.add(id);
+          return next;
+        }
+        return hits;
+      });
+      setMarquee(null);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  // ---- Context menu -----------------------------------------------------
+  const onFixtureContextMenu = (id: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Right-clicking a non-selected fixture selects just that one, so
+    // the "Park", "Duplicate", etc. actions don't accidentally fire on
+    // the whole previous selection.
+    setSelectedIds((prev) => (prev.has(id) ? prev : new Set([id])));
+    setMenu({ x: e.clientX, y: e.clientY, fixtureId: id });
+  };
+
+  const closeMenu = () => setMenu(null);
+
+  const writeChannelToFixtures = async (
+    targets: FixtureInstance[],
+    role: string,
+    value: number,
+  ) => {
+    await Promise.all(
+      targets.flatMap((f) => {
+        const def = libraryById[f.definition_id];
+        const mode = def?.modes[f.mode_index];
+        if (!mode) return [];
+        const offset = mode.channels.findIndex((c) => roleLabel(c.role) === role);
+        if (offset < 0) return [];
+        return [setFixtureChannel(f.id, offset, value)];
+      }),
+    );
+  };
+
+  const targetsForAction = (): FixtureInstance[] => {
+    if (!show || !menu) return [];
+    if (selectedIds.has(menu.fixtureId) && selectedIds.size > 1) {
+      return show.fixtures.filter((f) => selectedIds.has(f.id));
+    }
+    const f = show.fixtures.find((x) => x.id === menu.fixtureId);
+    return f ? [f] : [];
+  };
+
+  const actionCenterPanTilt = async () => {
+    const targets = targetsForAction();
+    await Promise.all([
+      writeChannelToFixtures(targets, "pan", 127),
+      writeChannelToFixtures(targets, "pan_fine", 127),
+      writeChannelToFixtures(targets, "tilt", 127),
+      writeChannelToFixtures(targets, "tilt_fine", 127),
+    ]);
+    closeMenu();
+  };
+
+  const actionPark = async () => {
+    const targets = targetsForAction();
+    await Promise.all(
+      targets.flatMap((f) => {
+        const mode = libraryById[f.definition_id]?.modes[f.mode_index];
+        if (!mode) return [];
+        return mode.channels.map((ch, i) => setFixtureChannel(f.id, i, ch.default ?? 0));
+      }),
+    );
+    closeMenu();
+  };
+
+  const actionFullIntensity = async () => {
+    await writeChannelToFixtures(targetsForAction(), "intensity", 255);
+    closeMenu();
+  };
+
+  const actionBlackoutFixture = async () => {
+    await writeChannelToFixtures(targetsForAction(), "intensity", 0);
+    closeMenu();
+  };
+
+  const actionRename = () => {
+    if (!show || !menu) return closeMenu();
+    const f = show.fixtures.find((x) => x.id === menu.fixtureId);
+    if (!f) return closeMenu();
+    const next = window.prompt("Nuevo nombre para el fixture:", f.label ?? f.id);
+    if (next !== null) {
+      const trimmed = next.trim();
+      updateFixture({ ...f, label: trimmed === "" ? null : trimmed });
+    }
+    closeMenu();
+  };
+
+  const actionDuplicate = async () => {
+    if (!show || !menu) return closeMenu();
+    const targets = targetsForAction();
+    if (targets.length === 0) return closeMenu();
+    const used = new Set(show.fixtures.map((f) => f.id));
+    const dupes: FixtureInstance[] = targets.map((f) => {
+      let n = 2;
+      let candidate = `${f.id}-copy`;
+      while (used.has(candidate)) {
+        candidate = `${f.id}-copy-${n++}`;
+      }
+      used.add(candidate);
+      return {
+        ...f,
+        id: candidate,
+        position: [f.position[0] + GRID_SIZE * 3, f.position[1]],
+        label: f.label ? `${f.label} copy` : null,
+      };
+    });
+    await addFixtures(dupes);
+    closeMenu();
+  };
+
+  const actionRemove = async () => {
+    const targets = targetsForAction();
+    if (targets.length === 0) return closeMenu();
+    const ok = window.confirm(
+      targets.length === 1
+        ? `¿Eliminar "${targets[0].label ?? targets[0].id}"?`
+        : `¿Eliminar ${targets.length} fixtures?`,
+    );
+    if (!ok) return closeMenu();
+    for (const f of targets) {
+      await removeFixture(f.id);
+    }
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const f of targets) next.delete(f.id);
+      return next;
+    });
+    closeMenu();
+  };
+
   return (
     <main className="page stage-view">
       <header className="page-head">
@@ -978,7 +1433,7 @@ export function StageView() {
           )}
         </aside>
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <div ref={stageRef} className="stage-canvas">
+          <div ref={stageRef} className="stage-canvas" onPointerDown={onCanvasPointerDown}>
             {show.fixtures.map((f) => (
               <StageFixture
                 key={f.id}
@@ -987,11 +1442,41 @@ export function StageView() {
                 imageUrl={imageUrlByDef[f.definition_id] ?? null}
                 barColor={barColorByFixture[f.id] ?? null}
                 selected={selectedIds.has(f.id)}
+                effects={effectsByFixture[f.id] ?? []}
                 onSelect={(e) => onFixtureClick(f.id, e)}
+                onContextMenu={onFixtureContextMenu(f.id)}
               />
             ))}
+            {marquee ? (
+              <div
+                className="stage-marquee"
+                style={{
+                  left: Math.min(marquee.x0, marquee.x1),
+                  top: Math.min(marquee.y0, marquee.y1),
+                  width: Math.abs(marquee.x1 - marquee.x0),
+                  height: Math.abs(marquee.y1 - marquee.y0),
+                }}
+                aria-hidden="true"
+              />
+            ) : null}
           </div>
         </DndContext>
+        {menu ? (
+          <FixtureContextMenu
+            x={menu.x}
+            y={menu.y}
+            multi={selectedIds.has(menu.fixtureId) && selectedIds.size > 1}
+            count={selectedIds.has(menu.fixtureId) && selectedIds.size > 1 ? selectedIds.size : 1}
+            onClose={closeMenu}
+            onCenterPanTilt={actionCenterPanTilt}
+            onPark={actionPark}
+            onFullIntensity={actionFullIntensity}
+            onBlackout={actionBlackoutFixture}
+            onRename={actionRename}
+            onDuplicate={actionDuplicate}
+            onRemove={actionRemove}
+          />
+        ) : null}
         <div
           className={`stage-splitter${splitterActive ? " active" : ""}`}
           onPointerDown={onSplitterDown}
@@ -1003,6 +1488,7 @@ export function StageView() {
               key={editorKey}
               fixtures={selectedFixtures}
               libraryById={libraryById}
+              effectsByFixture={effectsByFixture}
             />
           ) : (
             <p>

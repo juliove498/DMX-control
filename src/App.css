@@ -132,6 +132,43 @@ code,
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  background: transparent;
+  border: 1px dashed transparent;
+  padding: 4px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.show-name:hover {
+  border-color: #3a3a3a;
+  color: #cfcfcf;
+}
+.show-name-input {
+  font-size: 12px;
+  margin-right: 12px;
+  max-width: 240px;
+  background: #1a1a1a;
+  color: #fff;
+  border: 1px solid #4a4a4a;
+  border-radius: 3px;
+  padding: 4px 6px;
+}
+.app-toast {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a1a;
+  color: #f5d896;
+  border: 1px solid #3a3a3a;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  pointer-events: none;
+  /* `output` defaults to inline-block, so center via translate above. */
+  display: inline-block;
 }
 
 .tabs button {
@@ -801,7 +838,14 @@ label {
   font: inherit;
   font-size: 11px;
   text-align: left;
-  min-width: 96px;
+  /* Fixed footprint so the marquee hit-test, the auto-grid layout,
+     and the thumbnail/label area all line up with one source of
+     truth. Children adapt; the box doesn't grow with content. */
+  width: 100px;
+  height: 120px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   z-index: 1;
 }
 .stage-fixture.selected {
@@ -816,10 +860,16 @@ label {
 .stage-fixture .label {
   font-weight: 600;
   color: #fff;
+  /* Single line, ellipsis when long. Without this a long fixture
+     name would push the meta row out of the fixed-height box. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .stage-fixture .meta {
   color: #b8c4dc;
   font-size: 10px;
+  margin-top: auto;
 }
 .stage-side {
   flex: 0 0 auto;
@@ -1086,6 +1136,69 @@ label {
   gap: 8px;
   padding: 4px 0;
 }
+.channel-editor .ch-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 0;
+  border-bottom: 1px dashed #1f1f1f;
+}
+.channel-editor .ch-block:last-child {
+  border-bottom: 0;
+}
+.channel-editor .ch-block .ch {
+  padding: 0;
+}
+.channel-editor .range-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding-left: 24px;
+}
+.channel-editor .range-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  padding: 2px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.channel-editor .range-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 2px;
+  pointer-events: none;
+}
+.channel-editor .range-btn .range-btn-fallback {
+  font-size: 10px;
+  color: #b6b6b6;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.channel-editor .range-btn .range-btn-label {
+  /* Visually hidden, kept for screen readers. The visible label lives
+     in the `title` tooltip + the (slightly cropped) thumbnail. */
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+.channel-editor .range-btn:hover {
+  border-color: #5a5a5a;
+}
+.channel-editor .range-btn.active {
+  border-color: #f5d896;
+  box-shadow: 0 0 0 1px #f5d896 inset;
+}
 .channel-editor .ch input[type="range"] {
   accent-color: #6dd3a3;
 }
@@ -1214,13 +1327,17 @@ label {
 
 /* === Stage fixture with image === */
 .stage-fixture.has-image {
-  min-width: 88px;
   padding-top: 4px;
 }
 .stage-fixture .fixture-thumb {
   display: block;
   width: 100%;
-  height: 56px;
+  /* `flex: 1 1 auto` would let the thumb grow to fill, but we want a
+     stable area so two adjacent fixtures with different aspect-ratio
+     images line up. Reserve a fixed 60px and let the rest of the
+     content (color-bar, label, meta) live below. */
+  flex: 0 0 60px;
+  height: 60px;
   object-fit: contain;
   margin-bottom: 4px;
   border-radius: 3px;
@@ -1378,6 +1495,137 @@ label {
   flex: 0 0 auto;
   box-shadow: 0 0 6px currentColor;
   opacity: 0.85;
+}
+
+/* Mini strip on each stage fixture showing which chasers / movements
+   are currently driving it. Sits at the top of the box so it doesn't
+   compete with the label below. */
+.fixture-fx-strip {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  display: flex;
+  gap: 2px;
+  pointer-events: none;
+}
+.fixture-fx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  box-shadow: 0 0 3px rgba(0, 0, 0, 0.5);
+  opacity: 0.95;
+}
+.fixture-fx-dot.movement {
+  border-radius: 50%;
+}
+
+/* Marquee selection rectangle on the stage. */
+.stage-marquee {
+  position: absolute;
+  background: rgba(245, 216, 150, 0.12);
+  border: 1px dashed #f5d896;
+  pointer-events: none;
+  border-radius: 2px;
+}
+
+/* "Efectos activos" panel inside the channel editor. */
+.editor-active-fx {
+  margin: 4px 0 8px;
+}
+.editor-active-fx h5 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #888;
+}
+.editor-active-fx-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.editor-fx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px 2px 4px;
+  border: 1px solid #2a2a2a;
+  border-radius: 999px;
+  background: #1a1a1a;
+  font-size: 11px;
+  color: #cfcfcf;
+}
+.editor-fx-chip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+.editor-fx-chip.movement .editor-fx-chip-dot {
+  border-radius: 50%;
+}
+.editor-fx-chip-kind {
+  color: #888;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 9px;
+}
+.editor-fx-chip-name {
+  color: #e6e6e6;
+}
+.editor-fx-chip-count {
+  color: #888;
+  font-variant-numeric: tabular-nums;
+  font-size: 10px;
+}
+
+/* Right-click menu for stage fixtures. */
+.fixture-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  max-width: 220px;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+.fcm-header {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #888;
+  padding: 4px 8px 6px;
+}
+.fcm-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: #e6e6e6;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+  border-radius: 2px;
+  cursor: pointer;
+}
+.fcm-item:hover {
+  background: #2a2a2a;
+}
+.fcm-item.danger {
+  color: #ffd2d2;
+}
+.fcm-item.danger:hover {
+  background: #4a1d1d;
+}
+.fcm-sep {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 4px 0;
 }
 .chaser-name {
   flex: 1 1 auto;

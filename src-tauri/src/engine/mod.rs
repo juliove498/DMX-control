@@ -84,6 +84,13 @@ pub struct EngineInner {
     /// `0.0..=1.0` visibility of the blind layer. `0` = blind contributes
     /// nothing; `1` = blind fully overrides. Driven by `globals::runtime`.
     pub blind_factor: f32,
+    /// Blackout overlay: per-fixture, per-channel target of `0`. Same
+    /// crossfade pattern as blind — channels listed in this overlay get
+    /// lerped toward 0 by `blackout_factor`, while channels not listed
+    /// (typically pan/tilt/zoom) pass through untouched. This replaces
+    /// the older "multiply every channel by `1 - factor`" path which
+    /// also dragged movers' positions to 0.
+    pub blackout_overlay: HashMap<u16, ChannelOverlay>,
 }
 
 impl EngineInner {
@@ -96,6 +103,7 @@ impl EngineInner {
             effects_overlay: HashMap::new(),
             blind_overlay: HashMap::new(),
             blind_factor: 0.0,
+            blackout_overlay: HashMap::new(),
         }
     }
 
@@ -110,6 +118,7 @@ impl EngineInner {
             effects_overlay: HashMap::new(),
             blind_overlay: HashMap::new(),
             blind_factor: 0.0,
+            blackout_overlay: HashMap::new(),
         }
     }
 
@@ -184,17 +193,21 @@ impl EngineInner {
                 *v = ((*v as u16 * m) / 255) as u8;
             }
         }
-        // 4. Blackout factor: animated 0..1 dim that kills everything
-        // when active. Skip the multiplication when there's no blackout.
+        // 4. Blackout layer: lerp the configured channels toward 0 by
+        // `blackout_factor`. Channels not present in the overlay pass
+        // through untouched, so a moving head holds its pan/tilt while
+        // its dimmer/strobe fade out.
         if self.blackout_factor > 0.0 {
-            let factor = self.blackout_factor.clamp(0.0, 1.0);
-            // Treat values >= ~0.999 as "fully out" so we hit clean zeros.
-            if factor >= 0.999 {
-                return Some([0u8; DMX_CHANNELS]);
-            }
-            let keep = 1.0 - factor;
-            for v in out.iter_mut() {
-                *v = ((*v as f32) * keep).round().clamp(0.0, 255.0) as u8;
+            if let Some(overlay) = self.blackout_overlay.get(&universe) {
+                let f = self.blackout_factor.clamp(0.0, 1.0);
+                for (i, slot) in overlay.iter().enumerate() {
+                    if slot.is_some() {
+                        // Target is always 0 for blackout — saves the
+                        // overlay from having to spell that out and
+                        // makes the lerp a single multiply.
+                        out[i] = ((out[i] as f32) * (1.0 - f)).round().clamp(0.0, 255.0) as u8;
+                    }
+                }
             }
         }
         Some(out)
@@ -211,6 +224,10 @@ impl EngineInner {
     /// `replace_effects_overlay` but at a higher priority.
     pub fn replace_blind_overlay(&mut self, next: HashMap<u16, ChannelOverlay>) {
         self.blind_overlay = next;
+    }
+
+    pub fn replace_blackout_overlay(&mut self, next: HashMap<u16, ChannelOverlay>) {
+        self.blackout_overlay = next;
     }
 }
 
@@ -274,18 +291,32 @@ mod tests {
     }
 
     #[test]
-    fn snapshot_blackout_zeros_all() {
+    fn snapshot_blackout_zeros_listed_channel() {
+        // Blackout now operates per-channel via an overlay (built by
+        // globals::runtime). Channels in the overlay get lerped to 0;
+        // channels outside it pass through. Here we list channel 0 and
+        // expect channel 1 to be untouched — the regression we're
+        // guarding against is "blackout drags pan/tilt to 0 even
+        // though the operator only wanted dimmers killed".
         let mut s = EngineInner::new(1);
         s.set_channel(0, 0, 255).unwrap();
+        s.set_channel(0, 1, 127).unwrap(); // pretend this is "pan"
+        let mut overlay = empty_overlay();
+        overlay[0] = Some(0);
+        s.blackout_overlay.insert(0, overlay);
         s.blackout_factor = 1.0;
         let snap = s.snapshot_universe(0).unwrap();
         assert_eq!(snap[0], 0);
+        assert_eq!(snap[1], 127, "blackout must not touch unlisted channels");
     }
 
     #[test]
     fn snapshot_blackout_partial_dims_proportionally() {
         let mut s = EngineInner::new(1);
         s.set_channel(0, 0, 200).unwrap();
+        let mut overlay = empty_overlay();
+        overlay[0] = Some(0);
+        s.blackout_overlay.insert(0, overlay);
         s.blackout_factor = 0.5; // 50% blackout → keep 50%
         let snap = s.snapshot_universe(0).unwrap();
         assert!((snap[0] as i32 - 100).abs() <= 1, "got {}", snap[0]);
@@ -338,10 +369,16 @@ mod tests {
 
     #[test]
     fn effects_overlay_killed_by_blackout() {
+        // Effects (chasers, movement) sit under master + blackout, so
+        // a chaser writing 255 to a channel listed in the blackout
+        // overlay should still come through as 0 at full blackout.
         let mut s = EngineInner::new(1);
-        let mut overlay = empty_overlay();
-        overlay[0] = Some(255);
-        s.effects_overlay.insert(0, overlay);
+        let mut effects = empty_overlay();
+        effects[0] = Some(255);
+        s.effects_overlay.insert(0, effects);
+        let mut blackout = empty_overlay();
+        blackout[0] = Some(0);
+        s.blackout_overlay.insert(0, blackout);
         s.blackout_factor = 1.0;
         let snap = s.snapshot_universe(0).unwrap();
         assert_eq!(snap[0], 0);

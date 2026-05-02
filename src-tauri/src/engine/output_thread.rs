@@ -168,14 +168,15 @@ where
                     let chaser_ov = chasers_thread.lock().tick(frame_start);
                     let movement_ov = movement_thread.lock().tick(frame_start);
                     let merged = merge_overlays(chaser_ov, movement_ov);
-                    let (blind_overlay, blackout_factor, blind_factor) = {
+                    let (blind_overlay, blackout_overlay, blackout_factor, blind_factor) = {
                         let mut g = globals_thread.lock();
-                        let blind = g.tick(frame_start);
-                        (blind, g.blackout_factor, g.blind_factor)
+                        let out = g.tick(frame_start);
+                        (out.blind, out.blackout, g.blackout_factor, g.blind_factor)
                     };
                     let mut e = engine.write();
                     e.replace_effects_overlay(merged);
                     e.replace_blind_overlay(blind_overlay);
+                    e.replace_blackout_overlay(blackout_overlay);
                     e.blackout_factor = blackout_factor;
                     e.blind_factor = blind_factor;
                 }

@@ -31,6 +31,7 @@ interface ShowStoreState {
   newShow: () => Promise<void>;
   openShow: (path: string) => Promise<void>;
   saveShow: (path?: string) => Promise<string>;
+  renameShow: (name: string) => Promise<void>;
 
   setOutputs: (outputs: OutputsConfig) => Promise<void>;
 
@@ -134,7 +135,16 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   async saveShow(path) {
     const result = await invoke<string>("save_show", { path: path ?? null });
     set({ showPath: result });
+    // The backend may have updated the show.name (e.g. "Save As" took
+    // the filename stem when the show was still on its default name);
+    // pull the fresh state so the UI reflects it without flicker.
+    await get().refresh();
     return result;
+  },
+
+  async renameShow(name) {
+    await invoke("rename_show", { name });
+    await get().refresh();
   },
 
   async setOutputs(outputs) {

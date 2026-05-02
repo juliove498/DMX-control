@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use super::fixture::FixtureInstance;
+use super::fixture::{FixtureDefinition, FixtureInstance};
 use crate::chaser::AmbientChaser;
 use crate::globals::GlobalsConfig;
 use crate::movement::MovementGenerator;
@@ -43,6 +43,16 @@ pub struct ShowFileV1 {
     /// times and blinder fixture list survive a restart.
     #[serde(default)]
     pub globals: GlobalsConfig,
+    /// Snapshot of the fixture definitions referenced by this show.
+    /// Saved alongside `fixtures` so a `.json` is portable across
+    /// machines: open the file on a fresh install and the rig appears
+    /// without needing to ship the user's library directory too. The
+    /// commands layer fills this on save (only the defs actually used)
+    /// and merges it into the runtime library on open. Empty for shows
+    /// saved before this field existed — the loader falls back to the
+    /// installed library exactly as it always did.
+    #[serde(default)]
+    pub library: Vec<FixtureDefinition>,
 }
 
 impl Default for ShowFileV1 {
@@ -56,6 +66,7 @@ impl Default for ShowFileV1 {
             movement: None,
             movements: Vec::new(),
             globals: GlobalsConfig::default(),
+            library: Vec::new(),
         }
     }
 }

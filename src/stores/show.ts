@@ -6,6 +6,7 @@ import type { GlobalsConfig } from "@bindings/GlobalsConfig";
 import type { MovementGenerator } from "@bindings/MovementGenerator";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { PatchReport } from "@bindings/PatchReport";
+import type { ProgrammerStatus } from "@bindings/ProgrammerStatus";
 import type { Scene } from "@bindings/Scene";
 import type { SerialPortInfo } from "@bindings/SerialPortInfo";
 import type { ShowFileV1 } from "@bindings/ShowFileV1";
@@ -82,8 +83,9 @@ interface ShowStoreState {
   releaseScene: () => Promise<void>;
   activeSceneId: () => Promise<string | null>;
   activeSceneStep: () => Promise<number | null>;
-  programmerStatus: () => Promise<{ touched: string[] }>;
+  programmerStatus: () => Promise<ProgrammerStatus>;
   programmerClear: () => Promise<void>;
+  programmerUntouch: (fixtureId: string) => Promise<void>;
 
   setBlackout: (active: boolean) => Promise<void>;
   setBlind: (pressed: boolean) => Promise<void>;
@@ -331,11 +333,15 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   },
 
   async programmerStatus() {
-    return invoke<{ touched: string[] }>("programmer_status");
+    return invoke<ProgrammerStatus>("programmer_status");
   },
 
   async programmerClear() {
     await invoke("programmer_clear");
+  },
+
+  async programmerUntouch(fixtureId) {
+    await invoke("programmer_untouch", { fixtureId });
   },
 
   async deleteScene(id) {

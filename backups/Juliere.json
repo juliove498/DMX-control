@@ -301,7 +301,7 @@
     {
       "id": "7382a221-43fb-4a66-9607-10b38e740c19",
       "name": "Symmetric Spectrum",
-      "enabled": true,
+      "enabled": false,
       "slots": [
         {
           "fixture_id": "fx-1",
@@ -680,6 +680,605 @@
       ]
     }
   },
+  "scenes": [
+    {
+      "id": "09e2496e-41c9-4f62-8fbe-958bc6bd1e53",
+      "name": "Scene 1",
+      "steps": [
+        {
+          "id": "17ed4706-4095-46b5-b23a-2f875f8b18de",
+          "fade_in_ms": 800,
+          "hold_ms": 0,
+          "fixtures": [
+            {
+              "fixture_id": "fx-1",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 132
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 41
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-2",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 132
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 41
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-3",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 132
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 41
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-4",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 132
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 41
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-6",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 153
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 185
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-7",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 153
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 185
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 86
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 142
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 71
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 33
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-8",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 153
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 185
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-9",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 153
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 185
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 87
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-5",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 13,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 14,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 15,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 16,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 17,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 18,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 19,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-10",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 172
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 117
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 13,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 14,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 15,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 16,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 17,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 18,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 19,
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "disabled"
+          },
+          "movement_state": {
+            "type": "disabled"
+          }
+        }
+      ]
+    }
+  ],
   "library": [
     {
       "id": "shamsonic-rgbwyp-led",

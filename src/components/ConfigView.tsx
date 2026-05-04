@@ -6,46 +6,71 @@ import { MidiConfigView } from "./MidiConfigView";
 import { OutputsView } from "./OutputsView";
 import { PatchView } from "./PatchView";
 
-type ConfigTab = "direct" | "patch" | "outputs" | "library" | "buttons" | "midi";
+type ConfigTab = "library" | "outputs" | "patch" | "blackout-blind" | "midi" | "direct";
 
-const SUB_TABS: Array<{ id: ConfigTab; label: string; hint: string }> = [
-  { id: "direct", label: "Direct", hint: "Per-channel raw faders for universe 0" },
-  { id: "patch", label: "Patch", hint: "Assign fixtures to DMX addresses" },
-  { id: "outputs", label: "Outputs", hint: "Universes and DMX drivers" },
-  { id: "library", label: "Library", hint: "Fixture definitions" },
-  { id: "buttons", label: "Buttons", hint: "Blackout & Blind fades + blind fixtures" },
-  { id: "midi", label: "MIDI", hint: "Control surface (Launchpad, etc.)" },
-];
+// Grouped by setup flow: hardware → control surface → debug.
+// Order inside each group reflects the order a fresh user would touch them
+// (define fixtures → wire universes → patch addresses; then surface; debug last).
+const GROUPS: Array<{ id: string; items: Array<{ id: ConfigTab; label: string; hint: string }> }> =
+  [
+    {
+      id: "hardware",
+      items: [
+        { id: "library", label: "Library", hint: "Definiciones de fixtures" },
+        { id: "outputs", label: "Outputs", hint: "Universos y drivers DMX" },
+        { id: "patch", label: "Patch", hint: "Asignar fixtures a direcciones DMX" },
+      ],
+    },
+    {
+      id: "surface",
+      items: [
+        {
+          id: "blackout-blind",
+          label: "Blackout & Blind",
+          hint: "Fades y fixtures afectados por los botones globales",
+        },
+        { id: "midi", label: "MIDI", hint: "Superficie de control (Launchpad, etc.)" },
+      ],
+    },
+    {
+      id: "debug",
+      items: [
+        { id: "direct", label: "Direct", hint: "Faders crudos por canal — herramienta de debug" },
+      ],
+    },
+  ];
 
 export function ConfigView() {
-  const [sub, setSub] = useState<ConfigTab>("patch");
+  // Default to Library: that's where a fresh setup starts. Existing users can
+  // jump anywhere with a single click; not worth persisting last-used.
+  const [sub, setSub] = useState<ConfigTab>("library");
 
   return (
     <main className="page config-view">
-      <aside className="config-sidebar">
-        <h3>Config</h3>
-        <nav className="config-nav">
-          {SUB_TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              className={`config-nav-btn${sub === t.id ? " active" : ""}`}
-              onClick={() => setSub(t.id)}
-              title={t.hint}
-            >
-              <span className="config-nav-label">{t.label}</span>
-              <span className="config-nav-hint">{t.hint}</span>
-            </button>
-          ))}
-        </nav>
-      </aside>
+      <nav className="config-tabs">
+        {GROUPS.map((group) => (
+          <div key={group.id} className="config-tabs-group">
+            {group.items.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                className={`config-tab-btn${sub === t.id ? " active" : ""}`}
+                onClick={() => setSub(t.id)}
+                title={t.hint}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
       <div className="config-content">
-        {sub === "direct" && <DirectOutput />}
-        {sub === "patch" && <PatchView />}
-        {sub === "outputs" && <OutputsView />}
         {sub === "library" && <LibraryView />}
-        {sub === "buttons" && <ButtonsConfigView />}
+        {sub === "outputs" && <OutputsView />}
+        {sub === "patch" && <PatchView />}
+        {sub === "blackout-blind" && <ButtonsConfigView />}
         {sub === "midi" && <MidiConfigView />}
+        {sub === "direct" && <DirectOutput />}
       </div>
     </main>
   );

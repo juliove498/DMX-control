@@ -468,6 +468,7 @@ pub fn run() {
             commands::active_scene_step,
             commands::programmer_status,
             commands::programmer_clear,
+            commands::programmer_untouch,
             // Globals (Blackout + Blind)
             commands::get_globals,
             commands::update_globals,

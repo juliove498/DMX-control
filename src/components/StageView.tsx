@@ -22,6 +22,9 @@ const GRID_SIZE = 32;
 /// agree. If you change these, update the matching values in App.css.
 const FIXTURE_W = 100;
 const FIXTURE_H = 120;
+// Stable reference for the "no touched channels" case so the
+// `<StageFixture>` doesn't see a brand-new `[]` each render.
+const EMPTY_LABELS: string[] = [];
 
 type FxHit = { kind: "chaser" | "movement"; index: number; name: string; color: string };
 
@@ -32,8 +35,11 @@ function StageFixture({
   barColor,
   selected,
   effects,
+  touchedLabels,
+  flashStamp,
   onSelect,
   onContextMenu,
+  onUntouch,
 }: {
   fixture: FixtureInstance;
   def: FixtureDefinition | undefined;
@@ -41,8 +47,20 @@ function StageFixture({
   barColor: string | null;
   selected: boolean;
   effects: FxHit[];
+  /** Resolved channel labels currently touched on this fixture. Empty
+   *  array → not touched. The card shows a halo + corner badge with the
+   *  count, and lists the labels in the tooltip so the operator can
+   *  see *what* they dialed in without opening the channel editor. */
+  touchedLabels: string[];
+  /** Bump to retrigger the locate-flash animation. Used as a `key`
+   *  fragment on the halo element so each press restarts the keyframe
+   *  cleanly even if the fixture was already touched. */
+  flashStamp: number;
   onSelect: (e: React.MouseEvent) => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  /** Drop this fixture from the touched set. Called when the operator
+   *  clicks the corner badge. Only wired when the helper is on. */
+  onUntouch: (fixtureId: string) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: fixture.id,
@@ -51,13 +69,22 @@ function StageFixture({
   const dx = transform?.x ?? 0;
   const dy = transform?.y ?? 0;
   const labelText = fixture.label ?? def?.name ?? fixture.id;
+  const touchedCount = touchedLabels.length;
+  const isTouched = touchedCount > 0;
+  // Tooltip lists the labels so the user can see *what* they touched
+  // without opening the per-channel editor. Falls back to the bare
+  // label when nothing is touched.
+  const tooltip = isTouched
+    ? `${labelText} · touched: ${touchedLabels.join(", ")}`
+    : labelText;
   return (
     <button
       ref={setNodeRef}
       type="button"
-      className={`stage-fixture${selected ? " selected" : ""}${isDragging ? " dragging" : ""}${imageUrl ? " has-image" : ""}`}
+      className={`stage-fixture${selected ? " selected" : ""}${isDragging ? " dragging" : ""}${imageUrl ? " has-image" : ""}${isTouched ? " touched" : ""}`}
       onClick={(e) => onSelect(e)}
       onContextMenu={onContextMenu}
+      title={tooltip}
       style={{
         left: x,
         top: y,
@@ -85,6 +112,49 @@ function StageFixture({
             />
           ))}
         </div>
+      ) : null}
+      {isTouched ? (
+        // Re-keying on flashStamp restarts the CSS keyframe each time
+        // the operator presses Localizar — even on already-touched
+        // fixtures, so the pulse is felt as a fresh ping.
+        <span
+          key={`halo-${flashStamp}`}
+          className="touched-halo"
+          aria-hidden="true"
+        />
+      ) : null}
+      {isTouched ? (
+        // The badge is rendered as a span (the parent is already a
+        // <button>, so nesting another button would be invalid HTML)
+        // with a click handler + stopPropagation. Hover swaps the dot
+        // for a × so the un-touch affordance is discoverable without
+        // adding a second visible chrome element.
+        <span
+          role="button"
+          tabIndex={0}
+          className="touched-badge clickable"
+          aria-label={`Quitar de touched (${touchedCount} canales)`}
+          title={`Click para quitar de touched · canales: ${touchedLabels.join(", ")}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onUntouch(fixture.id);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              onUntouch(fixture.id);
+            }
+          }}
+        >
+          <span className="touched-badge-default" aria-hidden="true">
+            •{touchedCount}
+          </span>
+          <span className="touched-badge-hover" aria-hidden="true">
+            ×
+          </span>
+        </span>
       ) : null}
     </button>
   );
@@ -802,6 +872,10 @@ function FixtureChannelEditor({
 const SIDE_MIN = 260;
 const SIDE_MAX = 900;
 const SIDE_STORAGE_KEY = "stage.sideWidth";
+// Persisted preference for the "show touched on canvas" helper. Off by
+// default — operators told us the always-on halos felt noisy, so we
+// only render them as an opt-in helper while the Scene panel is open.
+const TOUCHED_HELPER_KEY = "stage.touchedHelper";
 
 function clampSideWidth(n: number): number {
   if (!Number.isFinite(n)) return 320;
@@ -991,10 +1065,20 @@ function SceneQuickPanel({
   activeSceneId,
   activeStepIdx,
   onClose,
+  onLocateTouched,
+  touchedHelperOn,
+  onToggleTouchedHelper,
 }: {
   activeSceneId: string | null;
   activeStepIdx: number | null;
   onClose: () => void;
+  /** Fires the locate-flash on every touched fixture so the operator
+   *  can find what they were dialing without scanning the whole canvas. */
+  onLocateTouched: () => void;
+  /** When true, the parent paints the touched halo + badge on each
+   *  fixture card. Off by default; this panel exposes the toggle. */
+  touchedHelperOn: boolean;
+  onToggleTouchedHelper: () => void;
 }) {
   const show = useShowStore((s) => s.show);
   const recallScene = useShowStore((s) => s.recallScene);
@@ -1400,6 +1484,29 @@ function SceneQuickPanel({
           >
             {selectedScene ? "+ Add step" : "● Record"}
           </button>
+          <button
+            type="button"
+            className={`sqp-btn ghost${touchedHelperOn ? " toggled" : ""}`}
+            onClick={onToggleTouchedHelper}
+            title={
+              touchedHelperOn
+                ? "Ocultar halos de fixtures touched en la canvas"
+                : "Mostrar halos de fixtures touched en la canvas mientras este panel esté abierto"
+            }
+            aria-pressed={touchedHelperOn}
+          >
+            👁 Touched
+          </button>
+          {touched.length > 0 && touchedHelperOn ? (
+            <button
+              type="button"
+              className="sqp-btn ghost"
+              onClick={onLocateTouched}
+              title="Hacer un pulse en los fixtures touched para encontrarlos en la canvas"
+            >
+              📍 Localizar
+            </button>
+          ) : null}
           {touched.length > 0 ? (
             <button type="button" className="sqp-btn ghost" onClick={() => programmerClear()}>
               Clear PROG
@@ -1420,6 +1527,7 @@ function FixtureContextMenu({
   y,
   multi,
   count,
+  touchedCount,
   onClose,
   onCenterPanTilt,
   onPark,
@@ -1427,12 +1535,16 @@ function FixtureContextMenu({
   onBlackout,
   onRename,
   onDuplicate,
+  onUntouch,
   onRemove,
 }: {
   x: number;
   y: number;
   multi: boolean;
   count: number;
+  /** Of the targeted fixtures, how many are currently touched. The
+   *  Untouch item is hidden when zero — there's nothing to do. */
+  touchedCount: number;
   onClose: () => void;
   onCenterPanTilt: () => void;
   onPark: () => void;
@@ -1440,6 +1552,7 @@ function FixtureContextMenu({
   onBlackout: () => void;
   onRename: () => void;
   onDuplicate: () => void;
+  onUntouch: () => void;
   onRemove: () => void;
 }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -1491,6 +1604,14 @@ function FixtureContextMenu({
       <button type="button" className="fcm-item" onClick={onDuplicate}>
         Duplicar{multi ? ` (×${count})` : ""}
       </button>
+      {touchedCount > 0 ? (
+        <>
+          <div className="fcm-sep" aria-hidden="true" />
+          <button type="button" className="fcm-item" onClick={onUntouch}>
+            Untouch{touchedCount > 1 ? ` (×${touchedCount})` : ""}
+          </button>
+        </>
+      ) : null}
       <button type="button" className="fcm-item danger" onClick={onRemove}>
         Eliminar{multi ? ` (×${count})` : ""}
       </button>
@@ -1507,10 +1628,56 @@ export function StageView() {
   const removeFixture = useShowStore((s) => s.removeFixture);
   const updateFixture = useShowStore((s) => s.updateFixture);
   const addFixtures = useShowStore((s) => s.addFixtures);
+  const programmerStatus = useShowStore((s) => s.programmerStatus);
+  const programmerUntouch = useShowStore((s) => s.programmerUntouch);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+
+  // Per-fixture touched offsets, polled from the programmer. Drives the
+  // halo + corner badge + tooltip on each card. Polling at 250ms is
+  // imperceptible to the operator but cheap on IPC.
+  const [touchedByFixture, setTouchedByFixture] = useState<Record<string, number[]>>({});
+  // Bumped by the Localizar button to retrigger the halo flash even on
+  // already-touched fixtures. Plain timestamp so it monotonically grows.
+  const [flashStamp, setFlashStamp] = useState(0);
+  // "Show touched on canvas" is an opt-in helper, not always-on. Even
+  // when enabled it only paints while the Scene panel is open, since
+  // that's the only context where knowing what's touched is useful.
+  const [touchedHelperOn, setTouchedHelperOn] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(TOUCHED_HELPER_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(TOUCHED_HELPER_KEY, touchedHelperOn ? "1" : "0");
+    } catch {
+      // localStorage unavailable — preference still works in-session.
+    }
+  }, [touchedHelperOn]);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      programmerStatus()
+        .then((s) => {
+          if (cancelled) return;
+          const next: Record<string, number[]> = {};
+          for (const t of s.channels) next[t.fixture_id] = t.channels;
+          setTouchedByFixture(next);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [programmerStatus]);
 
   // Floating scene panel: opt-in overlay over Stage so the operator can
   // record / overwrite steps without context-switching to the Scenes
@@ -1590,6 +1757,31 @@ export function StageView() {
     for (const d of library) m[d.id] = d;
     return m;
   }, [library]);
+
+  // Resolve each touched channel offset to a human-friendly label using
+  // the fixture's mode definition. Falls back to "Ch N" when the
+  // definition is missing (legacy show file, etc.) so the badge still
+  // reads sensibly. Capitalised so the tooltip looks like "Pan, Tilt"
+  // instead of the raw lowercase role names.
+  const touchedLabelsByFixture = useMemo(() => {
+    if (!show) return {} as Record<string, string[]>;
+    const out: Record<string, string[]> = {};
+    for (const f of show.fixtures) {
+      const offsets = touchedByFixture[f.id];
+      if (!offsets || offsets.length === 0) continue;
+      const mode = libraryById[f.definition_id]?.modes[f.mode_index];
+      out[f.id] = offsets.map((offset) => {
+        const ch = mode?.channels[offset];
+        if (ch?.name) return ch.name;
+        if (ch?.role) {
+          const raw = roleLabel(ch.role);
+          return raw.charAt(0).toUpperCase() + raw.slice(1);
+        }
+        return `Ch ${offset + 1}`;
+      });
+    }
+    return out;
+  }, [show, libraryById, touchedByFixture]);
 
   const imageUrlByDef = useMemo(() => {
     const m: Record<string, string> = {};
@@ -2023,6 +2215,33 @@ export function StageView() {
     closeMenu();
   };
 
+  // Drop a single fixture from the touched set. Optimistically clears
+  // the local map so the halo/badge disappear instantly; the next poll
+  // would catch up anyway but the operator notices the lag at 250ms.
+  const handleUntouch = (fixtureId: string) => {
+    setTouchedByFixture((prev) => {
+      if (!prev[fixtureId]) return prev;
+      const { [fixtureId]: _drop, ...rest } = prev;
+      return rest;
+    });
+    programmerUntouch(fixtureId).catch(() => {});
+  };
+
+  const actionUntouch = async () => {
+    const targets = targetsForAction();
+    if (targets.length === 0) return closeMenu();
+    // Optimistic batch-clear of the touched map for these fixtures.
+    setTouchedByFixture((prev) => {
+      const next = { ...prev };
+      for (const f of targets) delete next[f.id];
+      return next;
+    });
+    for (const f of targets) {
+      await programmerUntouch(f.id).catch(() => {});
+    }
+    closeMenu();
+  };
+
   return (
     <main className="page stage-view">
       <header className="page-head">
@@ -2065,8 +2284,19 @@ export function StageView() {
                 barColor={barColorByFixture[f.id] ?? null}
                 selected={selectedIds.has(f.id)}
                 effects={effectsByFixture[f.id] ?? []}
+                touchedLabels={
+                  // Hide touched indicators unless the operator is in
+                  // record context (Scene panel open) AND has the
+                  // helper enabled. Empty array means "no halo, no
+                  // badge, plain tooltip".
+                  scenePopupOpen && touchedHelperOn
+                    ? touchedLabelsByFixture[f.id] ?? EMPTY_LABELS
+                    : EMPTY_LABELS
+                }
+                flashStamp={flashStamp}
                 onSelect={(e) => onFixtureClick(f.id, e)}
                 onContextMenu={onFixtureContextMenu(f.id)}
+                onUntouch={handleUntouch}
               />
             ))}
             {marquee ? (
@@ -2089,6 +2319,16 @@ export function StageView() {
             y={menu.y}
             multi={selectedIds.has(menu.fixtureId) && selectedIds.size > 1}
             count={selectedIds.has(menu.fixtureId) && selectedIds.size > 1 ? selectedIds.size : 1}
+            touchedCount={
+              // Reuse the same target-selection logic as the actions:
+              // when the right-clicked fixture is part of a multi-
+              // selection we count touched across the whole selection;
+              // otherwise just the clicked one.
+              (selectedIds.has(menu.fixtureId) && selectedIds.size > 1
+                ? Array.from(selectedIds)
+                : [menu.fixtureId]
+              ).filter((id) => (touchedByFixture[id]?.length ?? 0) > 0).length
+            }
             onClose={closeMenu}
             onCenterPanTilt={actionCenterPanTilt}
             onPark={actionPark}
@@ -2096,6 +2336,7 @@ export function StageView() {
             onBlackout={actionBlackoutFixture}
             onRename={actionRename}
             onDuplicate={actionDuplicate}
+            onUntouch={actionUntouch}
             onRemove={actionRemove}
           />
         ) : null}
@@ -2131,6 +2372,9 @@ export function StageView() {
           activeSceneId={activeSceneId}
           activeStepIdx={activeStepIdx}
           onClose={() => setScenePopupOpen(false)}
+          onLocateTouched={() => setFlashStamp(Date.now())}
+          touchedHelperOn={touchedHelperOn}
+          onToggleTouchedHelper={() => setTouchedHelperOn((v) => !v)}
         />
       ) : null}
     </main>

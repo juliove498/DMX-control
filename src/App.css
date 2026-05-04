@@ -124,6 +124,54 @@ code,
   color: #fff;
 }
 
+.tab-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+}
+.tab-group.active {
+  background: #2c2c2c;
+}
+.tab-group .tab {
+  padding-right: 4px;
+}
+.tab-popout-btn {
+  background: transparent;
+  border: none;
+  color: #6c6c6c;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 6px;
+  margin-right: 2px;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.1s ease, color 0.1s ease, background 0.1s ease;
+}
+.tab-group:hover .tab-popout-btn,
+.tab-popout-btn:focus-visible {
+  opacity: 1;
+}
+.tab-popout-btn:hover {
+  color: #f5d896;
+  background: #232323;
+}
+
+.fullscreen-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #9a9a9a;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.fullscreen-btn:hover {
+  color: #f5d896;
+  border-color: #3a3a3a;
+}
+
 .show-name {
   font-size: 12px;
   color: #b6b6b6;
@@ -473,71 +521,59 @@ label {
   color: #b1f5c7;
 }
 
-/* === Config (with sub-sidebar) === */
+/* === Config (horizontal grouped tabs) === */
 .config-view {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   min-height: 0;
 }
-.config-sidebar {
-  flex: 0 0 220px;
-  background: #181818;
-  border: 1px solid #2a2a2a;
-  border-radius: 4px;
-  padding: 10px 8px;
+.config-tabs {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  overflow: auto;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  border-bottom: 1px solid #2a2a2a;
+  padding-bottom: 6px;
 }
-.config-sidebar h3 {
-  margin: 4px 8px 8px;
-  color: #888;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-}
-.config-nav {
+/* Each group is its own flex row of tabs; groups are separated by a thin
+ * divider so the hardware / surface / debug split stays readable without
+ * needing an extra label per section. */
+.config-tabs-group {
   display: flex;
-  flex-direction: column;
   gap: 2px;
 }
-.config-nav-btn {
+.config-tabs-group + .config-tabs-group {
+  margin-left: 14px;
+  padding-left: 14px;
+  border-left: 1px solid #2a2a2a;
+}
+.config-tab-btn {
   background: transparent;
   border: 0;
   color: #cfcfcf;
   font: inherit;
   font-size: 12px;
-  text-align: left;
-  padding: 8px 10px;
-  border-radius: 3px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  padding: 6px 12px;
+  border-radius: 4px;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  white-space: nowrap;
 }
-.config-nav-btn:hover {
+.config-tab-btn:hover {
   background: #232323;
-}
-.config-nav-btn.active {
-  background: #2c2c2c;
   color: #fff;
 }
-.config-nav-label {
-  font-weight: 600;
-}
-.config-nav-hint {
-  font-size: 10px;
-  color: #666;
-  font-weight: 400;
-}
-.config-nav-btn.active .config-nav-hint {
-  color: #999;
+.config-tab-btn.active {
+  background: #2c2c2c;
+  color: #fff;
+  box-shadow: inset 0 -2px 0 #f5d896;
 }
 .config-content {
   flex: 1 1 auto;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -857,6 +893,92 @@ label {
   z-index: 2;
   opacity: 0.85;
   cursor: grabbing;
+}
+
+/* === Touched indicator ===
+ * A dotted dorado outline drawn outside the card via an absolute
+ * sibling (.touched-halo) instead of a real border, so it doesn't
+ * compete with .selected (solid dorado) and survives the existing
+ * box-shadow/border styling. The corner badge shows the count of
+ * touched channels; the full list is in the title tooltip. */
+.stage-fixture.touched .touched-halo {
+  position: absolute;
+  inset: -4px;
+  border: 1.5px dashed #f5d896;
+  border-radius: 6px;
+  pointer-events: none;
+  /* Soft outer glow so the marker reads at a glance even on a busy
+   * canvas, without being as loud as the .selected solid ring. */
+  box-shadow: 0 0 8px rgba(245, 216, 150, 0.35);
+}
+/* Re-keying on flashStamp restarts this animation, so the Localizar
+ * button feels like a fresh ping every press. */
+.stage-fixture.touched .touched-halo {
+  animation: touched-flash 1.5s ease-out;
+}
+@keyframes touched-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(245, 216, 150, 0.9), 0 0 18px 6px rgba(245, 216, 150, 0.7);
+    transform: scale(1.06);
+  }
+  35% {
+    box-shadow: 0 0 0 4px rgba(245, 216, 150, 0.35), 0 0 14px 4px rgba(245, 216, 150, 0.5);
+    transform: scale(1.02);
+  }
+  100% {
+    box-shadow: 0 0 8px rgba(245, 216, 150, 0.35);
+    transform: scale(1);
+  }
+}
+.touched-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  background: #f5d896;
+  color: #1a1a1a;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 6px;
+  border-radius: 999px;
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+/* When the badge is the un-touch button: enable pointer events, swap
+ * to a × on hover, and tint red so the destructive intent reads. The
+ * default span and hover span are layered so the swap is animation-
+ * free and the badge size stays stable. */
+.touched-badge.clickable {
+  cursor: pointer;
+  pointer-events: auto;
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 18px;
+  padding: 0 5px;
+  transition: background 0.1s ease, color 0.1s ease, transform 0.1s ease;
+}
+.touched-badge.clickable .touched-badge-hover {
+  display: none;
+}
+.touched-badge.clickable:hover,
+.touched-badge.clickable:focus-visible {
+  background: #d04444;
+  color: #fff;
+  transform: scale(1.1);
+  outline: none;
+}
+.touched-badge.clickable:hover .touched-badge-default,
+.touched-badge.clickable:focus-visible .touched-badge-default {
+  display: none;
+}
+.touched-badge.clickable:hover .touched-badge-hover,
+.touched-badge.clickable:focus-visible .touched-badge-hover {
+  display: inline;
+  font-size: 14px;
+  line-height: 1;
 }
 .stage-fixture .label {
   font-weight: 600;
@@ -1837,6 +1959,13 @@ label {
 }
 .sqp-btn.ghost {
   background: transparent;
+}
+.sqp-btn.ghost.toggled {
+  /* Active "helper enabled" affordance — dorado matches the touched
+   * halo so the operator can see the relationship at a glance. */
+  background: rgba(245, 216, 150, 0.12);
+  border-color: #f5d896;
+  color: #f5d896;
 }
 .sqp-btn.full {
   display: block;

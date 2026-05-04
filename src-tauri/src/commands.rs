@@ -795,10 +795,11 @@ pub fn set_fixture_channel(
         .write()
         .set_channel(universe, channel, value)
         .map_err(|e| CommandError::Other(e.to_string()))?;
-    // Mark this fixture as touched in the programmer. The next "Record"
-    // or "Update scene" command can use this set to capture only the
-    // fixtures the operator was actively dialing in.
-    programmer.lock().touch(fixture_id);
+    // Mark this fixture *and the specific channel* as touched. The
+    // recording flows still capture at fixture granularity (Update / Add
+    // step / Solo touched), but the per-channel detail powers the
+    // "what did I touch on this fixture" UI on the stage canvas.
+    programmer.lock().touch(fixture_id, channel_offset);
     Ok(())
 }
 
@@ -1285,6 +1286,19 @@ pub fn programmer_status(programmer: State<'_, SharedProgrammer>) -> ProgrammerS
 #[tauri::command]
 pub fn programmer_clear(programmer: State<'_, SharedProgrammer>) {
     programmer.lock().clear();
+}
+
+/// Drop a single fixture from the touched set without affecting any of
+/// the others. Used by the canvas badge / context-menu "Untouch" action
+/// when the operator wants to selectively exclude a fixture from the
+/// next Record/Update without losing the whole programmer state.
+/// Idempotent: untouching a fixture that wasn't touched is a no-op.
+#[tauri::command]
+pub fn programmer_untouch(
+    programmer: State<'_, SharedProgrammer>,
+    fixture_id: String,
+) {
+    programmer.lock().untouch(&fixture_id);
 }
 
 // ---- Scenes (Phase 4 it. 3: multi-step + FX capture) ---------------------

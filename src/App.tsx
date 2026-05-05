@@ -9,6 +9,7 @@ import "./App.css";
 import { ChaserView } from "./components/ChaserView";
 import { ConfigView } from "./components/ConfigView";
 import { MovementView } from "./components/MovementView";
+import { Preview3D } from "./components/Preview3D";
 import { ScenesView } from "./components/ScenesView";
 import { StageView } from "./components/StageView";
 import {
@@ -27,6 +28,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "scenes", label: "Scenes" },
   { id: "chaser", label: "Chaser" },
   { id: "movement", label: "Movement" },
+  { id: "preview3d", label: "Preview 3D" },
   { id: "config", label: "Config" },
 ];
 
@@ -40,6 +42,8 @@ function renderTab(tab: Tab) {
       return <ChaserView />;
     case "movement":
       return <MovementView />;
+    case "preview3d":
+      return <Preview3D />;
     case "config":
       return <ConfigView />;
   }

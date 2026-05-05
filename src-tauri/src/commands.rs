@@ -1775,6 +1775,13 @@ pub fn recall_scene_impl(
     //   - target for the release fade-out (so "Liberar" returns the
     //     rig to whatever was on the wire just before recall, even
     //     channels only touched by later steps).
+    //
+    // We capture the BASE layer only (no effects/blind/master/blackout
+    // merge). The overlays apply independently each frame, and on
+    // release the FX state is also restored to its pre-recall value
+    // — so capturing the merged output here would double-count the
+    // chaser/movement contribution and leave channels too bright
+    // after release.
     let mut pre_recall_values: std::collections::HashMap<(u16, u16), u8> =
         std::collections::HashMap::new();
     let mut step_inputs: Vec<crate::engine::scene_playback::ResolvedStepInput> = Vec::new();
@@ -1795,7 +1802,7 @@ pub fn recall_scene_impl(
                 };
                 let snap = match universe_snaps.get(&inst.universe) {
                     Some(s) => Some(s),
-                    None => match g.snapshot_universe(inst.universe) {
+                    None => match g.snapshot_base(inst.universe) {
                         Some(s) => {
                             universe_snaps.insert(inst.universe, s);
                             universe_snaps.get(&inst.universe)
@@ -2077,6 +2084,247 @@ pub fn apply_outputs(
         *guard = Some(h);
     }
     Ok(())
+}
+
+// ---- AI scene generation (POC) ------------------------------------------
+
+#[derive(Debug, serde::Serialize, ts_rs::TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct AiAvailableModels {
+    pub anthropic: Vec<crate::ai::config::AiModelOption>,
+    pub openai: Vec<crate::ai::config::AiModelOption>,
+}
+
+#[tauri::command]
+pub fn get_ai_config(app: AppHandle) -> crate::ai::config::AiConfig {
+    crate::ai::config::load(&app)
+}
+
+#[tauri::command]
+pub fn set_ai_config(
+    app: AppHandle,
+    config: crate::ai::config::AiConfig,
+) -> Result<(), CommandError> {
+    crate::ai::config::save(&app, &config).map_err(CommandError::Other)
+}
+
+#[tauri::command]
+pub fn ai_list_models() -> AiAvailableModels {
+    AiAvailableModels {
+        anthropic: crate::ai::config::anthropic_models(),
+        openai: crate::ai::config::openai_models(),
+    }
+}
+
+/// Validate the active provider's API key by making a tiny request.
+/// Returns a human-readable success message or an error string with
+/// the API's response body.
+#[tauri::command]
+pub async fn ai_test_connection(app: AppHandle) -> Result<String, CommandError> {
+    use crate::ai::config::AiProvider;
+    let cfg = crate::ai::config::load(&app);
+    let Some((provider, api_key, model)) = cfg.active() else {
+        return Err(CommandError::Other(
+            "Configurá un provider y una API key primero".into(),
+        ));
+    };
+    // The closures need owned strings to satisfy 'static for spawn.
+    let api_key = api_key.to_string();
+    let model = model.to_string();
+    match provider {
+        AiProvider::Anthropic => crate::ai::anthropic::test_connection(&api_key, &model)
+            .await
+            .map_err(CommandError::Other),
+        AiProvider::Openai => crate::ai::openai::test_connection(&api_key, &model)
+            .await
+            .map_err(CommandError::Other),
+        AiProvider::None => unreachable!("active() filtered None"),
+    }
+}
+
+// `seed`, when provided, makes the LLM treat the existing scene as
+// the starting point and the prompt as a tweak instruction. Fixture
+// context is still sent so the model can dip into available channels.
+#[tauri::command]
+pub async fn ai_generate_scene_draft(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    prompt: String,
+    step_count: u32,
+    fixture_ids: Option<Vec<String>>,
+    seed: Option<crate::ai::scene_gen::DraftScene>,
+) -> Result<crate::ai::scene_gen::DraftScene, CommandError> {
+    let cfg = crate::ai::config::load(&app);
+    let Some((provider, api_key, model)) = cfg.active() else {
+        return Err(CommandError::Other(
+            "Configurá un provider y una API key primero".into(),
+        ));
+    };
+    let api_key = api_key.to_string();
+    let model = model.to_string();
+
+    // Snapshot the show + library while we hold the read lock; the HTTP
+    // call below is async and we don't want to hold a parking_lot guard
+    // across await points. Cloning a few hundred KB here is fine for
+    // the cost; the alternative is restructuring the show state.
+    let (show_snapshot, library_snapshot) = {
+        let s = show.read();
+        (s.show.clone(), s.library.clone())
+    };
+
+    let context = crate::ai::scene_gen::build_context(
+        &show_snapshot,
+        &library_snapshot,
+        fixture_ids.as_deref(),
+    );
+
+    crate::ai::scene_gen::generate(
+        provider,
+        &api_key,
+        &model,
+        &prompt,
+        step_count,
+        &context,
+        seed.as_ref(),
+    )
+    .await
+    .map_err(CommandError::Other)
+}
+
+/// Replace an existing scene's name + steps with the contents of a
+/// validated draft. Keeps the scene's id (so MIDI bindings, UI
+/// selection, etc. stay anchored to the same scene) and preserves
+/// the chaser/movement layer state — only the steps and name change.
+#[tauri::command]
+pub fn ai_replace_scene(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    scene_id: String,
+    draft: crate::ai::scene_gen::DraftScene,
+) -> Result<crate::show::scene::Scene, CommandError> {
+    use crate::show::scene::{SceneChannel, SceneFixture, SceneFxState, SceneStep};
+    if draft.steps.is_empty() {
+        return Err(CommandError::Other(
+            "El draft no tiene ningún step válido luego de la validación".into(),
+        ));
+    }
+    let new_steps: Vec<SceneStep> = draft
+        .steps
+        .into_iter()
+        .map(|step| SceneStep {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: step.name,
+            fade_in_ms: step.fade_in_ms,
+            hold_ms: step.hold_ms,
+            fixtures: step
+                .fixtures
+                .into_iter()
+                .map(|fx| SceneFixture {
+                    fixture_id: fx.fixture_id,
+                    values: fx
+                        .values
+                        .into_iter()
+                        .map(|v| SceneChannel {
+                            channel_offset: v.channel_offset,
+                            value: v.value,
+                        })
+                        .collect(),
+                })
+                .collect(),
+            chaser_state: SceneFxState::Inherit,
+            movement_state: SceneFxState::Inherit,
+        })
+        .collect();
+    let new_name = if draft.name.trim().is_empty() {
+        None
+    } else {
+        Some(draft.name.trim().to_string())
+    };
+
+    let updated = {
+        let mut s = show.write();
+        let updated = {
+            let Some(scene) = s.show.scenes.iter_mut().find(|sc| sc.id == scene_id) else {
+                return Err(CommandError::Other(format!(
+                    "Escena {scene_id} no encontrada"
+                )));
+            };
+            if let Some(name) = new_name {
+                scene.name = name;
+            }
+            scene.steps = new_steps;
+            scene.clone()
+        };
+        s.dirty = true;
+        updated
+    };
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(updated)
+}
+
+/// Materialise a validated draft into the show as a real scene. Runs
+/// after the operator hits "Apply" in the preview UI; nothing in the
+/// generation path mutates the show on its own.
+#[tauri::command]
+pub fn ai_apply_draft_scene(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    draft: crate::ai::scene_gen::DraftScene,
+) -> Result<crate::show::scene::Scene, CommandError> {
+    use crate::show::scene::{Scene, SceneChannel, SceneFixture, SceneFxState, SceneStep};
+    if draft.steps.is_empty() {
+        return Err(CommandError::Other(
+            "El draft no tiene ningún step válido luego de la validación".into(),
+        ));
+    }
+
+    let scene_id = uuid::Uuid::new_v4().to_string();
+    let scene_name = if draft.name.trim().is_empty() {
+        format!("AI Scene {}", show.read().show.scenes.len() + 1)
+    } else {
+        draft.name.trim().to_string()
+    };
+    let mut scene = Scene::default_with_id(scene_id, scene_name);
+
+    for step in draft.steps {
+        let fixtures: Vec<SceneFixture> = step
+            .fixtures
+            .into_iter()
+            .map(|fx| SceneFixture {
+                fixture_id: fx.fixture_id,
+                values: fx
+                    .values
+                    .into_iter()
+                    .map(|v| SceneChannel {
+                        channel_offset: v.channel_offset,
+                        value: v.value,
+                    })
+                    .collect(),
+            })
+            .collect();
+        scene.steps.push(SceneStep {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: step.name,
+            fade_in_ms: step.fade_in_ms,
+            hold_ms: step.hold_ms,
+            fixtures,
+            // AI-generated steps don't manage chaser/movement layers —
+            // operators add that in post if they want it. Inherit
+            // means "leave whatever's running alone" on recall.
+            chaser_state: SceneFxState::Inherit,
+            movement_state: SceneFxState::Inherit,
+        });
+    }
+
+    {
+        let mut s = show.write();
+        s.show.scenes.push(scene.clone());
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(scene)
 }
 
 /// Persist on every mutation. Always writes the autosave so an Untitled show

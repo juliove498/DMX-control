@@ -1,8 +1,32 @@
+import type { DraftScene } from "@bindings/DraftScene";
 import type { Scene } from "@bindings/Scene";
 import type { SceneFxState } from "@bindings/SceneFxState";
 import type { SceneStep } from "@bindings/SceneStep";
 import { useEffect, useMemo, useState } from "react";
 import { useShowStore } from "../stores/show";
+import { AiGenerateModal, type AiGenerateModalSeed } from "./AiGenerateModal";
+
+/// Project a live Scene into the DraftScene shape the LLM iteration
+/// flow expects. Drops chaser/movement state — the iterator focuses
+/// on light values; FX layers are preserved unchanged when the
+/// scene is replaced via `aiReplaceScene`.
+function sceneToDraft(scene: Scene): DraftScene {
+  return {
+    name: scene.name,
+    steps: scene.steps.map((step) => ({
+      name: step.name ?? null,
+      fade_in_ms: step.fade_in_ms,
+      hold_ms: step.hold_ms,
+      fixtures: step.fixtures.map((fx) => ({
+        fixture_id: fx.fixture_id,
+        values: fx.values.map((v) => ({
+          channel_offset: v.channel_offset,
+          value: v.value,
+        })),
+      })),
+    })),
+  };
+}
 
 /// Scenes UI (Phase 4 iteration 3): two-pane layout.
 ///
@@ -31,6 +55,10 @@ export function ScenesView() {
   const [activeStep, setActiveStep] = useState<number | null>(null);
   const [touched, setTouched] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  // When set, the modal opens in iterate mode with this seed instead
+  // of the from-scratch form. Cleared on close.
+  const [aiSeed, setAiSeed] = useState<AiGenerateModalSeed | undefined>(undefined);
 
   // Auto-select first scene when the list isn't empty and nothing is
   // selected. Reset selection if the selected scene was deleted.
@@ -101,6 +129,19 @@ export function ScenesView() {
         <span className="meta">
           Multi-step + FX capture · {scenes.length} escena{scenes.length === 1 ? "" : "s"}
         </span>
+        <div className="actions">
+          <button
+            type="button"
+            className="ai-trigger-btn"
+            onClick={() => {
+              setAiSeed(undefined);
+              setAiOpen(true);
+            }}
+            title="Generar una escena nueva con IA a partir de un prompt"
+          >
+            ✨ Generar con IA
+          </button>
+        </div>
       </header>
 
       {error ? (
@@ -167,6 +208,14 @@ export function ScenesView() {
               onDelete={() => deleteScene(selectedScene.id)}
               onRecall={() => recallScene(selectedScene.id)}
               programmerClear={programmerClear}
+              onIterateWithAi={() => {
+                setAiSeed({
+                  sceneId: selectedScene.id,
+                  sceneName: selectedScene.name,
+                  draft: sceneToDraft(selectedScene),
+                });
+                setAiOpen(true);
+              }}
             />
           ) : (
             <div className="scenes-empty-editor">
@@ -186,6 +235,15 @@ export function ScenesView() {
             Clear
           </button>
         </footer>
+      ) : null}
+      {aiOpen ? (
+        <AiGenerateModal
+          initialSeed={aiSeed}
+          onClose={() => {
+            setAiOpen(false);
+            setAiSeed(undefined);
+          }}
+        />
       ) : null}
     </main>
   );
@@ -250,6 +308,7 @@ function SceneEditor({
   onDelete,
   onRecall,
   programmerClear,
+  onIterateWithAi,
 }: {
   scene: Scene;
   fixtures: { id: string; label: string | null }[];
@@ -275,6 +334,9 @@ function SceneEditor({
   onDelete: () => Promise<void>;
   onRecall: () => void;
   programmerClear: () => Promise<void>;
+  /** Open the AI modal seeded with this scene so the operator can
+   *  iterate over its values with a tweak prompt. */
+  onIterateWithAi: () => void;
 }) {
   const [name, setName] = useState(scene.name);
   // Local controls for the "+ Add step" footer.
@@ -324,6 +386,14 @@ function SceneEditor({
           }}
         />
         <span className="scene-editor-cycle">Ciclo total: {(totalCycleMs / 1000).toFixed(1)}s</span>
+        <button
+          type="button"
+          className="ai-trigger-btn scene-editor-ai"
+          onClick={onIterateWithAi}
+          title="Iterar esta escena con IA (refinar valores, fades, agregar/quitar steps)"
+        >
+          ✨ Mejorar con IA
+        </button>
         <button
           type="button"
           className="danger"

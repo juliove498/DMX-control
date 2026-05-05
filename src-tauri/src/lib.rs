@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod chaser;
 pub mod commands;
 pub mod engine;
@@ -469,6 +470,14 @@ pub fn run() {
             commands::programmer_status,
             commands::programmer_clear,
             commands::programmer_untouch,
+            // AI scene generation (POC)
+            commands::get_ai_config,
+            commands::set_ai_config,
+            commands::ai_list_models,
+            commands::ai_test_connection,
+            commands::ai_generate_scene_draft,
+            commands::ai_apply_draft_scene,
+            commands::ai_replace_scene,
             // Globals (Blackout + Blind)
             commands::get_globals,
             commands::update_globals,

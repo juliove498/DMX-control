@@ -8,10 +8,10 @@
       "mode_index": 0,
       "universe": 0,
       "address": 1,
-      "label": "SMSN 18x18 1",
+      "label": "RGBWYP LED 18x18 1",
       "position": [
-        32.0,
-        32.0
+        0.0,
+        0.0
       ]
     },
     {
@@ -20,10 +20,10 @@
       "mode_index": 0,
       "universe": 0,
       "address": 11,
-      "label": "SMSN 18x18 2",
+      "label": "RGBWYP LED 18x18 2",
       "position": [
-        160.0,
-        32.0
+        128.0,
+        0.0
       ]
     },
     {
@@ -32,10 +32,10 @@
       "mode_index": 0,
       "universe": 0,
       "address": 21,
-      "label": "SMSN 18x18 3",
+      "label": "RGBWYP LED 18x18 3",
       "position": [
-        288.0,
-        32.0
+        256.0,
+        0.0
       ]
     },
     {
@@ -44,82 +44,178 @@
       "mode_index": 0,
       "universe": 0,
       "address": 31,
-      "label": "SMSN 18x18 4",
+      "label": "RGBWYP LED 18x18 4",
       "position": [
-        416.0,
-        32.0
-      ]
-    },
-    {
-      "id": "fx-6",
-      "definition_id": "magic-color-small-steel-gun",
-      "mode_index": 0,
-      "universe": 0,
-      "address": 52,
-      "label": "Magic Color Small Steel Gun 1",
-      "position": [
-        288.0,
-        192.0
-      ]
-    },
-    {
-      "id": "fx-7",
-      "definition_id": "magic-color-small-steel-gun",
-      "mode_index": 0,
-      "universe": 0,
-      "address": 65,
-      "label": "Magic Color Small Steel Gun 2",
-      "position": [
-        32.0,
-        192.0
-      ]
-    },
-    {
-      "id": "fx-8",
-      "definition_id": "magic-color-small-steel-gun",
-      "mode_index": 0,
-      "universe": 0,
-      "address": 78,
-      "label": "Magic Color Small Steel Gun 3",
-      "position": [
-        160.0,
-        192.0
-      ]
-    },
-    {
-      "id": "fx-9",
-      "definition_id": "magic-color-small-steel-gun",
-      "mode_index": 0,
-      "universe": 0,
-      "address": 91,
-      "label": "Magic Color Small Steel Gun 4",
-      "position": [
-        416.0,
-        192.0
+        384.0,
+        0.0
       ]
     },
     {
       "id": "fx-5",
-      "definition_id": "six-3in1-retro",
+      "definition_id": "shamsonic-rgbwyp-led",
       "mode_index": 0,
       "universe": 0,
-      "address": 104,
-      "label": "Six 3in1 Retro 1",
+      "address": 41,
+      "label": "RGBWYP LED 18x18 5",
       "position": [
-        32.0,
-        352.0
+        0.0,
+        128.0
+      ]
+    },
+    {
+      "id": "fx-6",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 51,
+      "label": "RGBWYP LED 18x18 6",
+      "position": [
+        128.0,
+        128.0
+      ]
+    },
+    {
+      "id": "fx-7",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 61,
+      "label": "RGBWYP LED 18x18 7",
+      "position": [
+        256.0,
+        128.0
+      ]
+    },
+    {
+      "id": "fx-8",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 71,
+      "label": "RGBWYP LED 18x18 8",
+      "position": [
+        384.0,
+        128.0
+      ]
+    },
+    {
+      "id": "fx-9",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 81,
+      "label": "RGBWYP LED 18x18 9",
+      "position": [
+        0.0,
+        256.0
       ]
     },
     {
       "id": "fx-10",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 91,
+      "label": "RGBWYP LED 18x18 10",
+      "position": [
+        128.0,
+        256.0
+      ]
+    },
+    {
+      "id": "fx-11",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 101,
+      "label": "RGBWYP LED 18x18 11",
+      "position": [
+        256.0,
+        256.0
+      ]
+    },
+    {
+      "id": "fx-12",
+      "definition_id": "shamsonic-rgbwyp-led",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 111,
+      "label": "RGBWYP LED 18x18 12",
+      "position": [
+        384.0,
+        256.0
+      ]
+    },
+    {
+      "id": "fx-13",
+      "definition_id": "magic-color-small-steel-gun",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 121,
+      "label": "Magic Color Small Steel Gun 1",
+      "position": [
+        0.0,
+        416.0
+      ]
+    },
+    {
+      "id": "fx-14",
+      "definition_id": "magic-color-small-steel-gun",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 134,
+      "label": "Magic Color Small Steel Gun 2",
+      "position": [
+        128.0,
+        416.0
+      ]
+    },
+    {
+      "id": "fx-15",
+      "definition_id": "magic-color-small-steel-gun",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 147,
+      "label": "Magic Color Small Steel Gun 3",
+      "position": [
+        256.0,
+        416.0
+      ]
+    },
+    {
+      "id": "fx-16",
+      "definition_id": "magic-color-small-steel-gun",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 160,
+      "label": "Magic Color Small Steel Gun 4",
+      "position": [
+        384.0,
+        416.0
+      ]
+    },
+    {
+      "id": "fx-17",
       "definition_id": "six-3in1-retro",
       "mode_index": 0,
       "universe": 0,
-      "address": 124,
+      "address": 173,
+      "label": "Six 3in1 Retro 1",
+      "position": [
+        512.0,
+        416.0
+      ]
+    },
+    {
+      "id": "fx-18",
+      "definition_id": "six-3in1-retro",
+      "mode_index": 0,
+      "universe": 0,
+      "address": 193,
       "label": "Six 3in1 Retro 2",
       "position": [
-        160.0,
-        352.0
+        512.0,
+        288.0
       ]
     }
   ],
@@ -150,28 +246,7 @@
       "id": "923000e4-5085-4654-b90c-65f34b7d5c17",
       "name": "Cyber Pulse",
       "enabled": false,
-      "slots": [
-        {
-          "fixture_id": "fx-1",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-2",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-3",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-4",
-          "use_intensity": true,
-          "use_color": true
-        }
-      ],
+      "slots": [],
       "pattern": {
         "type": "center_out"
       },
@@ -197,28 +272,7 @@
       "id": "324c3a17-f298-4fe6-a05e-c5f953ca9e71",
       "name": "Cyan / Magenta Flash",
       "enabled": false,
-      "slots": [
-        {
-          "fixture_id": "fx-1",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-2",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-3",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-4",
-          "use_intensity": true,
-          "use_color": true
-        }
-      ],
+      "slots": [],
       "pattern": {
         "type": "center_out"
       },
@@ -275,6 +329,46 @@
           "fixture_id": "fx-4",
           "use_intensity": true,
           "use_color": true
+        },
+        {
+          "fixture_id": "fx-5",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-6",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-7",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-8",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-9",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-10",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-11",
+          "use_intensity": true,
+          "use_color": true
+        },
+        {
+          "fixture_id": "fx-12",
+          "use_intensity": true,
+          "use_color": true
         }
       ],
       "pattern": {
@@ -302,28 +396,7 @@
       "id": "7382a221-43fb-4a66-9607-10b38e740c19",
       "name": "Symmetric Spectrum",
       "enabled": false,
-      "slots": [
-        {
-          "fixture_id": "fx-1",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-2",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-3",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-4",
-          "use_intensity": true,
-          "use_color": true
-        }
-      ],
+      "slots": [],
       "pattern": {
         "type": "symmetric"
       },
@@ -380,28 +453,7 @@
       "id": "1ac64056-2c67-4af0-8718-e5a526c655e1",
       "name": "Theater Marquee",
       "enabled": false,
-      "slots": [
-        {
-          "fixture_id": "fx-1",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-2",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-3",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-4",
-          "use_intensity": true,
-          "use_color": true
-        }
-      ],
+      "slots": [],
       "pattern": {
         "type": "chase"
       },
@@ -438,28 +490,7 @@
       "id": "16a9b0fc-e8bf-4594-a2bb-3530b415d952",
       "name": "Build & Drop",
       "enabled": false,
-      "slots": [
-        {
-          "fixture_id": "fx-1",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-2",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-3",
-          "use_intensity": true,
-          "use_color": true
-        },
-        {
-          "fixture_id": "fx-4",
-          "use_intensity": true,
-          "use_color": true
-        }
-      ],
+      "slots": [],
       "pattern": {
         "type": "build"
       },
@@ -489,35 +520,29 @@
     {
       "id": "2e5ce792-ff45-4bed-af90-b7b3527345ec",
       "name": "Movement",
-      "enabled": false,
+      "enabled": true,
       "fixtures": [
         {
-          "fixture_id": "fx-5",
+          "fixture_id": "fx-13",
           "phase_offset": 0.0,
           "invert_pan": false,
           "invert_tilt": false
         },
         {
-          "fixture_id": "fx-6",
-          "phase_offset": 0.0,
+          "fixture_id": "fx-14",
+          "phase_offset": 0.25,
           "invert_pan": false,
           "invert_tilt": false
         },
         {
-          "fixture_id": "fx-7",
-          "phase_offset": 0.0,
+          "fixture_id": "fx-15",
+          "phase_offset": 0.5,
           "invert_pan": false,
           "invert_tilt": false
         },
         {
-          "fixture_id": "fx-9",
-          "phase_offset": 0.0,
-          "invert_pan": false,
-          "invert_tilt": false
-        },
-        {
-          "fixture_id": "fx-8",
-          "phase_offset": 0.0,
+          "fixture_id": "fx-16",
+          "phase_offset": 0.75,
           "invert_pan": false,
           "invert_tilt": false
         }
@@ -525,12 +550,12 @@
       "shape": {
         "type": "circle"
       },
-      "size_x": 0.136126,
-      "size_y": 0.13933691,
-      "center_x": 0.18612988,
-      "center_y": -0.801292,
-      "rotation_deg": 2.5400345,
-      "spread_mode": "none",
+      "size_x": 0.28867453,
+      "size_y": 0.13431627,
+      "center_x": 0.10341869,
+      "center_y": -0.53155816,
+      "rotation_deg": 359.32993,
+      "spread_mode": "even",
       "tempo": {
         "type": "fixed",
         "bpm": 25.0
@@ -544,8 +569,26 @@
       "enabled": false,
       "fixtures": [
         {
-          "fixture_id": "fx-5",
+          "fixture_id": "fx-13",
           "phase_offset": 0.0,
+          "invert_pan": false,
+          "invert_tilt": false
+        },
+        {
+          "fixture_id": "fx-14",
+          "phase_offset": 0.25,
+          "invert_pan": false,
+          "invert_tilt": false
+        },
+        {
+          "fixture_id": "fx-15",
+          "phase_offset": 0.5,
+          "invert_pan": false,
+          "invert_tilt": false
+        },
+        {
+          "fixture_id": "fx-16",
+          "phase_offset": 0.75,
           "invert_pan": false,
           "invert_tilt": false
         }
@@ -557,10 +600,10 @@
       },
       "size_x": 0.17010146,
       "size_y": 0.16093095,
-      "center_x": 0.26388294,
-      "center_y": -0.76768434,
+      "center_x": 0.11717697,
+      "center_y": -0.7806925,
       "rotation_deg": 21.692719,
-      "spread_mode": "none",
+      "spread_mode": "even",
       "tempo": {
         "type": "fixed",
         "bpm": 60.0
@@ -574,48 +617,7 @@
       "active": false,
       "fade_in_ms": 200,
       "fade_out_ms": 800,
-      "fixtures": [
-        {
-          "fixture_id": "fx-1",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-2",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-3",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-4",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-6",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-7",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-8",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-9",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-5",
-          "channels_to_zero": []
-        },
-        {
-          "fixture_id": "fx-10",
-          "channels_to_zero": []
-        }
-      ]
+      "fixtures": []
     },
     "blind": {
       "fade_in_ms": 80,
@@ -623,91 +625,84 @@
       "fixtures": [
         {
           "fixture_id": "fx-1",
-          "channels_at_full": [
-            "intensity",
-            "white",
-            "yellow",
-            "red",
-            "green",
-            "blue"
-          ]
+          "channels_at_full": []
         },
         {
           "fixture_id": "fx-2",
-          "channels_at_full": [
-            "intensity",
-            "red",
-            "green",
-            "blue",
-            "white",
-            "yellow"
-          ]
+          "channels_at_full": []
         },
         {
           "fixture_id": "fx-3",
-          "channels_at_full": [
-            "intensity",
-            "red",
-            "green",
-            "blue",
-            "white",
-            "yellow"
-          ]
+          "channels_at_full": []
         },
         {
           "fixture_id": "fx-4",
-          "channels_at_full": [
-            "intensity",
-            "red",
-            "green",
-            "white",
-            "yellow",
-            "blue"
-          ]
+          "channels_at_full": []
         },
         {
           "fixture_id": "fx-5",
-          "channels_at_full": [
-            "white"
-          ]
+          "channels_at_full": []
+        },
+        {
+          "fixture_id": "fx-6",
+          "channels_at_full": []
+        },
+        {
+          "fixture_id": "fx-7",
+          "channels_at_full": []
+        },
+        {
+          "fixture_id": "fx-8",
+          "channels_at_full": []
+        },
+        {
+          "fixture_id": "fx-9",
+          "channels_at_full": []
+        },
+        {
+          "fixture_id": "fx-12",
+          "channels_at_full": []
+        },
+        {
+          "fixture_id": "fx-11",
+          "channels_at_full": []
         },
         {
           "fixture_id": "fx-10",
-          "channels_at_full": [
-            "white"
-          ]
+          "channels_at_full": []
         }
       ]
     }
   },
   "scenes": [
     {
-      "id": "09e2496e-41c9-4f62-8fbe-958bc6bd1e53",
-      "name": "Scene 1",
+      "id": "e656f71e-0578-40cf-bb03-69f151dbb3bc",
+      "name": "Violeta→Azul Fan+Prisma→Centro",
       "steps": [
         {
-          "id": "17ed4706-4095-46b5-b23a-2f875f8b18de",
-          "fade_in_ms": 800,
-          "hold_ms": 0,
+          "id": "cb5b1a14-a9ef-4ebb-aac0-45e8f1d76ec5",
+          "name": "Gradiente Violeta-Azul | Fan Prisma → Centro",
+          "fade_in_ms": 2000,
+          "hold_ms": 8000,
           "fixtures": [
             {
               "fixture_id": "fx-1",
               "values": [
                 {
                   "channel_offset": 0,
-                  "value": 172
+                  "value": 220
                 },
                 {
                   "channel_offset": 1,
-                  "value": 0
+                  "value": 80
                 },
                 {
                   "channel_offset": 2,
-                  "value": 132
+                  "value": 0
                 },
                 {
                   "channel_offset": 3,
-                  "value": 41
+                  "value": 60
                 },
                 {
                   "channel_offset": 4,
@@ -719,18 +714,1356 @@
                 },
                 {
                   "channel_offset": 6,
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-2",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 100
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 190
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-3",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-4",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-5",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-6",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-7",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 100
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 190
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-8",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-9",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-10",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-11",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-12",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
                   "value": 0
                 },
                 {
                   "channel_offset": 7,
-                  "value": 0
+                  "value": 45
                 },
                 {
                   "channel_offset": 8,
-                  "value": 0
+                  "value": 5
                 },
                 {
                   "channel_offset": 9,
+                  "value": 108
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 108
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-17",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 13,
+                  "value": 255
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-18",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 13,
+                  "value": 255
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "810d4974-faa2-4e2d-b67b-2796d712b650",
+      "name": "Violeta→Azul Fan+Prisma→Centro | Rojo Random",
+      "steps": [
+        {
+          "id": "af6ead03-29d5-44d6-89d2-04dad89c5383",
+          "name": "Gradiente Violeta-Azul | Fan Prisma → Centro",
+          "fade_in_ms": 2000,
+          "hold_ms": 2000,
+          "fixtures": [
+            {
+              "fixture_id": "fx-1",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-2",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 100
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 190
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-3",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-4",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-5",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-6",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-7",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 100
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 190
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-8",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-9",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 220
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-10",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-11",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 110
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-12",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 150
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 108
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 108
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 35
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-17",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 13,
+                  "value": 255
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-18",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 12,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 13,
+                  "value": 255
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "0ea30dd0-9718-4b19-9881-be4b9ea6f69e",
+          "name": "Todo Rojo | Cabezales Movimiento Random",
+          "fade_in_ms": 800,
+          "hold_ms": 2000,
+          "fixtures": [
+            {
+              "fixture_id": "fx-1",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
                   "value": 0
                 }
               ]
@@ -740,19 +2073,19 @@
               "values": [
                 {
                   "channel_offset": 0,
-                  "value": 172
+                  "value": 255
                 },
                 {
                   "channel_offset": 1,
-                  "value": 0
+                  "value": 255
                 },
                 {
                   "channel_offset": 2,
-                  "value": 132
+                  "value": 0
                 },
                 {
                   "channel_offset": 3,
-                  "value": 41
+                  "value": 0
                 },
                 {
                   "channel_offset": 4,
@@ -764,18 +2097,6 @@
                 },
                 {
                   "channel_offset": 6,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 117
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 9,
                   "value": 0
                 }
               ]
@@ -785,19 +2106,19 @@
               "values": [
                 {
                   "channel_offset": 0,
-                  "value": 172
+                  "value": 255
                 },
                 {
                   "channel_offset": 1,
-                  "value": 0
+                  "value": 255
                 },
                 {
                   "channel_offset": 2,
-                  "value": 132
+                  "value": 0
                 },
                 {
                   "channel_offset": 3,
-                  "value": 41
+                  "value": 0
                 },
                 {
                   "channel_offset": 4,
@@ -809,18 +2130,6 @@
                 },
                 {
                   "channel_offset": 6,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 117
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 9,
                   "value": 0
                 }
               ]
@@ -830,60 +2139,15 @@
               "values": [
                 {
                   "channel_offset": 0,
-                  "value": 172
+                  "value": 255
                 },
                 {
                   "channel_offset": 1,
-                  "value": 0
+                  "value": 255
                 },
                 {
                   "channel_offset": 2,
-                  "value": 132
-                },
-                {
-                  "channel_offset": 3,
-                  "value": 41
-                },
-                {
-                  "channel_offset": 4,
                   "value": 0
-                },
-                {
-                  "channel_offset": 5,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 6,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 117
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 9,
-                  "value": 0
-                }
-              ]
-            },
-            {
-              "fixture_id": "fx-6",
-              "values": [
-                {
-                  "channel_offset": 0,
-                  "value": 153
-                },
-                {
-                  "channel_offset": 1,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 2,
-                  "value": 185
                 },
                 {
                   "channel_offset": 3,
@@ -895,205 +2159,10 @@
                 },
                 {
                   "channel_offset": 5,
-                  "value": 172
+                  "value": 0
                 },
                 {
                   "channel_offset": 6,
-                  "value": 117
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 19
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 9,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 10,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 11,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 12,
-                  "value": 0
-                }
-              ]
-            },
-            {
-              "fixture_id": "fx-7",
-              "values": [
-                {
-                  "channel_offset": 0,
-                  "value": 153
-                },
-                {
-                  "channel_offset": 1,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 2,
-                  "value": 185
-                },
-                {
-                  "channel_offset": 3,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 4,
-                  "value": 86
-                },
-                {
-                  "channel_offset": 5,
-                  "value": 172
-                },
-                {
-                  "channel_offset": 6,
-                  "value": 142
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 71
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 33
-                },
-                {
-                  "channel_offset": 9,
-                  "value": 109
-                },
-                {
-                  "channel_offset": 10,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 11,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 12,
-                  "value": 0
-                }
-              ]
-            },
-            {
-              "fixture_id": "fx-8",
-              "values": [
-                {
-                  "channel_offset": 0,
-                  "value": 153
-                },
-                {
-                  "channel_offset": 1,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 2,
-                  "value": 185
-                },
-                {
-                  "channel_offset": 3,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 4,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 5,
-                  "value": 172
-                },
-                {
-                  "channel_offset": 6,
-                  "value": 117
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 19
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 9,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 10,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 11,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 12,
-                  "value": 0
-                }
-              ]
-            },
-            {
-              "fixture_id": "fx-9",
-              "values": [
-                {
-                  "channel_offset": 0,
-                  "value": 153
-                },
-                {
-                  "channel_offset": 1,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 2,
-                  "value": 185
-                },
-                {
-                  "channel_offset": 3,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 4,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 5,
-                  "value": 172
-                },
-                {
-                  "channel_offset": 6,
-                  "value": 117
-                },
-                {
-                  "channel_offset": 7,
-                  "value": 87
-                },
-                {
-                  "channel_offset": 8,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 9,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 10,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 11,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 12,
                   "value": 0
                 }
               ]
@@ -1103,11 +2172,11 @@
               "values": [
                 {
                   "channel_offset": 0,
-                  "value": 172
+                  "value": 255
                 },
                 {
                   "channel_offset": 1,
-                  "value": 0
+                  "value": 255
                 },
                 {
                   "channel_offset": 2,
@@ -1128,57 +2197,137 @@
                 {
                   "channel_offset": 6,
                   "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-6",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
                 },
                 {
-                  "channel_offset": 7,
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
                   "value": 0
                 },
                 {
-                  "channel_offset": 8,
+                  "channel_offset": 3,
                   "value": 0
                 },
                 {
-                  "channel_offset": 9,
+                  "channel_offset": 4,
                   "value": 0
                 },
                 {
-                  "channel_offset": 10,
+                  "channel_offset": 5,
                   "value": 0
                 },
                 {
-                  "channel_offset": 11,
+                  "channel_offset": 6,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-7",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
                   "value": 0
                 },
                 {
-                  "channel_offset": 12,
+                  "channel_offset": 3,
                   "value": 0
                 },
                 {
-                  "channel_offset": 13,
+                  "channel_offset": 4,
                   "value": 0
                 },
                 {
-                  "channel_offset": 14,
+                  "channel_offset": 5,
                   "value": 0
                 },
                 {
-                  "channel_offset": 15,
+                  "channel_offset": 6,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-8",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
                   "value": 0
                 },
                 {
-                  "channel_offset": 16,
+                  "channel_offset": 3,
                   "value": 0
                 },
                 {
-                  "channel_offset": 17,
+                  "channel_offset": 4,
                   "value": 0
                 },
                 {
-                  "channel_offset": 18,
+                  "channel_offset": 5,
                   "value": 0
                 },
                 {
-                  "channel_offset": 19,
+                  "channel_offset": 6,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-9",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
                   "value": 0
                 }
               ]
@@ -1188,11 +2337,11 @@
               "values": [
                 {
                   "channel_offset": 0,
-                  "value": 172
+                  "value": 255
                 },
                 {
                   "channel_offset": 1,
-                  "value": 117
+                  "value": 255
                 },
                 {
                   "channel_offset": 2,
@@ -1213,14 +2362,297 @@
                 {
                   "channel_offset": 6,
                   "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-11",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-12",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 210
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 80
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 170
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
                 },
                 {
                   "channel_offset": 7,
-                  "value": 0
+                  "value": 19
                 },
                 {
                   "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
                   "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 13
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 75
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 190
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 13
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 180
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 140
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 100
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 13
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 50
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 230
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 210
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 13
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 150
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-17",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 255
                 },
                 {
                   "channel_offset": 9,
@@ -1232,7 +2664,7 @@
                 },
                 {
                   "channel_offset": 11,
-                  "value": 0
+                  "value": 255
                 },
                 {
                   "channel_offset": 12,
@@ -1241,39 +2673,1592 @@
                 {
                   "channel_offset": 13,
                   "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-18",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 255
                 },
                 {
-                  "channel_offset": 14,
+                  "channel_offset": 8,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 9,
                   "value": 0
                 },
                 {
-                  "channel_offset": 15,
+                  "channel_offset": 10,
                   "value": 0
                 },
                 {
-                  "channel_offset": 16,
+                  "channel_offset": 11,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 12,
                   "value": 0
                 },
                 {
-                  "channel_offset": 17,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 18,
-                  "value": 0
-                },
-                {
-                  "channel_offset": 19,
+                  "channel_offset": 13,
                   "value": 0
                 }
               ]
             }
           ],
           "chaser_state": {
-            "type": "disabled"
+            "type": "inherit"
           },
           "movement_state": {
-            "type": "disabled"
+            "type": "inherit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "f8dd3251-6fe4-452d-8e25-b33424171346",
+      "name": "Alternancia Par A / Par B",
+      "steps": [
+        {
+          "id": "a0fd9dc5-99c5-4f94-ad8a-df978897391d",
+          "name": "Par A encendido – Par B en movimiento",
+          "fade_in_ms": 80,
+          "hold_ms": 2000,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 190
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 180
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 180
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "e5948090-b59f-49d7-afea-85b0d9c33a1d",
+          "name": "Par B encendido – Par A en movimiento",
+          "fade_in_ms": 80,
+          "hold_ms": 2000,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 180
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 190
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 180
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 127
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "764742e1-8ed3-4d73-9e58-48368efa9230",
+      "name": "Encendido secuencial 1 por 1",
+      "steps": [
+        {
+          "id": "da128593-01f2-468d-aea9-c5e3be431bc3",
+          "name": "Gun 1 ON",
+          "fade_in_ms": 600,
+          "hold_ms": 800,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "bae06859-2cd6-4147-ac43-47805842c1f8",
+          "name": "Gun 1+2 ON",
+          "fade_in_ms": 600,
+          "hold_ms": 800,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "862876f3-b718-46b0-9651-613d5f86b9f7",
+          "name": "Gun 1+2+3 ON",
+          "fade_in_ms": 600,
+          "hold_ms": 800,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 39
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "b0d056f5-1573-4166-b3ae-38b0fd9761f5",
+          "name": "Todos ON",
+          "fade_in_ms": 600,
+          "hold_ms": 1200,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 6
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 39
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 15
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 52
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "83a4d0a8-302a-4e13-9401-cd373ee3d4e9",
+      "name": "Spectacle — 4 Heads Unleashed",
+      "steps": [
+        {
+          "id": "f7498aee-ef4c-4fc0-a45a-46340f97b6af",
+          "name": "Apertura — Rainbow + Prisma cruzado",
+          "fade_in_ms": 1800,
+          "hold_ms": 2500,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 70
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 143
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 74
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 185
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 143
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 160
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 63
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 70
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 165
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 175
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 41
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 185
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 165
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 175
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 5
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 8
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "dd07cb4c-ba4a-476f-878c-1ca2c2ce2b56",
+          "name": "Tormenta — Strobe + Gobos giratorios",
+          "fade_in_ms": 120,
+          "hold_ms": 1500,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 144
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 52
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 215
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 55
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 58
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 175
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 40
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 55
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 84
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 237
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 30
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 215
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 45
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 237
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 63
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "f35da4dd-e722-4764-a8fd-887bbe5ce5f5",
+          "name": "Abanico — Positions extremas + color sólido vibrante",
+          "fade_in_ms": 800,
+          "hold_ms": 2000,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 20
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 110
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 30
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 84
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 52
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 110
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 30
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 97
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 42
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 41
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 165
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 110
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 30
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 71
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 115
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 63
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 235
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 110
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 30
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 19
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 115
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 109
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 8
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
+          }
+        },
+        {
+          "id": "8a86dc35-3e41-4886-9e54-64d4372249eb",
+          "name": "Clímax — Centro + Rainbow CCW Fast + Prisma + Aro Auto",
+          "fade_in_ms": 400,
+          "hold_ms": 3000,
+          "fixtures": [
+            {
+              "fixture_id": "fx-13",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 10
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 60
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 200
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-14",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 10
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 42
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 220
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-15",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 10
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 115
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 240
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            },
+            {
+              "fixture_id": "fx-16",
+              "values": [
+                {
+                  "channel_offset": 0,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 1,
+                  "value": 128
+                },
+                {
+                  "channel_offset": 2,
+                  "value": 90
+                },
+                {
+                  "channel_offset": 3,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 4,
+                  "value": 10
+                },
+                {
+                  "channel_offset": 5,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 6,
+                  "value": 0
+                },
+                {
+                  "channel_offset": 7,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 8,
+                  "value": 97
+                },
+                {
+                  "channel_offset": 9,
+                  "value": 255
+                },
+                {
+                  "channel_offset": 10,
+                  "value": 180
+                },
+                {
+                  "channel_offset": 11,
+                  "value": 0
+                }
+              ]
+            }
+          ],
+          "chaser_state": {
+            "type": "inherit"
+          },
+          "movement_state": {
+            "type": "inherit"
           }
         }
       ]

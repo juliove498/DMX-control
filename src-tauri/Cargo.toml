@@ -44,6 +44,14 @@ midir = "0.10"
 # definitions. Keeps each fixture self-contained for portability — copy
 # one .json file across machines and the picture goes with it.
 base64 = "0.22"
+# AI scene generation: HTTP POST to Anthropic / OpenAI APIs. rustls-tls
+# avoids needing a system OpenSSL on Windows. JSON feature parses the
+# tool/function-call responses inline.
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Tokio runtime — Tauri 2 already pulls it in but the AI commands need
+# the multi-thread feature to spawn a blocking HTTP call without
+# blocking the UI thread.
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [dev-dependencies]
 hex-literal = "0.4"

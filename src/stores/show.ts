@@ -4,6 +4,9 @@ import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
 import type { GlobalsConfig } from "@bindings/GlobalsConfig";
 import type { MovementGenerator } from "@bindings/MovementGenerator";
+import type { AiAvailableModels } from "@bindings/AiAvailableModels";
+import type { AiConfig } from "@bindings/AiConfig";
+import type { DraftScene } from "@bindings/DraftScene";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { PatchReport } from "@bindings/PatchReport";
 import type { ProgrammerStatus } from "@bindings/ProgrammerStatus";
@@ -95,6 +98,21 @@ interface ShowStoreState {
   connectMidiDevice: (name: string) => Promise<void>;
   disconnectMidi: () => Promise<void>;
   sendMidiRaw: (bytes: number[]) => Promise<void>;
+
+  // AI scene generation (POC) — keys live off the show file in the OS
+  // app-config dir, so these don't touch show state.
+  getAiConfig: () => Promise<AiConfig>;
+  setAiConfig: (config: AiConfig) => Promise<void>;
+  aiListModels: () => Promise<AiAvailableModels>;
+  aiTestConnection: () => Promise<string>;
+  aiGenerateSceneDraft: (
+    prompt: string,
+    stepCount: number,
+    fixtureIds: string[] | null,
+    seed?: DraftScene | null,
+  ) => Promise<DraftScene>;
+  aiApplyDraftScene: (draft: DraftScene) => Promise<void>;
+  aiReplaceScene: (sceneId: string, draft: DraftScene) => Promise<void>;
 
   initListeners: () => Promise<() => void>;
 }
@@ -396,6 +414,41 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
 
   async sendMidiRaw(bytes) {
     await invoke("send_midi_raw", { bytes });
+  },
+
+  async getAiConfig() {
+    return invoke<AiConfig>("get_ai_config");
+  },
+
+  async setAiConfig(config) {
+    await invoke("set_ai_config", { config });
+  },
+
+  async aiListModels() {
+    return invoke<AiAvailableModels>("ai_list_models");
+  },
+
+  async aiTestConnection() {
+    return invoke<string>("ai_test_connection");
+  },
+
+  async aiGenerateSceneDraft(prompt, stepCount, fixtureIds, seed) {
+    return invoke<DraftScene>("ai_generate_scene_draft", {
+      prompt,
+      stepCount,
+      fixtureIds,
+      seed: seed ?? null,
+    });
+  },
+
+  async aiApplyDraftScene(draft) {
+    await invoke("ai_apply_draft_scene", { draft });
+    await get().refresh();
+  },
+
+  async aiReplaceScene(sceneId, draft) {
+    await invoke("ai_replace_scene", { sceneId, draft });
+    await get().refresh();
   },
 
   async initListeners() {

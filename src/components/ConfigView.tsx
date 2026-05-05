@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AiConfigView } from "./AiConfigView";
 import { ButtonsConfigView } from "./ButtonsConfigView";
 import { DirectOutput } from "./DirectOutput";
 import { LibraryView } from "./LibraryView";
@@ -6,7 +7,14 @@ import { MidiConfigView } from "./MidiConfigView";
 import { OutputsView } from "./OutputsView";
 import { PatchView } from "./PatchView";
 
-type ConfigTab = "library" | "outputs" | "patch" | "blackout-blind" | "midi" | "direct";
+type ConfigTab =
+  | "library"
+  | "outputs"
+  | "patch"
+  | "blackout-blind"
+  | "midi"
+  | "ai"
+  | "direct";
 
 // Grouped by setup flow: hardware → control surface → debug.
 // Order inside each group reflects the order a fresh user would touch them
@@ -30,6 +38,11 @@ const GROUPS: Array<{ id: string; items: Array<{ id: ConfigTab; label: string; h
           hint: "Fades y fixtures afectados por los botones globales",
         },
         { id: "midi", label: "MIDI", hint: "Superficie de control (Launchpad, etc.)" },
+        {
+          id: "ai",
+          label: "IA",
+          hint: "Provider, modelo y API key para generación de escenas con LLM",
+        },
       ],
     },
     {
@@ -70,6 +83,7 @@ export function ConfigView() {
         {sub === "patch" && <PatchView />}
         {sub === "blackout-blind" && <ButtonsConfigView />}
         {sub === "midi" && <MidiConfigView />}
+        {sub === "ai" && <AiConfigView />}
         {sub === "direct" && <DirectOutput />}
       </div>
     </main>

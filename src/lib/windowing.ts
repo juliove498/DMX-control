@@ -4,7 +4,14 @@ import {
   WebviewWindow,
 } from "@tauri-apps/api/webviewWindow";
 
-export const POPOUT_VIEWS = ["stage", "scenes", "chaser", "movement", "config"] as const;
+export const POPOUT_VIEWS = [
+  "stage",
+  "scenes",
+  "chaser",
+  "movement",
+  "preview3d",
+  "config",
+] as const;
 export type PopoutView = (typeof POPOUT_VIEWS)[number];
 
 const TITLES: Record<PopoutView, string> = {
@@ -12,6 +19,7 @@ const TITLES: Record<PopoutView, string> = {
   scenes: "DMX — Scenes",
   chaser: "DMX — Chaser",
   movement: "DMX — Movement",
+  preview3d: "DMX — Preview 3D",
   config: "DMX — Config",
 };
 

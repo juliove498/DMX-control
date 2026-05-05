@@ -158,6 +158,17 @@ impl EngineInner {
         Ok(())
     }
 
+    /// Raw base-layer snapshot — what `set_channel` last wrote, with
+    /// no effects/blind/master/blackout overlays applied. Used by
+    /// scene recall to capture "where the base values were before
+    /// this recall" so release can fade base back without
+    /// double-counting chaser/movement contributions, which the
+    /// overlays apply independently each frame.
+    pub fn snapshot_base(&self, universe: u16) -> Option<[u8; DMX_CHANNELS]> {
+        let u = self.universes.iter().find(|u| u.id == universe)?;
+        Some(u.data)
+    }
+
     pub fn snapshot_universe(&self, universe: u16) -> Option<[u8; DMX_CHANNELS]> {
         let u = self.universes.iter().find(|u| u.id == universe)?;
         let mut out = u.data;

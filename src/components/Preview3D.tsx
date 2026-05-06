@@ -251,14 +251,21 @@ export function Preview3D() {
             {/* Fog density derived from atmosphere slider. Fog and
                 bloom together sell the "club" feeling — bloom alone
                 makes lights pop, fog makes the room feel like it
-                has air in it. */}
-            <fog
+                has air in it.
+                Exponential (FogExp2) instead of linear: linear fog
+                ramps clear → black inside a fixed near/far band, and
+                anything past `far` snaps to full fog colour. The
+                snap was visible on zoom-out — the whole stage went
+                black the moment the camera retreated past 30 m.
+                Exp curve is smooth all the way through and never
+                reaches "fully fogged", so you can pull back as far
+                as you want and the venue just gets gradually
+                hazier instead of disappearing. Density tuned so
+                atmosphere=0.5 yields ~12 % fog at 5 m, ~27 % at
+                12 m, ~50 % at 25 m — visible but breathable. */}
+            <fogExp2
               attach="fog"
-              args={[
-                "#06080c",
-                Math.max(2, 8 - config.atmosphere * 6),
-                Math.max(20, 40 - config.atmosphere * 18),
-              ]}
+              args={["#0a0e15", config.atmosphere * 0.028]}
             />
 
             <CameraRig

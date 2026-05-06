@@ -440,25 +440,24 @@ function decodeFixture(
   if (wheelRgb && !wheelIsOpen) {
     [baseR, baseG, baseB] = wheelRgb;
   } else if (layout.hasRGB || layout.white !== null || layout.amber !== null) {
+    // Honest mix: dimmer × (R + W + A) per channel. If the operator
+    // sets RGB(W/A) all to zero, the fixture is OFF — same as a real
+    // par, regardless of how high the dimmer is. We used to force a
+    // warm-white fallback here (so an intensity-up par with no colour
+    // dialled wouldn't appear "broken"), but that produced a phantom
+    // white wash whenever someone parked all colour channels at 0;
+    // now the fixture goes dark and the operator gets the same
+    // visual feedback they'd see on stage.
     baseR = Math.min(1, r + w + a);
     baseG = Math.min(1, g + w + a * 0.5);
     baseB = Math.min(1, b + w);
-    // If all colour channels are 0 but there IS an intensity, fall
-    // back to wheel (open-white) or warm white. Without this an
-    // intensity-up RGB par looks black-on-black until the operator
-    // also dials a colour.
-    if (baseR === 0 && baseG === 0 && baseB === 0 && intensity > 0) {
-      if (wheelRgb) {
-        [baseR, baseG, baseB] = wheelRgb;
-      } else {
-        baseR = 1;
-        baseG = 0.85;
-        baseB = 0.7;
-      }
-    }
   } else if (wheelRgb) {
     [baseR, baseG, baseB] = wheelRgb;
   } else {
+    // No colour controls at all (dimmer-only fixture): warm-white
+    // fallback so the cone has a colour to draw with. This branch
+    // is the only place that path makes sense — once a fixture has
+    // RGB / W / A / wheel, the operator controls the colour.
     baseR = 1;
     baseG = 0.85;
     baseB = 0.7;

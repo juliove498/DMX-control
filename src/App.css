@@ -4024,6 +4024,133 @@ label {
   gap: 4px;
 }
 
+/* Library: per-fixture range editor (gobo / colour wheel / macros).
+ * Hangs off each `.lib-item` row when expanded. The mode <details>
+ * are closed by default except the first one — most operators only
+ * use one channel mode and don't want to scroll past them all to
+ * find their gobos.
+ *
+ * The `.lib-item` selector earlier in this file styles the row as a
+ * horizontal flex (`display: flex; align-items: center`). When the
+ * expander is open we need the item to act as a vertical stack and
+ * its children to span the full row width — otherwise `align-items:
+ * center` collapses each child to its content width and the gobo
+ * grid degrades to a single-column list. The block below overrides
+ * those properties only for the expanded variant. */
+.lib-item.expanded {
+  flex-direction: column;
+  align-items: stretch;
+}
+.lib-item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  /* Mirror `.lib-item`'s padding-equivalent layout when used inside
+   * an expanded item (the outer .lib-item still owns padding). */
+  width: 100%;
+}
+.lib-ranges {
+  width: 100%;
+  border-top: 1px dashed #2a2a2a;
+  margin-top: 10px;
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lib-mode {
+  width: 100%;
+  background: #161616;
+  border: 1px solid #232323;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.lib-mode > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #cfcfcf;
+  padding: 4px 0;
+  user-select: none;
+}
+.lib-channel {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed #1f1f1f;
+}
+.lib-channel:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+.lib-channel h5 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #b6b6b6;
+}
+.lib-range-grid {
+  /* Auto-fill packs as many ~108-px cards as fit before wrapping;
+   * `1fr` lets the last column eat the leftover width so the grid
+   * never leaves an awkward gap on the right. 108-px lower bound
+   * fits 5 cards per ~600-px column on the typical Config-tab
+   * width and scales up to 12+ on a wide monitor. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+.lib-range-cell {
+  background: #1c1c1c;
+  border: 1px solid #232323;
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  /* Locked to a square-ish ratio so the grid reads as a tile sheet
+   * rather than a list of variable-height rows. */
+  min-width: 0;
+}
+.lib-range-thumb {
+  /* Square that fills the card width, capped so we never overflow
+   * the 108-px minimum column width. */
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 96px;
+  border-radius: 4px;
+  background: #0f0f0f;
+  border: 1px solid #2a2a2a;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lib-range-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.lib-range-label {
+  font-size: 11px;
+  color: #cfcfcf;
+  text-align: center;
+  line-height: 1.25;
+  word-break: break-word;
+  width: 100%;
+  /* Two-line clamp keeps the cards uniform; the full text is on
+   * the title attribute for hover. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.lib-range-cell button {
+  width: 100%;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
 .mixed-hint {
   margin: 0 0 10px;
   padding: 6px 8px;

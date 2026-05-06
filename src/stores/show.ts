@@ -32,6 +32,13 @@ interface ShowStoreState {
   refreshFtdiDevices: () => Promise<void>;
   reloadLibrary: () => Promise<void>;
   setFixtureImage: (definitionId: string, sourcePath: string) => Promise<void>;
+  setChannelRangeImage: (
+    definitionId: string,
+    modeIndex: number,
+    channelIndex: number,
+    rangeIndex: number,
+    sourcePath: string,
+  ) => Promise<void>;
 
   newShow: () => Promise<void>;
   openShow: (path: string) => Promise<void>;
@@ -170,6 +177,17 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
 
   async setFixtureImage(definitionId, sourcePath) {
     await invoke<string>("set_fixture_image", { definitionId, sourcePath });
+    await get().reloadLibrary();
+  },
+
+  async setChannelRangeImage(definitionId, modeIndex, channelIndex, rangeIndex, sourcePath) {
+    await invoke<string>("set_channel_range_image", {
+      definitionId,
+      modeIndex,
+      channelIndex,
+      rangeIndex,
+      sourcePath,
+    });
     await get().reloadLibrary();
   },
 

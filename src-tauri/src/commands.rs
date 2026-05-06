@@ -977,6 +977,139 @@ fn mime_for_extension(ext: &str) -> &'static str {
     }
 }
 
+/// Cap on per-range gobo bitmaps. Tighter than the fixture-thumbnail
+/// budget because a single fixture can carry 16+ ranges and we don't
+/// want a single rig to make `fixtures/*.json` files megabyte-sized
+/// and slow to parse on every open.
+const MAX_RANGE_IMAGE_BYTES: usize = 512 * 1024;
+
+/// Inline a bitmap into a single `ChannelRange.image` of a fixture
+/// definition (the per-position gobo / colour-wheel thumbnail).
+/// Mirrors `set_fixture_image` byte-for-byte except the patch site is
+/// `def.modes[mode_index].channels[channel_index].ranges[range_index]
+/// .image` instead of `def.image`. Returns the data URL so the UI can
+/// drop it into an `<img src>` immediately without re-fetching the
+/// library.
+///
+/// The patched JSON file is rewritten atomically (tmp + rename) and
+/// the in-memory library is reloaded so the next render sees the new
+/// image. The 3D preview's gobo path keys off the *active* range's
+/// image at runtime, so the new bitmap shows up the next time the
+/// fixture's gobo channel sits in this range.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn set_channel_range_image(
+    show: State<'_, ShowState>,
+    definition_id: String,
+    mode_index: u32,
+    channel_index: u32,
+    range_index: u32,
+    source_path: String,
+) -> Result<String, CommandError> {
+    use base64::engine::general_purpose::STANDARD as B64;
+    use base64::Engine;
+
+    let lib_dir = library_dir().ok_or_else(|| CommandError::Other("no config dir".into()))?;
+
+    {
+        let s = show.read();
+        if !s.library.contains_key(&definition_id) {
+            return Err(CommandError::Other(format!(
+                "unknown definition {definition_id}"
+            )));
+        }
+    }
+
+    let src = PathBuf::from(&source_path);
+    if !src.exists() {
+        return Err(CommandError::Io(format!(
+            "source image not found: {source_path}"
+        )));
+    }
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_ascii_lowercase())
+        .unwrap_or_else(|| "png".to_string());
+    let mime = mime_for_extension(&ext);
+
+    let bytes = std::fs::read(&src).map_err(|e| CommandError::Io(format!("read {source_path}: {e}")))?;
+    if bytes.len() > MAX_RANGE_IMAGE_BYTES {
+        return Err(CommandError::Other(format!(
+            "image is {} KB; per-range thumbnails are capped at {} KB so the fixture JSON stays portable across many ranges",
+            bytes.len() / 1024,
+            MAX_RANGE_IMAGE_BYTES / 1024
+        )));
+    }
+
+    let data_url = format!("data:{};base64,{}", mime, B64.encode(&bytes));
+
+    let mut patched = false;
+    for entry in std::fs::read_dir(&lib_dir).map_err(|e| CommandError::Io(e.to_string()))? {
+        let entry = entry.map_err(|e| CommandError::Io(e.to_string()))?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let raw = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        let mut def: FixtureDefinition = match serde_json::from_slice(&raw) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        if def.id != definition_id {
+            continue;
+        }
+        // Bounds-check the requested mode/channel/range path before
+        // writing — a stale UI sending an out-of-bounds index should
+        // get a clear error instead of silently corrupting the file.
+        let mode = def.modes.get_mut(mode_index as usize).ok_or_else(|| {
+            CommandError::Other(format!("mode index {mode_index} out of bounds"))
+        })?;
+        let channel = mode
+            .channels
+            .get_mut(channel_index as usize)
+            .ok_or_else(|| {
+                CommandError::Other(format!("channel index {channel_index} out of bounds"))
+            })?;
+        let range = channel
+            .ranges
+            .get_mut(range_index as usize)
+            .ok_or_else(|| {
+                CommandError::Other(format!("range index {range_index} out of bounds"))
+            })?;
+        range.image = Some(data_url.clone());
+        // The legacy on-disk `image_path` is informational from the
+        // import flow; clear it so future readers don't think the
+        // bitmap lives at some external path.
+        range.image_path = None;
+        let body = serde_json::to_vec_pretty(&def).map_err(|e| CommandError::Show(e.to_string()))?;
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, &body).map_err(|e| CommandError::Io(e.to_string()))?;
+        std::fs::rename(&tmp, &path).map_err(|e| CommandError::Io(e.to_string()))?;
+        tracing::info!(
+            target: "dmx::library",
+            path = %path.display(),
+            mode_index, channel_index, range_index,
+            bytes = bytes.len(),
+            "definition range patched with inline image"
+        );
+        patched = true;
+        break;
+    }
+    if !patched {
+        return Err(CommandError::Other(format!(
+            "no library file matched definition {definition_id}"
+        )));
+    }
+
+    let lib = load_all(&lib_dir).map_err(|e| CommandError::Show(e.to_string()))?;
+    show.write().library = lib;
+    Ok(data_url)
+}
+
 // ---- Ambient Chaser ------------------------------------------------------
 
 /// Push the show's chasers and current fixture/library context into the

@@ -431,6 +431,7 @@ pub fn run() {
             commands::reload_library,
             commands::get_library_dir,
             commands::set_fixture_image,
+            commands::set_channel_range_image,
             commands::get_show,
             commands::get_show_path,
             commands::new_show,

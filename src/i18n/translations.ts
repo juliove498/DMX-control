@@ -184,6 +184,15 @@ export type Translation = {
   "library.errorSetImage": string;
   "library.modeSummary": string;
   "library.filesPath": string;
+  "library.gobosToggle": string;
+  "library.gobosCollapse": string;
+  "library.gobosEmpty": string;
+  "library.gobosModeFmt": string;
+  "library.gobosChannelFmt": string;
+  "library.gobosUpload": string;
+  "library.gobosReplace": string;
+  "library.gobosRangeFmt": string;
+  "library.gobosErrorOversize": string;
 
   // ---- Outputs ---------------------------------------------------------
   "outputs.title": string;
@@ -868,6 +877,15 @@ export const en: Translation = {
   "library.errorSetImage": "Could not change image: {err}",
   "library.modeSummary": "{name} · {count}ch",
   "library.filesPath": "JSON files live in {path}.",
+  "library.gobosToggle": "Edit gobos / colours",
+  "library.gobosCollapse": "Collapse",
+  "library.gobosEmpty": "This fixture has no channels with ranges (no gobo / colour wheel / macro defined).",
+  "library.gobosModeFmt": "{name} ({count}ch)",
+  "library.gobosChannelFmt": "{name} · {role}",
+  "library.gobosUpload": "Upload",
+  "library.gobosReplace": "Replace",
+  "library.gobosRangeFmt": "{label} (DMX {from}–{to})",
+  "library.gobosErrorOversize": "Image too large for a per-range thumbnail (max 512 KB).",
 
   "outputs.title": "Outputs",
   "outputs.kind.mock": "Mock (logging)",
@@ -1573,6 +1591,15 @@ export const es: Translation = {
   "library.errorSetImage": "No se pudo cambiar la imagen: {err}",
   "library.modeSummary": "{name} · {count}ch",
   "library.filesPath": "Los archivos JSON viven en {path}.",
+  "library.gobosToggle": "Editar gobos / colores",
+  "library.gobosCollapse": "Cerrar",
+  "library.gobosEmpty": "Este fixture no tiene canales con ranges (sin rueda de gobos / colores / macros definida).",
+  "library.gobosModeFmt": "{name} ({count}ch)",
+  "library.gobosChannelFmt": "{name} · {role}",
+  "library.gobosUpload": "Subir",
+  "library.gobosReplace": "Reemplazar",
+  "library.gobosRangeFmt": "{label} (DMX {from}–{to})",
+  "library.gobosErrorOversize": "Imagen muy grande para un thumbnail por range (máx 512 KB).",
 
   "outputs.title": "Outputs",
   "outputs.kind.mock": "Mock (logging)",

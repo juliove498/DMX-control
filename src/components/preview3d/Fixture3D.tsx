@@ -153,6 +153,10 @@ uniform float uLength;
 uniform float uHalfLength;
 uniform float uMaxRadius;
 uniform vec2 uDir;
+// Gaussian sharpness: higher = tighter centre with darker edges
+// (closer to a spot's hot core), lower = wide soft spread (washes,
+// pars). Driven from the JS side per fixture kind.
+uniform float uFalloffK;
 varying vec2 vLocal;
 
 void main() {
@@ -178,8 +182,15 @@ void main() {
   float lifted = 0.55 + bright * 1.6;
   // Axial fade: ramp at the lens, dissolve into haze at the tip.
   float axial = smoothstep(0.0, 0.05, t) * (1.0 - smoothstep(0.55, 1.0, t));
-  // Radial fade — soft cone edge.
-  float radialFade = 1.0 - smoothstep(0.85, 1.0, absRadial);
+  // Radial profile: Gaussian core × edge mask. The Gaussian gives
+  // the smooth "hot in the middle, soft toward the edges" look real
+  // fixtures have — replacing the previous flat-then-fade ramp
+  // which made every cone look like a flashlight. The edge mask
+  // brings it cleanly to zero at the rim so the cone has no hard
+  // boundary line.
+  float gauss = exp(-absRadial * absRadial * uFalloffK);
+  float edgeMask = 1.0 - smoothstep(0.92, 1.0, absRadial);
+  float radialFade = gauss * edgeMask;
   float alpha = lifted * axial * radialFade * uOpacity;
   if (alpha <= 0.001) discard;
   vec3 finalColor = uColor * (0.85 + bright * 0.7);
@@ -191,6 +202,7 @@ function buildBeamPlaneMaterial(
   beamLength: number,
   maxRadius: number,
   azimuth: number,
+  falloffK: number,
 ): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
@@ -205,6 +217,7 @@ function buildBeamPlaneMaterial(
       // -sin(θ) along V (matches three.js Y-rotation convention
       // where local +X maps to world +X·cos − +Z·sin).
       uDir: { value: new THREE.Vector2(Math.cos(azimuth), -Math.sin(azimuth)) },
+      uFalloffK: { value: falloffK },
     },
     vertexShader: BEAM_VERTEX,
     fragmentShader: BEAM_FRAGMENT,
@@ -248,24 +261,30 @@ void main() {
 /// planes which carry the continuous shaft from any angle.
 const DISC_FRAGMENT = /* glsl */ `
 #include <clipping_planes_pars_fragment>
-uniform sampler2D uGoboMap;
 uniform vec3 uColor;
 uniform float uOpacity;
+uniform float uFalloffK;
 varying vec2 vRadial;
 
 void main() {
   #include <clipping_planes_fragment>
   float radial = length(vRadial);
   if (radial > 1.0) discard;
-  vec2 uv = (vRadial + 1.0) * 0.5;
-  vec4 g = texture2D(uGoboMap, uv);
-  float bright = max(g.r, max(g.g, g.b));
-  float lifted = 0.4 + bright * 1.6;
-  float radialFade = 1.0 - smoothstep(0.85, 1.0, radial);
-  float alpha = lifted * radialFade * uOpacity;
+  // Discs only contribute volumetric atmosphere — they do NOT
+  // sample the gobo as a 2D pattern. Sampling the gobo here
+  // produced 24 echoes of the pattern stacked along the beam
+  // (one per disc), which read as a "mixed disc" artefact the
+  // moment a high-contrast gobo was loaded. The gobo's shape
+  // already lives on (a) the crossed planes that carry 1D chords
+  // through it, and (b) the spotLight.map wall projection. Discs
+  // here are pure haze with the same Gaussian falloff as the
+  // planes for tonal coherence.
+  float gauss = exp(-radial * radial * uFalloffK);
+  float edgeMask = 1.0 - smoothstep(0.92, 1.0, radial);
+  float radialFade = gauss * edgeMask;
+  float alpha = 0.55 * radialFade * uOpacity;
   if (alpha <= 0.001) discard;
-  vec3 finalColor = uColor * (0.85 + bright * 0.7);
-  gl_FragColor = vec4(finalColor, alpha);
+  gl_FragColor = vec4(uColor, alpha);
 }
 `;
 
@@ -277,13 +296,14 @@ interface BeamDisc {
   axial: number;
 }
 
-function buildDiscMaterial(radius: number): THREE.ShaderMaterial {
+function buildDiscMaterial(radius: number, falloffK: number): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
       uGoboMap: { value: DEFAULT_WHITE_TEX },
       uColor: { value: new THREE.Color(1, 1, 1) },
       uOpacity: { value: 0 },
       uDiscRadius: { value: Math.max(radius, 1e-4) },
+      uFalloffK: { value: falloffK },
     },
     vertexShader: DISC_VERTEX,
     fragmentShader: DISC_FRAGMENT,
@@ -302,7 +322,11 @@ function buildDiscMaterial(radius: number): THREE.ShaderMaterial {
 /// isn't perpendicular to the beam.
 const BEAM_DISC_COUNT = 24;
 
-function buildBeamDiscs(beamLength: number, maxRadius: number): BeamDisc[] {
+function buildBeamDiscs(
+  beamLength: number,
+  maxRadius: number,
+  falloffK: number,
+): BeamDisc[] {
   const arr: BeamDisc[] = [];
   for (let i = 0; i < BEAM_DISC_COUNT; i++) {
     const t = (i + 0.5) / BEAM_DISC_COUNT;
@@ -313,7 +337,7 @@ function buildBeamDiscs(beamLength: number, maxRadius: number): BeamDisc[] {
       t,
       depth: t * beamLength,
       radius,
-      mat: buildDiscMaterial(radius),
+      mat: buildDiscMaterial(radius, falloffK),
       axial,
     });
   }
@@ -331,12 +355,46 @@ function smoothstepEase(edge0: number, edge1: number, x: number): number {
 /// the discrete-disc artefact of stacked cross-sections. Rendering
 /// cost: 4 quads per beam — vastly cheaper than the disc stack
 /// while looking better.
-function buildBeamPlanes(beamLength: number, maxRadius: number): BeamPlane[] {
-  const angles = [0, Math.PI / 4, Math.PI / 2, (3 * Math.PI) / 4];
-  return angles.map((angle) => ({
-    angle,
-    mat: buildBeamPlaneMaterial(beamLength, maxRadius, angle),
-  }));
+/// Number of crossed planes through the cone axis. Each plane is a
+/// vertical sheet that samples a 1D chord through the gobo and
+/// projects it along the beam length. Going from 4 → 8 planes
+/// doubles the chord samples (so the gobo's 2D shape extrudes more
+/// faithfully through the volume) and, more importantly, halves the
+/// visible "blade gap" between adjacent planes — at 4 planes you
+/// could see an 8-ray cross artefact on any wall the beam hits;
+/// 8 planes wash that into a near-circular footprint while the
+/// per-plane opacity is reduced to keep total brightness flat.
+const BEAM_PLANE_COUNT = 8;
+
+function buildBeamPlanes(
+  beamLength: number,
+  maxRadius: number,
+  falloffK: number,
+): BeamPlane[] {
+  const planes: BeamPlane[] = [];
+  for (let i = 0; i < BEAM_PLANE_COUNT; i++) {
+    const angle = (i / BEAM_PLANE_COUNT) * Math.PI; // 0..π, the other half is the same plane
+    planes.push({
+      angle,
+      mat: buildBeamPlaneMaterial(beamLength, maxRadius, angle, falloffK),
+    });
+  }
+  return planes;
+}
+
+/// Per-kind defaults for the Gaussian falloff sharpness. Spots have
+/// a tighter optical core (clear hot centre, edges drop fast) so we
+/// pick a higher k. Washes / RGB pars throw a smooth wide cone with
+/// barely-visible edge — k=2.0 keeps the centre at 1.0, the half-
+/// radius around 0.6, the rim at ~0.13. Beams (the very-narrow
+/// focused spots) push k=4.5 for an even crisper hot spot.
+function defaultFalloffK(kind: FixtureKind): number {
+  switch (kind) {
+    case "spot":
+      return 3.5;
+    case "wash":
+      return 2.0;
+  }
 }
 
 /// Per-label cache of procedural fallback textures. We only build
@@ -474,28 +532,32 @@ export function Fixture3D({
     const maxDeg = overrides.beamAngle?.maxDeg ?? (kind === "spot" ? 8 : 55);
     return beamLength * Math.tan(maxDeg * THREE.MathUtils.DEG2RAD);
   }, [kind, beamLength, overrides.beamAngle?.maxDeg]);
+  // Gaussian sharpness chosen per fixture kind: spots get a tighter
+  // hot core (clearer central punch), washes/pars a wide gentle
+  // falloff that reads as a soft glow rather than a flashlight.
+  const falloffK = defaultFalloffK(kind);
   // Crossed planes through the cone axis — 4 vertical sheets at
   // azimuths 0/45/90/135°. Combined additively they read as a
   // continuous volumetric shaft with the gobo's shape extruded
   // along the beam, not discrete floating discs.
   const mainBeamPlanes = useMemo(
-    () => buildBeamPlanes(beamLength, maxRadius),
-    [beamLength, maxRadius],
+    () => buildBeamPlanes(beamLength, maxRadius, falloffK),
+    [beamLength, maxRadius, falloffK],
   );
   const prismBeamPlanes = useMemo(
-    () => buildBeamPlanes(beamLength, maxRadius * 0.55),
-    [beamLength, maxRadius],
+    () => buildBeamPlanes(beamLength, maxRadius * 0.55, falloffK),
+    [beamLength, maxRadius, falloffK],
   );
   // Discs perpendicular to the beam axis carry the gobo's full 2D
   // pattern (planes can only show 1D chords). Together they read
   // as a volumetric beam shaft with the gobo extruded.
   const mainBeamDiscs = useMemo(
-    () => buildBeamDiscs(beamLength, maxRadius),
-    [beamLength, maxRadius],
+    () => buildBeamDiscs(beamLength, maxRadius, falloffK),
+    [beamLength, maxRadius, falloffK],
   );
   const prismBeamDiscs = useMemo(
-    () => buildBeamDiscs(beamLength, maxRadius * 0.55),
-    [beamLength, maxRadius],
+    () => buildBeamDiscs(beamLength, maxRadius * 0.55, falloffK),
+    [beamLength, maxRadius, falloffK],
   );
   // Apply clipping planes so the beam doesn't punch the floor or
   // back wall when the fixture is aimed at them.
@@ -573,35 +635,52 @@ export function Fixture3D({
     const baseOpacity = lit * (0.55 + atmosphere * 1.6);
     const prismOn = (s.prismValue ?? 0) > prismThreshold;
     const mainScale = prismOn ? 0.55 : 1;
+    // Plane contribution is intentionally low (0.18) so the 8
+    // crossed planes don't sum to a bright "burst" where they
+    // converge on the cone axis — that artefact was masking the
+    // SpotLight cookie projection on walls. Planes still carry
+    // the gobo's 1D chords through the volume; the discs (uniform
+    // fog with axial-faded radial Gauss) take over the cone-fill
+    // role since they don't share a common axis line.
     for (const p of mainBeamPlanes) {
       p.mat.uniforms.uColor.value.setRGB(s.color.r, s.color.g, s.color.b);
-      p.mat.uniforms.uOpacity.value = baseOpacity * mainScale * 0.7;
+      p.mat.uniforms.uOpacity.value = baseOpacity * mainScale * 0.18;
       p.mat.uniforms.uGoboMap.value = goboTex;
     }
     for (const p of prismBeamPlanes) {
       p.mat.uniforms.uColor.value.setRGB(s.color.r, s.color.g, s.color.b);
-      p.mat.uniforms.uOpacity.value = baseOpacity * 0.5;
+      p.mat.uniforms.uOpacity.value = baseOpacity * 0.13;
       p.mat.uniforms.uGoboMap.value = goboTex;
     }
-    // Discs: per-disc axial fade pre-baked at construction.
+    // Discs: per-disc axial fade pre-baked at construction. They
+    // carry most of the cone's body now (0.65) — uniform haze
+    // without gobo sampling, so adjacent discs at different depths
+    // don't all peak on the same axis line the way the planes do.
     for (const d of mainBeamDiscs) {
       d.mat.uniforms.uColor.value.setRGB(s.color.r, s.color.g, s.color.b);
-      d.mat.uniforms.uOpacity.value = baseOpacity * mainScale * d.axial * 0.45;
-      d.mat.uniforms.uGoboMap.value = goboTex;
+      d.mat.uniforms.uOpacity.value = baseOpacity * mainScale * d.axial * 0.65;
     }
     for (const d of prismBeamDiscs) {
       d.mat.uniforms.uColor.value.setRGB(s.color.r, s.color.g, s.color.b);
-      d.mat.uniforms.uOpacity.value = baseOpacity * d.axial * 0.3;
-      d.mat.uniforms.uGoboMap.value = goboTex;
+      d.mat.uniforms.uOpacity.value = baseOpacity * d.axial * 0.45;
     }
 
     if (lightRef.current) {
-      lightRef.current.color.setRGB(
-        Math.max(s.color.r, 0.01),
-        Math.max(s.color.g, 0.01),
-        Math.max(s.color.b, 0.01),
-      );
-      const baseLum = s.kind === "spot" ? 22 : 12;
+      // Color goes straight through, no min-clamp. A defensive
+      // `Math.max(c, 0.01)` used to live here, but the floor of 0.01
+      // meant RGB=(0,0,0) at full dimmer leaked a (0.12, 0.12, 0.12)
+      // contribution into the scene — a dim grey "phantom light"
+      // that read as a bright white wash on light-grey floors.
+      // Real RGB pars output zero when their colour mix is zero,
+      // regardless of the dimmer; the same should hold here.
+      lightRef.current.color.setRGB(s.color.r, s.color.g, s.color.b);
+      // Spots get a higher base luminance than washes so their
+      // gobo projection on walls reads through the volumetric haze
+      // — the spotlight's `.map` cookie modulates intensity, and
+      // a brighter spotlight means stronger contrast between the
+      // gobo's open and blocked areas relative to the additive
+      // haze layer drawn on top.
+      const baseLum = s.kind === "spot" ? 38 : 12;
       lightRef.current.intensity = lit * baseLum;
       lightRef.current.angle = beamHalfAngleRad(s.kind, s.zoom, overrides.beamAngle);
       // Spots: tight penumbra so the gobo / beam edges read sharp.
@@ -724,9 +803,9 @@ export function Fixture3D({
               edges. That matches what an LED par actually looks
               like in a smokeless room. */}
           {kind === "spot"
-            ? mainBeamPlanes.map((p, i) => (
+            ? mainBeamPlanes.map((p) => (
                 <mesh
-                  key={`plane-${i}`}
+                  key={`plane-${p.angle}`}
                   position={[0, -beamLength / 2, 0]}
                   rotation={[0, p.angle, 0]}
                 >
@@ -740,9 +819,9 @@ export function Fixture3D({
               chords). They mostly show when the camera isn't
               perpendicular to the beam axis. */}
           {kind === "spot"
-            ? mainBeamDiscs.map((d, i) => (
+            ? mainBeamDiscs.map((d) => (
                 <mesh
-                  key={`disc-${i}`}
+                  key={`disc-${d.depth}`}
                   position={[0, -d.depth, 0]}
                   rotation={[-Math.PI / 2, 0, 0]}
                 >
@@ -759,10 +838,10 @@ export function Fixture3D({
                 const rx = Math.sin(angle) * splay;
                 const rz = Math.cos(angle) * splay;
                 return [
-                  <group key={`prism-${i}`} rotation={[rx, 0, rz]}>
-                    {prismBeamPlanes.map((p, j) => (
+                  <group key={`prism-${angle}`} rotation={[rx, 0, rz]}>
+                    {prismBeamPlanes.map((p) => (
                       <mesh
-                        key={`prism-plane-${j}`}
+                        key={`prism-plane-${p.angle}`}
                         position={[0, -beamLength / 2, 0]}
                         rotation={[0, p.angle, 0]}
                       >
@@ -770,9 +849,9 @@ export function Fixture3D({
                         <primitive object={p.mat} attach="material" />
                       </mesh>
                     ))}
-                    {prismBeamDiscs.map((d, j) => (
+                    {prismBeamDiscs.map((d) => (
                       <mesh
-                        key={`prism-disc-${j}`}
+                        key={`prism-disc-${d.depth}`}
                         position={[0, -d.depth, 0]}
                         rotation={[-Math.PI / 2, 0, 0]}
                       >

@@ -3,8 +3,16 @@ import type { Scene } from "@bindings/Scene";
 import type { SceneFxState } from "@bindings/SceneFxState";
 import type { SceneStep } from "@bindings/SceneStep";
 import { useEffect, useMemo, useState } from "react";
+import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 import { useShowStore } from "../stores/show";
 import { AiGenerateModal, type AiGenerateModalSeed } from "./AiGenerateModal";
+
+// Spanish "fixtures" / "scenes" / "tocados" all switch their plural
+// suffix on count === 1 → empty, otherwise → "s". English does the same
+// for "scene" / "step" / "fixture". Single helper for both — passed to
+// `t()` as the `plural` substitution.
+const plural = (n: number) => (n === 1 ? "" : "s");
 
 /// Project a live Scene into the DraftScene shape the LLM iteration
 /// flow expects. Drops chaser/movement state — the iterator focuses
@@ -36,6 +44,7 @@ function sceneToDraft(scene: Scene): DraftScene {
 /// at the bottom. The active scene + active step get a dorado halo
 /// matching what the Launchpad shows.
 export function ScenesView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const createScene = useShowStore((s) => s.createSceneFromState);
   const addStep = useShowStore((s) => s.addSceneStep);
@@ -103,7 +112,7 @@ export function ScenesView() {
     };
   }, [activeSceneIdQuery, activeSceneStepQuery, programmerStatus]);
 
-  if (!show) return <main className="page">Cargando…</main>;
+  if (!show) return <main className="page">{t("common.loading")}</main>;
   const fixtures = show.fixtures;
   const chasers = show.chasers.map((c) => ({ id: c.id, name: c.name }));
   const movements = show.movements.map((m) => ({ id: m.id, name: m.name }));
@@ -118,16 +127,16 @@ export function ScenesView() {
       const newScene = await createScene("", [], 800, false, true, true);
       setSelectedId(newScene.id);
     } catch (e) {
-      setError(`No se pudo crear la escena: ${stringifyError(e)}`);
+      setError(t("scenes.errCreate", { err: stringifyError(e) }));
     }
   };
 
   return (
     <main className="page scenes-view-v2">
       <header className="page-head">
-        <h2>Escenas</h2>
+        <h2>{t("scenes.title")}</h2>
         <span className="meta">
-          Multi-step + FX capture · {scenes.length} escena{scenes.length === 1 ? "" : "s"}
+          {t("scenes.metaSummary", { count: scenes.length, plural: plural(scenes.length) })}
         </span>
         <div className="actions">
           <button
@@ -137,9 +146,9 @@ export function ScenesView() {
               setAiSeed(undefined);
               setAiOpen(true);
             }}
-            title="Generar una escena nueva con IA a partir de un prompt"
+            title={t("scenes.aiTriggerHint")}
           >
-            ✨ Generar con IA
+            {t("scenes.aiTrigger")}
           </button>
         </div>
       </header>
@@ -154,12 +163,10 @@ export function ScenesView() {
         {/* ---- LEFT: list ---- */}
         <aside className="scenes-list-pane">
           <button type="button" className="scenes-new-btn" onClick={handleCreate}>
-            + Nueva escena
+            {t("scenes.list.new")}
           </button>
           {scenes.length === 0 ? (
-            <p className="empty">
-              Sin escenas todavía. Armá un look en Stage y tocá "Nueva escena" para grabarlo.
-            </p>
+            <p className="empty">{t("scenes.list.empty")}</p>
           ) : (
             <ul className="scenes-list">
               {scenes.map((s, i) => (
@@ -178,13 +185,17 @@ export function ScenesView() {
           {activeId ? (
             <div className="scenes-list-footer">
               <span>
-                ▶ {scenes.find((s) => s.id === activeId)?.name ?? "—"}
+                {t("scenes.list.activePrefix", {
+                  name: scenes.find((s) => s.id === activeId)?.name ?? "—",
+                })}
                 {activeStep !== null ? (
-                  <span className="scene-active-step"> · paso {activeStep + 1}</span>
+                  <span className="scene-active-step">
+                    {t("scenes.list.activeStep", { step: activeStep + 1 })}
+                  </span>
                 ) : null}
               </span>
               <button type="button" onClick={() => releaseScene()}>
-                Liberar
+                {t("scenes.list.release")}
               </button>
             </div>
           ) : null}
@@ -219,7 +230,7 @@ export function ScenesView() {
             />
           ) : (
             <div className="scenes-empty-editor">
-              <p>Elegí una escena de la izquierda — o creá una nueva.</p>
+              <p>{t("scenes.editor.empty")}</p>
             </div>
           )}
         </section>
@@ -228,11 +239,13 @@ export function ScenesView() {
       {touched.length > 0 ? (
         <footer className="programmer-bar">
           <span className="programmer-bar-label">
-            <strong>PROG</strong> · {touched.length} fixture{touched.length === 1 ? "" : "s"} tocado
-            {touched.length === 1 ? "" : "s"}
+            {t("scenes.programmer.label", {
+              count: touched.length,
+              plural: plural(touched.length),
+            })}
           </span>
           <button type="button" onClick={() => programmerClear()}>
-            Clear
+            {t("scenes.programmer.clear")}
           </button>
         </footer>
       ) : null}
@@ -264,7 +277,8 @@ function SceneListItem({
   onSelect: () => void;
   onRecall: () => void;
 }) {
-  const lpHint = index < 8 ? `LP fila 3, pad ${index + 1}` : null;
+  const t = useT();
+  const lpHint = index < 8 ? t("scenes.list.lpHint", { pad: index + 1 }) : null;
   return (
     <li className={`scenes-list-item${isSelected ? " selected" : ""}${isActive ? " active" : ""}`}>
       <button
@@ -274,7 +288,7 @@ function SceneListItem({
           e.stopPropagation();
           onRecall();
         }}
-        title="Recall (▶ GO)"
+        title={t("scenes.list.recallHint")}
       >
         ▶
       </button>
@@ -286,7 +300,10 @@ function SceneListItem({
       >
         <span className="scenes-list-name">{scene.name}</span>
         <span className="scenes-list-meta">
-          {scene.steps.length} step{scene.steps.length === 1 ? "" : "s"}
+          {t("scenes.list.stepCount", {
+            count: scene.steps.length,
+            plural: plural(scene.steps.length),
+          })}
         </span>
       </button>
     </li>
@@ -338,6 +355,7 @@ function SceneEditor({
    *  iterate over its values with a tweak prompt. */
   onIterateWithAi: () => void;
 }) {
+  const t = useT();
   const [name, setName] = useState(scene.name);
   // Local controls for the "+ Add step" footer.
   const [addFade, setAddFade] = useState(800);
@@ -371,9 +389,9 @@ function SceneEditor({
           type="button"
           className="scene-editor-go"
           onClick={onRecall}
-          title="Recall esta escena (▶ GO)"
+          title={t("scenes.editor.recallHint")}
         >
-          ▶ GO
+          {t("scenes.editor.go")}
         </button>
         <input
           className="scene-editor-name"
@@ -385,35 +403,35 @@ function SceneEditor({
             else if (e.key === "Escape") setName(scene.name);
           }}
         />
-        <span className="scene-editor-cycle">Ciclo total: {(totalCycleMs / 1000).toFixed(1)}s</span>
+        <span className="scene-editor-cycle">
+          {t("scenes.editor.cycleTotal", { seconds: (totalCycleMs / 1000).toFixed(1) })}
+        </span>
         <button
           type="button"
           className="ai-trigger-btn scene-editor-ai"
           onClick={onIterateWithAi}
-          title="Iterar esta escena con IA (refinar valores, fades, agregar/quitar steps)"
+          title={t("scenes.editor.aiIterateHint")}
         >
-          ✨ Mejorar con IA
+          {t("scenes.editor.aiIterate")}
         </button>
         <button
           type="button"
           className="danger"
           onClick={async () => {
-            if (window.confirm(`¿Eliminar "${scene.name}"?`)) await onDelete();
+            if (window.confirm(t("scenes.editor.deleteConfirm", { name: scene.name })))
+              await onDelete();
           }}
         >
-          Eliminar
+          {t("scenes.editor.delete")}
         </button>
       </header>
 
-      <p className="hint scene-fx-hint">
-        Cada step graba el chaser y movement activos en ese instante. Al frenar la escena se
-        restaura lo que estaba corriendo antes del recall. Editá el FX state por step abajo.
-      </p>
+      <p className="hint scene-fx-hint">{t("scenes.editor.fxHint")}</p>
 
       <div className="scene-steps-wrap">
-        <h4>Steps ({scene.steps.length})</h4>
+        <h4>{t("scenes.editor.stepsHeading", { count: scene.steps.length })}</h4>
         {scene.steps.length === 0 ? (
-          <p className="empty">La escena no tiene steps. Agregá uno desde el bloque de abajo.</p>
+          <p className="empty">{t("scenes.editor.stepsEmpty")}</p>
         ) : (
           <ul className="scene-steps">
             {scene.steps.map((step, i) => (
@@ -475,10 +493,10 @@ function SceneEditor({
         )}
 
         <div className="scene-add-step">
-          <h5>Agregar step desde el estado actual</h5>
+          <h5>{t("scenes.editor.addStepHeading")}</h5>
           <div className="scene-add-row">
             <label>
-              Fade in (ms)
+              {t("scenes.editor.fadeIn")}
               <input
                 type="number"
                 min={0}
@@ -489,7 +507,7 @@ function SceneEditor({
               />
             </label>
             <label>
-              Hold (ms)
+              {t("scenes.editor.hold")}
               <input
                 type="number"
                 min={0}
@@ -505,7 +523,7 @@ function SceneEditor({
                 checked={addTouchedOnly}
                 onChange={(e) => setAddTouchedOnly(e.currentTarget.checked)}
               />
-              Solo touched ({touched.length})
+              {t("scenes.editor.touchedOnly", { count: touched.length })}
             </label>
             <button
               type="button"
@@ -514,26 +532,24 @@ function SceneEditor({
               disabled={addTouchedOnly && touched.length === 0}
               title={
                 addTouchedOnly && touched.length === 0
-                  ? "Tocá fixtures en Stage primero"
-                  : "Capturar el estado actual como nuevo step"
+                  ? t("scenes.editor.addDisabledHint")
+                  : t("scenes.editor.addEnabledHint")
               }
             >
-              + Add step
+              {t("scenes.editor.addStep")}
             </button>
           </div>
-          <p className="hint scene-add-hint">
-            Los pasos se reproducen en orden y vuelven al primero al final, formando un loop. El
-            siguiente paso arranca cuando termina el <code>hold</code> del actual.
-          </p>
+          <p className="hint scene-add-hint">{t("scenes.editor.loopHint")}</p>
         </div>
       </div>
 
       <p className="hint scene-fixtures-hint">
-        {scene.steps.reduce((acc, s) => acc + s.fixtures.length, 0)} writes totales sobre{" "}
-        {fixtures.length} fixtures patcheados. Tip: si hace falta, hacé Clear del programmer y usá
-        "Solo touched" para iterar steps sin pisarte de más.{" "}
+        {t("scenes.editor.fixturesHint", {
+          writes: scene.steps.reduce((acc, s) => acc + s.fixtures.length, 0),
+          fixtures: fixtures.length,
+        })}{" "}
         <button type="button" className="scene-prog-clear-link" onClick={() => programmerClear()}>
-          Clear programmer
+          {t("scenes.editor.clearProg")}
         </button>
       </p>
     </div>
@@ -573,6 +589,7 @@ function StepRow({
   onUpdateTouched: () => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const [localName, setLocalName] = useState(step.name ?? "");
   const [localFade, setLocalFade] = useState(step.fade_in_ms);
   const [localHold, setLocalHold] = useState(step.hold_ms);
@@ -589,7 +606,7 @@ function StepRow({
         <span className="scene-step-num">{index + 1}</span>
         <input
           className="scene-step-name"
-          placeholder={`Step ${index + 1}`}
+          placeholder={t("scenes.step.placeholder", { n: index + 1 })}
           value={localName}
           onChange={(e) => setLocalName(e.currentTarget.value)}
           onBlur={() => onRename(localName)}
@@ -598,7 +615,7 @@ function StepRow({
           }}
         />
         <label className="scene-step-time">
-          Fade
+          {t("scenes.step.fade")}
           <input
             type="number"
             min={0}
@@ -608,10 +625,10 @@ function StepRow({
             onChange={(e) => setLocalFade(Number(e.currentTarget.value))}
             onBlur={() => onChangeFade(localFade)}
           />
-          ms
+          {t("scenes.step.ms")}
         </label>
         <label className="scene-step-time">
-          Hold
+          {t("scenes.step.hold")}
           <input
             type="number"
             min={0}
@@ -621,50 +638,50 @@ function StepRow({
             onChange={(e) => setLocalHold(Number(e.currentTarget.value))}
             onBlur={() => onChangeHold(localHold)}
           />
-          ms
+          {t("scenes.step.ms")}
         </label>
         <span className="scene-step-meta">
-          {fixtureCount}f · {channelCount}ch
+          {t("scenes.step.metaFmt", { fixtures: fixtureCount, channels: channelCount })}
         </span>
         <button
           type="button"
           className="scene-step-update"
           onClick={onUpdateAll}
-          title="Re-grabar este step con el estado actual del rig (todos sus fixtures)"
+          title={t("scenes.step.updateAllHint")}
         >
-          ⟳
+          {t("scenes.step.update")}
         </button>
         <button
           type="button"
           className="scene-step-update touched"
           onClick={onUpdateTouched}
           disabled={touchedCount === 0}
-          title="Re-grabar solo los fixtures touched (resto queda como está)"
+          title={t("scenes.step.updateTouchedHint")}
         >
-          ⟳T
+          {t("scenes.step.updateTouched")}
         </button>
         <button
           type="button"
           className="scene-step-del danger"
           onClick={() => {
-            if (window.confirm(`¿Eliminar el step ${index + 1}?`)) onRemove();
+            if (window.confirm(t("scenes.step.removeConfirm", { n: index + 1 }))) onRemove();
           }}
           disabled={!canRemove}
-          title={canRemove ? "Eliminar este step" : "No se puede eliminar el único step"}
+          title={canRemove ? t("scenes.step.removeHint") : t("scenes.step.removeOnlyHint")}
         >
           ×
         </button>
       </div>
       <div className="scene-step-fx">
         <FxStateRow
-          label="Chaser"
+          labelKey="scenes.fx.chaser"
           state={step.chaser_state}
           options={chaserOptions}
           onChange={onChangeChaserState}
           compact
         />
         <FxStateRow
-          label="Movement"
+          labelKey="scenes.fx.movement"
           state={step.movement_state}
           options={movementOptions}
           onChange={onChangeMovementState}
@@ -676,24 +693,25 @@ function StepRow({
 }
 
 function FxStateRow({
-  label,
+  labelKey,
   state,
   options,
   onChange,
   compact,
 }: {
-  label: string;
+  labelKey: keyof Translation;
   state: SceneFxState;
   options: { id: string; name: string }[];
   onChange: (state: SceneFxState) => void;
   compact?: boolean;
 }) {
+  const t = useT();
   const mode: "inherit" | "disabled" | "enabled" =
     state.type === "inherit" ? "inherit" : state.type === "disabled" ? "disabled" : "enabled";
   const enabledId = state.type === "enabled" ? state.id : "";
   return (
     <div className={`fx-state-row${compact ? " compact" : ""}`}>
-      <span className="fx-state-label">{label}</span>
+      <span className="fx-state-label">{t(labelKey)}</span>
       <div className="fx-state-options">
         <label>
           <input
@@ -701,7 +719,7 @@ function FxStateRow({
             checked={mode === "inherit"}
             onChange={() => onChange({ type: "inherit" })}
           />
-          No tocar
+          {t("scenes.fx.inherit")}
         </label>
         <label>
           <input
@@ -709,7 +727,7 @@ function FxStateRow({
             checked={mode === "disabled"}
             onChange={() => onChange({ type: "disabled" })}
           />
-          Apagar
+          {t("scenes.fx.disable")}
         </label>
         <label>
           <input
@@ -718,14 +736,14 @@ function FxStateRow({
             onChange={() => onChange({ type: "enabled", id: enabledId || options[0]?.id || "" })}
             disabled={options.length === 0}
           />
-          Encender:
+          {t("scenes.fx.enable")}
         </label>
         {mode === "enabled" ? (
           <select
             value={enabledId}
             onChange={(e) => onChange({ type: "enabled", id: e.currentTarget.value })}
           >
-            {options.length === 0 ? <option value="">— sin opciones —</option> : null}
+            {options.length === 0 ? <option value="">{t("scenes.fx.noOptions")}</option> : null}
             {options.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.name}

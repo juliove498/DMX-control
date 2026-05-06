@@ -320,6 +320,62 @@ export type Translation = {
   "ai.testActiveHint": string;
   "ai.savedToast": string;
   "ai.errPrefix": string;
+
+  // ---- Scenes view -----------------------------------------------------
+  "scenes.title": string;
+  "scenes.metaSummary": string;
+  "scenes.aiTrigger": string;
+  "scenes.aiTriggerHint": string;
+  "scenes.errCreate": string;
+  "scenes.list.new": string;
+  "scenes.list.empty": string;
+  "scenes.list.lpHint": string;
+  "scenes.list.recallHint": string;
+  "scenes.list.stepCount": string;
+  "scenes.list.activePrefix": string;
+  "scenes.list.activeStep": string;
+  "scenes.list.release": string;
+  "scenes.editor.empty": string;
+  "scenes.editor.recallHint": string;
+  "scenes.editor.go": string;
+  "scenes.editor.cycleTotal": string;
+  "scenes.editor.aiIterate": string;
+  "scenes.editor.aiIterateHint": string;
+  "scenes.editor.delete": string;
+  "scenes.editor.deleteConfirm": string;
+  "scenes.editor.fxHint": string;
+  "scenes.editor.stepsHeading": string;
+  "scenes.editor.stepsEmpty": string;
+  "scenes.editor.addStepHeading": string;
+  "scenes.editor.fadeIn": string;
+  "scenes.editor.hold": string;
+  "scenes.editor.touchedOnly": string;
+  "scenes.editor.addStep": string;
+  "scenes.editor.addDisabledHint": string;
+  "scenes.editor.addEnabledHint": string;
+  "scenes.editor.loopHint": string;
+  "scenes.editor.fixturesHint": string;
+  "scenes.editor.clearProg": string;
+  "scenes.programmer.label": string;
+  "scenes.programmer.clear": string;
+  "scenes.step.fade": string;
+  "scenes.step.hold": string;
+  "scenes.step.ms": string;
+  "scenes.step.metaFmt": string;
+  "scenes.step.placeholder": string;
+  "scenes.step.update": string;
+  "scenes.step.updateAllHint": string;
+  "scenes.step.updateTouched": string;
+  "scenes.step.updateTouchedHint": string;
+  "scenes.step.removeHint": string;
+  "scenes.step.removeOnlyHint": string;
+  "scenes.step.removeConfirm": string;
+  "scenes.fx.chaser": string;
+  "scenes.fx.movement": string;
+  "scenes.fx.inherit": string;
+  "scenes.fx.disable": string;
+  "scenes.fx.enable": string;
+  "scenes.fx.noOptions": string;
 };
 
 export const en: Translation = {
@@ -635,6 +691,68 @@ export const en: Translation = {
   "ai.testActiveHint": "Make a minimal request to verify the API key + model",
   "ai.savedToast": "Configuration saved.",
   "ai.errPrefix": "Error: {err}",
+
+  "scenes.title": "Scenes",
+  "scenes.metaSummary": "Multi-step + FX capture · {count} scene{plural}",
+  "scenes.aiTrigger": "✨ Generate with AI",
+  "scenes.aiTriggerHint": "Generate a fresh scene with AI from a prompt",
+  "scenes.errCreate": "Could not create the scene: {err}",
+  "scenes.list.new": "+ New scene",
+  "scenes.list.empty":
+    "No scenes yet. Build a look in Stage and tap \"New scene\" to record it.",
+  "scenes.list.lpHint": "LP row 3, pad {pad}",
+  "scenes.list.recallHint": "Recall (▶ GO)",
+  "scenes.list.stepCount": "{count} step{plural}",
+  "scenes.list.activePrefix": "▶ {name}",
+  "scenes.list.activeStep": " · step {step}",
+  "scenes.list.release": "Release",
+  "scenes.editor.empty": "Pick a scene from the left — or create a new one.",
+  "scenes.editor.recallHint": "Recall this scene (▶ GO)",
+  "scenes.editor.go": "▶ GO",
+  "scenes.editor.cycleTotal": "Total cycle: {seconds}s",
+  "scenes.editor.aiIterate": "✨ Improve with AI",
+  "scenes.editor.aiIterateHint":
+    "Iterate this scene with AI (refine values, fades, add/remove steps)",
+  "scenes.editor.delete": "Delete",
+  "scenes.editor.deleteConfirm": "Delete \"{name}\"?",
+  "scenes.editor.fxHint":
+    "Each step records the chaser and movement active at that moment. Releasing the scene restores whatever was running before recall. Edit the FX state per step below.",
+  "scenes.editor.stepsHeading": "Steps ({count})",
+  "scenes.editor.stepsEmpty": "The scene has no steps. Add one from the block below.",
+  "scenes.editor.addStepHeading": "Add step from current state",
+  "scenes.editor.fadeIn": "Fade in (ms)",
+  "scenes.editor.hold": "Hold (ms)",
+  "scenes.editor.touchedOnly": "Touched only ({count})",
+  "scenes.editor.addStep": "+ Add step",
+  "scenes.editor.addDisabledHint": "Touch fixtures in Stage first",
+  "scenes.editor.addEnabledHint": "Capture the current state as a new step",
+  "scenes.editor.loopHint":
+    "Steps play in order and loop back to the first when they finish. The next step starts when the current one's hold ends.",
+  "scenes.editor.fixturesHint":
+    "{writes} total writes over {fixtures} patched fixtures. Tip: if needed, Clear the programmer and use \"Touched only\" to iterate steps without overwriting.",
+  "scenes.editor.clearProg": "Clear programmer",
+  "scenes.programmer.label": "PROG · {count} fixture{plural} touched",
+  "scenes.programmer.clear": "Clear",
+  "scenes.step.fade": "Fade",
+  "scenes.step.hold": "Hold",
+  "scenes.step.ms": "ms",
+  "scenes.step.metaFmt": "{fixtures}f · {channels}ch",
+  "scenes.step.placeholder": "Step {n}",
+  "scenes.step.update": "⟳",
+  "scenes.step.updateAllHint":
+    "Re-record this step with the rig's current state (all its fixtures)",
+  "scenes.step.updateTouched": "⟳T",
+  "scenes.step.updateTouchedHint":
+    "Re-record only the touched fixtures (the rest stays as-is)",
+  "scenes.step.removeHint": "Remove this step",
+  "scenes.step.removeOnlyHint": "Cannot remove the only step",
+  "scenes.step.removeConfirm": "Remove step {n}?",
+  "scenes.fx.chaser": "Chaser",
+  "scenes.fx.movement": "Movement",
+  "scenes.fx.inherit": "Don't touch",
+  "scenes.fx.disable": "Disable",
+  "scenes.fx.enable": "Enable:",
+  "scenes.fx.noOptions": "— no options —",
 };
 
 export const es: Translation = {
@@ -952,6 +1070,68 @@ export const es: Translation = {
   "ai.testActiveHint": "Hacer un request mínimo para verificar la API key + modelo",
   "ai.savedToast": "Configuración guardada.",
   "ai.errPrefix": "Error: {err}",
+
+  "scenes.title": "Escenas",
+  "scenes.metaSummary": "Multi-step + FX capture · {count} escena{plural}",
+  "scenes.aiTrigger": "✨ Generar con IA",
+  "scenes.aiTriggerHint": "Generar una escena nueva con IA a partir de un prompt",
+  "scenes.errCreate": "No se pudo crear la escena: {err}",
+  "scenes.list.new": "+ Nueva escena",
+  "scenes.list.empty":
+    "Sin escenas todavía. Armá un look en Stage y tocá \"Nueva escena\" para grabarlo.",
+  "scenes.list.lpHint": "LP fila 3, pad {pad}",
+  "scenes.list.recallHint": "Recall (▶ GO)",
+  "scenes.list.stepCount": "{count} step{plural}",
+  "scenes.list.activePrefix": "▶ {name}",
+  "scenes.list.activeStep": " · paso {step}",
+  "scenes.list.release": "Liberar",
+  "scenes.editor.empty": "Elegí una escena de la izquierda — o creá una nueva.",
+  "scenes.editor.recallHint": "Recall esta escena (▶ GO)",
+  "scenes.editor.go": "▶ GO",
+  "scenes.editor.cycleTotal": "Ciclo total: {seconds}s",
+  "scenes.editor.aiIterate": "✨ Mejorar con IA",
+  "scenes.editor.aiIterateHint":
+    "Iterar esta escena con IA (refinar valores, fades, agregar/quitar steps)",
+  "scenes.editor.delete": "Eliminar",
+  "scenes.editor.deleteConfirm": "¿Eliminar \"{name}\"?",
+  "scenes.editor.fxHint":
+    "Cada step graba el chaser y movement activos en ese instante. Al frenar la escena se restaura lo que estaba corriendo antes del recall. Editá el FX state por step abajo.",
+  "scenes.editor.stepsHeading": "Steps ({count})",
+  "scenes.editor.stepsEmpty": "La escena no tiene steps. Agregá uno desde el bloque de abajo.",
+  "scenes.editor.addStepHeading": "Agregar step desde el estado actual",
+  "scenes.editor.fadeIn": "Fade in (ms)",
+  "scenes.editor.hold": "Hold (ms)",
+  "scenes.editor.touchedOnly": "Solo touched ({count})",
+  "scenes.editor.addStep": "+ Add step",
+  "scenes.editor.addDisabledHint": "Tocá fixtures en Stage primero",
+  "scenes.editor.addEnabledHint": "Capturar el estado actual como nuevo step",
+  "scenes.editor.loopHint":
+    "Los pasos se reproducen en orden y vuelven al primero al final, formando un loop. El siguiente paso arranca cuando termina el hold del actual.",
+  "scenes.editor.fixturesHint":
+    "{writes} writes totales sobre {fixtures} fixtures patcheados. Tip: si hace falta, hacé Clear del programmer y usá \"Solo touched\" para iterar steps sin pisarte de más.",
+  "scenes.editor.clearProg": "Clear programmer",
+  "scenes.programmer.label": "PROG · {count} fixture{plural} tocado{plural}",
+  "scenes.programmer.clear": "Clear",
+  "scenes.step.fade": "Fade",
+  "scenes.step.hold": "Hold",
+  "scenes.step.ms": "ms",
+  "scenes.step.metaFmt": "{fixtures}f · {channels}ch",
+  "scenes.step.placeholder": "Step {n}",
+  "scenes.step.update": "⟳",
+  "scenes.step.updateAllHint":
+    "Re-grabar este step con el estado actual del rig (todos sus fixtures)",
+  "scenes.step.updateTouched": "⟳T",
+  "scenes.step.updateTouchedHint":
+    "Re-grabar solo los fixtures touched (resto queda como está)",
+  "scenes.step.removeHint": "Eliminar este step",
+  "scenes.step.removeOnlyHint": "No se puede eliminar el único step",
+  "scenes.step.removeConfirm": "¿Eliminar el step {n}?",
+  "scenes.fx.chaser": "Chaser",
+  "scenes.fx.movement": "Movement",
+  "scenes.fx.inherit": "No tocar",
+  "scenes.fx.disable": "Apagar",
+  "scenes.fx.enable": "Encender:",
+  "scenes.fx.noOptions": "— sin opciones —",
 };
 
 export type LanguageCode = "en" | "es";

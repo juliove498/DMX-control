@@ -29,6 +29,32 @@ use crate::show::ShowState;
 
 pub const STATS_EVENT: &str = "engine:stats";
 pub const SHOW_EVENT: &str = "show:updated";
+// Push events for the mobile remote bridge — also consumable by the
+// desktop frontend so the 200 ms polling loop in ScenesView can be
+// retired without changing the rest of the contract.
+pub const PROGRAMMER_EVENT: &str = "programmer:changed";
+pub const SCENE_ACTIVE_EVENT: &str = "scene:active_changed";
+pub const MASTER_EVENT: &str = "engine:master_changed";
+pub const BLIND_EVENT: &str = "engine:blind_changed";
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct SceneActiveChange {
+    pub active_scene_id: Option<String>,
+    pub step_index: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct MasterChange {
+    pub master: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct BlindChange {
+    pub pressed: bool,
+}
 
 pub struct OutputThreadState(pub Mutex<Option<OutputThreadHandle>>);
 
@@ -70,9 +96,10 @@ pub fn set_channel(
 }
 
 #[tauri::command]
-pub fn set_master(engine: State<'_, EngineState>, value: u8) {
+pub fn set_master(app: AppHandle, engine: State<'_, EngineState>, value: u8) {
     tracing::trace!(target: "dmx::input", value, "master → engine");
     engine.write().master = value;
+    let _ = app.emit(MASTER_EVENT, MasterChange { master: value });
 }
 
 /// Legacy: kept temporarily so any code path still calling this command
@@ -122,9 +149,10 @@ pub fn set_blackout_impl(
 /// Momentary halogen-blinder press. Not persisted: only the runtime knows
 /// the user is holding the button right now.
 #[tauri::command]
-pub fn set_blind(globals: State<'_, SharedGlobals>, pressed: bool) {
+pub fn set_blind(app: AppHandle, globals: State<'_, SharedGlobals>, pressed: bool) {
     tracing::trace!(target: "dmx::input", pressed, "blind → globals");
     globals.lock().set_blind(pressed);
+    let _ = app.emit(BLIND_EVENT, BlindChange { pressed });
 }
 
 #[tauri::command]
@@ -617,7 +645,12 @@ pub fn remove_fixture(
     programmer: State<'_, SharedProgrammer>,
     id: String,
 ) -> Result<(), CommandError> {
-    programmer.lock().untouch(&id);
+    let prog_snap = {
+        let mut p = programmer.lock();
+        p.untouch(&id);
+        p.snapshot()
+    };
+    let _ = app.emit(PROGRAMMER_EVENT, prog_snap);
     {
         let mut s = show.write();
         let before = s.show.fixtures.len();
@@ -751,6 +784,7 @@ pub fn get_fixture_values(
 
 #[tauri::command]
 pub fn set_fixture_channel(
+    app: AppHandle,
     engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
     programmer: State<'_, SharedProgrammer>,
@@ -799,7 +833,12 @@ pub fn set_fixture_channel(
     // recording flows still capture at fixture granularity (Update / Add
     // step / Solo touched), but the per-channel detail powers the
     // "what did I touch on this fixture" UI on the stage canvas.
-    programmer.lock().touch(fixture_id, channel_offset);
+    let snap = {
+        let mut p = programmer.lock();
+        p.touch(fixture_id, channel_offset);
+        p.snapshot()
+    };
+    let _ = app.emit(PROGRAMMER_EVENT, snap);
     Ok(())
 }
 
@@ -1284,8 +1323,13 @@ pub fn programmer_status(programmer: State<'_, SharedProgrammer>) -> ProgrammerS
 }
 
 #[tauri::command]
-pub fn programmer_clear(programmer: State<'_, SharedProgrammer>) {
-    programmer.lock().clear();
+pub fn programmer_clear(app: AppHandle, programmer: State<'_, SharedProgrammer>) {
+    let snap = {
+        let mut p = programmer.lock();
+        p.clear();
+        p.snapshot()
+    };
+    let _ = app.emit(PROGRAMMER_EVENT, snap);
 }
 
 /// Drop a single fixture from the touched set without affecting any of
@@ -1295,10 +1339,16 @@ pub fn programmer_clear(programmer: State<'_, SharedProgrammer>) {
 /// Idempotent: untouching a fixture that wasn't touched is a no-op.
 #[tauri::command]
 pub fn programmer_untouch(
+    app: AppHandle,
     programmer: State<'_, SharedProgrammer>,
     fixture_id: String,
 ) {
-    programmer.lock().untouch(&fixture_id);
+    let snap = {
+        let mut p = programmer.lock();
+        p.untouch(&fixture_id);
+        p.snapshot()
+    };
+    let _ = app.emit(PROGRAMMER_EVENT, snap);
 }
 
 // ---- Scenes (Phase 4 it. 3: multi-step + FX capture) ---------------------
@@ -1743,7 +1793,7 @@ pub fn recall_scene(
 /// a separate consumer thread (spawned in `lib.rs`) actually toggles
 /// chasers/movements so disk persistence stays off the DMX hot path.
 pub fn recall_scene_impl(
-    _app: &AppHandle,
+    app: &AppHandle,
     engine: &EngineState,
     show: &ShowState,
     _chasers: &SharedChasers,
@@ -1843,6 +1893,14 @@ pub fn recall_scene_impl(
         pre_recall_values,
         pre_recall_fx,
         std::time::Instant::now(),
+    );
+    let step_index = scenes_pb.lock().current_step_index().map(|i| i as u32);
+    let _ = app.emit(
+        SCENE_ACTIVE_EVENT,
+        SceneActiveChange {
+            active_scene_id: Some(id.to_string()),
+            step_index,
+        },
     );
     Ok(())
 }
@@ -1955,8 +2013,15 @@ fn apply_fx_state_movement(
 }
 
 #[tauri::command]
-pub fn release_scene(scenes_pb: State<'_, SharedScenePlayback>) {
+pub fn release_scene(app: AppHandle, scenes_pb: State<'_, SharedScenePlayback>) {
     scenes_pb.lock().release(std::time::Instant::now());
+    let _ = app.emit(
+        SCENE_ACTIVE_EVENT,
+        SceneActiveChange {
+            active_scene_id: None,
+            step_index: None,
+        },
+    );
 }
 
 #[tauri::command]

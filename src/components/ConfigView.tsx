@@ -6,6 +6,7 @@ import { LibraryView } from "./LibraryView";
 import { MidiConfigView } from "./MidiConfigView";
 import { OutputsView } from "./OutputsView";
 import { PatchView } from "./PatchView";
+import { RemoteBridgeView } from "./RemoteBridgeView";
 
 type ConfigTab =
   | "library"
@@ -14,6 +15,7 @@ type ConfigTab =
   | "blackout-blind"
   | "midi"
   | "ai"
+  | "remote"
   | "direct";
 
 // Grouped by setup flow: hardware → control surface → debug.
@@ -42,6 +44,11 @@ const GROUPS: Array<{ id: string; items: Array<{ id: ConfigTab; label: string; h
           id: "ai",
           label: "IA",
           hint: "Provider, modelo y API key para generación de escenas con LLM",
+        },
+        {
+          id: "remote",
+          label: "Remote",
+          hint: "Bridge LAN para la app companion en iPhone (scenes / master / blackout)",
         },
       ],
     },
@@ -84,6 +91,7 @@ export function ConfigView() {
         {sub === "blackout-blind" && <ButtonsConfigView />}
         {sub === "midi" && <MidiConfigView />}
         {sub === "ai" && <AiConfigView />}
+        {sub === "remote" && <RemoteBridgeView />}
         {sub === "direct" && <DirectOutput />}
       </div>
     </main>

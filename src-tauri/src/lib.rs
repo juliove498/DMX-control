@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod bridge;
 pub mod chaser;
 pub mod commands;
 pub mod engine;
@@ -217,6 +218,7 @@ pub fn run() {
     let launchpad_handle = shared_launchpad();
     let scene_playback_handle = shared_scene_playback();
     let programmer_handle = shared_programmer();
+    let bridge_state = crate::bridge::BridgeState::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -230,6 +232,7 @@ pub fn run() {
         .manage(launchpad_handle.clone())
         .manage(scene_playback_handle.clone())
         .manage(programmer_handle.clone())
+        .manage(bridge_state.clone())
         .setup(move |app| {
             let app_handle = app.handle().clone();
             let engine_state: tauri::State<'_, EngineState> = app.state();
@@ -489,6 +492,14 @@ pub fn run() {
             commands::disconnect_midi,
             commands::get_midi_status,
             commands::send_midi_raw,
+            // Mobile remote bridge
+            bridge::bridge_start,
+            bridge::bridge_stop,
+            bridge::bridge_status,
+            bridge::bridge_begin_pairing,
+            bridge::bridge_cancel_pairing,
+            bridge::bridge_list_devices,
+            bridge::bridge_revoke_device,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

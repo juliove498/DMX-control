@@ -312,6 +312,11 @@ fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
         let pressed = vel > 0;
         handles.blind_held.store(pressed, Ordering::Relaxed);
         handles.globals.lock().set_blind(pressed);
+        let _ = tauri::Emitter::emit(
+            &handles.app,
+            crate::commands::BLIND_EVENT,
+            crate::commands::BlindChange { pressed },
+        );
         return;
     }
 
@@ -638,6 +643,14 @@ fn handle_scene_press(pad_idx: usize, handles: &LpHandles) {
         // playback's channel, so chasers/movements come back to the
         // pre-recall state.
         handles.scenes.lock().release(std::time::Instant::now());
+        let _ = tauri::Emitter::emit(
+            &handles.app,
+            crate::commands::SCENE_ACTIVE_EVENT,
+            crate::commands::SceneActiveChange {
+                active_scene_id: None,
+                step_index: None,
+            },
+        );
         tracing::info!(scene = %scene_id, "launchpad released active scene");
         return;
     }

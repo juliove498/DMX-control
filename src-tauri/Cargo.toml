@@ -50,8 +50,24 @@ base64 = "0.22"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 # Tokio runtime — Tauri 2 already pulls it in but the AI commands need
 # the multi-thread feature to spawn a blocking HTTP call without
-# blocking the UI thread.
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+# blocking the UI thread. The bridge server (axum + tungstenite) also
+# wants `net`, `time`, `sync` for its socket / timer / oneshot needs.
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "sync", "io-util"] }
+# ---- Mobile remote bridge --------------------------------------------------
+# axum hosts the REST + WS endpoints the iPhone companion connects to.
+# tower-http only for the permissive CORS layer used by the LAN dashboard.
+# mdns-sd advertises the service on Bonjour/Avahi so the phone can find
+# the desktop without typing an IP. On Windows the Firewall typically
+# prompts on first launch; the UI exposes the literal IP+port so manual
+# entry is always available as a fallback.
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["cors"] }
+mdns-sd = "0.11"
+sha2 = "0.10"
+rand = "0.8"
+qrcodegen = "1.8"
+local-ip-address = "0.6"
+futures-util = { version = "0.3", default-features = false, features = ["std", "sink"] }
 
 [dev-dependencies]
 hex-literal = "0.4"

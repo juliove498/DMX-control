@@ -376,6 +376,290 @@ export type Translation = {
   "scenes.fx.disable": string;
   "scenes.fx.enable": string;
   "scenes.fx.noOptions": string;
+
+  // ---- Chaser view -----------------------------------------------------
+  "chaser.title": string;
+  "chaser.addExample": string;
+  "chaser.addNew": string;
+  "chaser.empty": string;
+  "chaser.exampleNoticeNoFixtures": string;
+  "chaser.exampleNoticeWithFixtures": string;
+  "chaser.toggle.on": string;
+  "chaser.toggle.off": string;
+  "chaser.toggle.disable": string;
+  "chaser.toggle.enable": string;
+  "chaser.lpHint": string;
+  "chaser.summary": string;
+  "chaser.summary.fade": string;
+  "chaser.hide": string;
+  "chaser.edit": string;
+  "chaser.del": string;
+  "chaser.tab.pattern": string;
+  "chaser.tab.timing": string;
+  "chaser.tab.slots": string;
+  "chaser.section.pattern": string;
+  "chaser.section.colorMode": string;
+  "chaser.section.tempo": string;
+  "chaser.section.levels": string;
+  "chaser.section.fade": string;
+  "chaser.bpm": string;
+  "chaser.subdivision": string;
+  "chaser.master": string;
+  "chaser.background": string;
+  "chaser.fadeEnabled": string;
+  "chaser.fadeAmount": string;
+  "chaser.fadeCurve": string;
+  "chaser.fadeHint": string;
+  "chaser.preview.empty": string;
+  "chaser.slots.empty": string;
+  "chaser.slots.intLabel": string;
+  "chaser.slots.colorLabel": string;
+  "chaser.slots.add": string;
+  "chaser.slots.fixtureFmt": string;
+  "chaser.cadence": string;
+  "chaser.cadenceN": string;
+  "chaser.rotation": string;
+  "chaser.removeColor": string;
+  "chaser.addColor": string;
+  "chaser.rainbowSpeed": string;
+  "chaser.rainbowSpread": string;
+  "chaser.fadeCurveLabel.linear": string;
+  "chaser.fadeCurveLabel.easeInOut": string;
+  "chaser.fadeCurveLabel.easeIn": string;
+  "chaser.fadeCurveLabel.easeOut": string;
+  "chaser.fadeCurveLabel.exponential": string;
+  "chaser.fadeCurveLabel.logarithmic": string;
+  "chaser.subdivisionLabel.16": string;
+  "chaser.subdivisionLabel.8": string;
+  "chaser.subdivisionLabel.4": string;
+  "chaser.subdivisionLabel.2": string;
+  "chaser.subdivisionLabel.1": string;
+  "chaser.patternLabel.allTogether": string;
+  "chaser.patternLabel.alternate": string;
+  "chaser.patternLabel.chase": string;
+  "chaser.patternLabel.chaseReverse": string;
+  "chaser.patternLabel.pingPong": string;
+  "chaser.patternLabel.wave": string;
+  "chaser.patternLabel.waveReverse": string;
+  "chaser.patternLabel.build": string;
+  "chaser.patternLabel.buildReverse": string;
+  "chaser.patternLabel.centerOut": string;
+  "chaser.patternLabel.symmetric": string;
+  "chaser.patternLabel.random": string;
+  "chaser.cadenceLabel.everyStep": string;
+  "chaser.cadenceLabel.everyN": string;
+  "chaser.cadenceLabel.perSlot": string;
+  "chaser.cadenceLabel.alternateSlots": string;
+  "chaser.cadenceLabel.chasePerColor": string;
+  "chaser.rotationLabel.perStep": string;
+  "chaser.rotationLabel.perCycle": string;
+  "chaser.rotationLabel.perSlot": string;
+  "chaser.colorModeLabel.disabled": string;
+  "chaser.colorModeLabel.single": string;
+  "chaser.colorModeLabel.twoColor": string;
+  "chaser.colorModeLabel.palette": string;
+  "chaser.colorModeLabel.rainbow": string;
+
+  // ---- Movement view ---------------------------------------------------
+  "movement.title": string;
+  "movement.addNew": string;
+  "movement.empty": string;
+  "movement.delete": string;
+  "movement.deleteConfirm": string;
+  "movement.lpHint": string;
+  "movement.legend.fixtures": string;
+  "movement.legend.shape": string;
+  "movement.legend.canon": string;
+  "movement.legend.timing": string;
+  "movement.legend.transform": string;
+  "movement.fixtures.empty": string;
+  "movement.fixtures.invertPan": string;
+  "movement.fixtures.invertTilt": string;
+  "movement.fixtures.add": string;
+  "movement.fixtures.fixtureFmt": string;
+  "movement.shape.sides": string;
+  "movement.shape.points": string;
+  "movement.shape.innerRatio": string;
+  "movement.timing.bpm": string;
+  "movement.timing.loopLength": string;
+  "movement.transform.sizeX": string;
+  "movement.transform.sizeY": string;
+  "movement.transform.centerX": string;
+  "movement.transform.centerY": string;
+  "movement.transform.rotation": string;
+  "movement.transform.reset": string;
+  "movement.previewHint": string;
+  "movement.previewBadgeOff": string;
+  "movement.previewMeta": string;
+  "movement.previewPaused": string;
+  "movement.wave.pan": string;
+  "movement.wave.tilt": string;
+  "movement.wave.waveform": string;
+  "movement.wave.frequency": string;
+  "movement.wave.phaseShift": string;
+  "movement.wave.amplitude": string;
+  "movement.wave.offset": string;
+  "movement.preset.label": string;
+  "movement.preset.loadHint": string;
+  "movement.shapeLabel.circle": string;
+  "movement.shapeLabel.polygon": string;
+  "movement.shapeLabel.star": string;
+  "movement.shapeLabel.figureEight": string;
+  "movement.shapeLabel.lineH": string;
+  "movement.shapeLabel.lineV": string;
+  "movement.shapeLabel.sineCombo": string;
+  "movement.spreadLabel.none": string;
+  "movement.spreadLabel.even": string;
+  "movement.spreadLabel.symmetric": string;
+  "movement.spreadLabel.pairs": string;
+  "movement.spreadLabel.manual": string;
+  "movement.directionLabel.forward": string;
+  "movement.directionLabel.reverse": string;
+  "movement.directionLabel.pingPong": string;
+  "movement.subdivLabel.16": string;
+  "movement.subdivLabel.8": string;
+  "movement.subdivLabel.1beat": string;
+  "movement.subdivLabel.2beats": string;
+  "movement.subdivLabel.4beats": string;
+  "movement.waveformLabel.sine": string;
+  "movement.waveformLabel.cosine": string;
+  "movement.waveformLabel.triangle": string;
+  "movement.waveformLabel.square": string;
+  "movement.waveformLabel.sawtooth": string;
+  "movement.waveformLabel.rampUp": string;
+  "movement.waveformLabel.rampDown": string;
+  "movement.presetLabel.circle": string;
+  "movement.presetLabel.figureEight": string;
+  "movement.presetLabel.lissajous32": string;
+  "movement.presetLabel.lissajous54": string;
+  "movement.presetLabel.wavePan": string;
+
+  // ---- Stage view ------------------------------------------------------
+  "stage.title": string;
+  "stage.meta": string;
+  "stage.metaSelected": string;
+  "stage.empty": string;
+  "stage.sidebar.placeholder": string;
+  "stage.fixture.untouchAria": string;
+  "stage.fixture.untouchTitle": string;
+  "stage.type.selectHint": string;
+  "stage.editor.unavailable": string;
+  "stage.editor.multiHeading": string;
+  "stage.editor.multiBadge": string;
+  "stage.editor.mixedHint": string;
+  "stage.editor.activeFx": string;
+  "stage.editor.fxKindChaser": string;
+  "stage.editor.fxKindMove": string;
+  "stage.editor.fxTooltipChaser": string;
+  "stage.editor.fxTooltipMovement": string;
+  "stage.editor.center": string;
+  "stage.editor.home": string;
+  "stage.editor.section.intStrobe": string;
+  "stage.editor.section.color": string;
+  "stage.editor.section.extras": string;
+  "stage.fxbar.scenes": string;
+  "stage.fxbar.movements": string;
+  "stage.fxbar.chasers": string;
+  "stage.fxbar.releaseHint": string;
+  "stage.fxbar.idle": string;
+  "stage.fxbar.openScenes": string;
+  "stage.fxbar.closeScenes": string;
+  "stage.fxbar.scenesBtnClose": string;
+  "stage.fxbar.scenesBtnOpen": string;
+  "stage.fxbar.morePill": string;
+  "stage.fxbar.scenePillTitle": string;
+  "stage.fxbar.disableMovement": string;
+  "stage.fxbar.enableMovement": string;
+  "stage.fxbar.disableChaser": string;
+  "stage.fxbar.enableChaser": string;
+  "stage.fxbar.stepName": string;
+  "stage.fxbar.stepFmt": string;
+  "stage.sqp.aria": string;
+  "stage.sqp.title": string;
+  "stage.sqp.metaFmt": string;
+  "stage.sqp.list": string;
+  "stage.sqp.newScene": string;
+  "stage.sqp.empty": string;
+  "stage.sqp.recallTitle": string;
+  "stage.sqp.editSceneTitle": string;
+  "stage.sqp.sceneStepFmt": string;
+  "stage.sqp.sceneLive": string;
+  "stage.sqp.releaseActive": string;
+  "stage.sqp.stepsHeading": string;
+  "stage.sqp.tagLive": string;
+  "stage.sqp.tagStopped": string;
+  "stage.sqp.followActive": string;
+  "stage.sqp.followActiveHint": string;
+  "stage.sqp.stepPlaceholder": string;
+  "stage.sqp.fadeTitle": string;
+  "stage.sqp.holdTitle": string;
+  "stage.sqp.overwriteAll": string;
+  "stage.sqp.overwriteTouched": string;
+  "stage.sqp.removeStep": string;
+  "stage.sqp.removeOnlyHint": string;
+  "stage.sqp.recordHeadingNew": string;
+  "stage.sqp.recordHeadingAdd": string;
+  "stage.sqp.fade": string;
+  "stage.sqp.hold": string;
+  "stage.sqp.ms": string;
+  "stage.sqp.touchedOnly": string;
+  "stage.sqp.addStep": string;
+  "stage.sqp.recordNew": string;
+  "stage.sqp.touchedHelperOn": string;
+  "stage.sqp.touchedHelperOff": string;
+  "stage.sqp.touchedToggle": string;
+  "stage.sqp.locateHint": string;
+  "stage.sqp.locate": string;
+  "stage.sqp.clearProg": string;
+  "stage.sqp.errRecord": string;
+  "stage.sqp.errAddStep": string;
+  "stage.sqp.errCreate": string;
+  "stage.sqp.errNoTouched": string;
+  "stage.menu.fixtureSingular": string;
+  "stage.menu.fixturePlural": string;
+  "stage.menu.centerPanTilt": string;
+  "stage.menu.park": string;
+  "stage.menu.fullIntensity": string;
+  "stage.menu.blackoutFixture": string;
+  "stage.menu.rename": string;
+  "stage.menu.duplicate": string;
+  "stage.menu.untouch": string;
+  "stage.menu.remove": string;
+  "stage.confirm.removeOne": string;
+  "stage.confirm.removeMany": string;
+
+  // ---- AI Generate Modal -----------------------------------------------
+  "aiGen.aria": string;
+  "aiGen.title": string;
+  "aiGen.titleIterating": string;
+  "aiGen.errPromptEmpty": string;
+  "aiGen.errScopeEmpty": string;
+  "aiGen.errRefineEmpty": string;
+  "aiGen.field.prompt": string;
+  "aiGen.field.promptPlaceholder": string;
+  "aiGen.field.stepCount": string;
+  "aiGen.field.scope": string;
+  "aiGen.scope.all": string;
+  "aiGen.scope.selected": string;
+  "aiGen.scope.fixturesHint": string;
+  "aiGen.disabledHint": string;
+  "aiGen.activeHint": string;
+  "aiGen.generating": string;
+  "aiGen.generate": string;
+  "aiGen.preview.stepCount": string;
+  "aiGen.preview.stepPlaceholder": string;
+  "aiGen.preview.stepMeta": string;
+  "aiGen.refine": string;
+  "aiGen.refinePlaceholder": string;
+  "aiGen.refineHint": string;
+  "aiGen.refining": string;
+  "aiGen.refineLabel": string;
+  "aiGen.resetFromScratch": string;
+  "aiGen.replaceOriginal": string;
+  "aiGen.replaceOriginalHint": string;
+  "aiGen.replacing": string;
+  "aiGen.applyNew": string;
+  "aiGen.applying": string;
 };
 
 export const en: Translation = {
@@ -753,6 +1037,299 @@ export const en: Translation = {
   "scenes.fx.disable": "Disable",
   "scenes.fx.enable": "Enable:",
   "scenes.fx.noOptions": "— no options —",
+
+  "chaser.title": "Ambient Chaser ({count})",
+  "chaser.addExample": "+ Example chasers",
+  "chaser.addNew": "+ New chaser",
+  "chaser.empty":
+    "No chasers. Create one and assign fixtures, or try + Example chasers to start with presets already configured.",
+  "chaser.exampleNoticeNoFixtures":
+    "Added {count} example chasers. Patch fixtures and add them to their slots to see them in action.",
+  "chaser.exampleNoticeWithFixtures":
+    "Added {count} example chasers with your {fixtures} already-patched fixture(s).",
+  "chaser.toggle.on": "ON",
+  "chaser.toggle.off": "OFF",
+  "chaser.toggle.disable": "Disable chaser",
+  "chaser.toggle.enable": "Enable chaser",
+  "chaser.lpHint": "Launchpad pad {pad} (bottom row)",
+  "chaser.summary": "{bpm} BPM · {slots} slots",
+  "chaser.summary.fade": " · fade",
+  "chaser.hide": "Hide",
+  "chaser.edit": "Edit",
+  "chaser.del": "Del",
+  "chaser.tab.pattern": "Pattern & Color",
+  "chaser.tab.timing": "Timing & Fade",
+  "chaser.tab.slots": "Slots ({count})",
+  "chaser.section.pattern": "Pattern",
+  "chaser.section.colorMode": "Colour mode",
+  "chaser.section.tempo": "Tempo",
+  "chaser.section.levels": "Levels",
+  "chaser.section.fade": "Fade between steps",
+  "chaser.bpm": "BPM",
+  "chaser.subdivision": "Subdivision",
+  "chaser.master": "Master",
+  "chaser.background": "Background",
+  "chaser.fadeEnabled": "Enabled",
+  "chaser.fadeAmount": "Amount (% of step)",
+  "chaser.fadeCurve": "Curve",
+  "chaser.fadeHint":
+    "0% = snap (off→on instantaneous). 90% = almost the whole step crossfading. The curve defines the shape of the transition.",
+  "chaser.preview.empty": "No slots — add fixtures to see the effect.",
+  "chaser.slots.empty": "No slots — add fixtures below.",
+  "chaser.slots.intLabel": "Int",
+  "chaser.slots.colorLabel": "Color",
+  "chaser.slots.add": "+ Add slot",
+  "chaser.slots.fixtureFmt": "{label} (U{universe}/{address})",
+  "chaser.cadence": "Cadence",
+  "chaser.cadenceN": "N steps",
+  "chaser.rotation": "Rotation",
+  "chaser.removeColor": "Remove colour",
+  "chaser.addColor": "+ Add colour",
+  "chaser.rainbowSpeed": "Speed (deg/step)",
+  "chaser.rainbowSpread": "Spread (rainbow length)",
+  "chaser.fadeCurveLabel.linear": "Linear",
+  "chaser.fadeCurveLabel.easeInOut": "Ease in/out",
+  "chaser.fadeCurveLabel.easeIn": "Ease in",
+  "chaser.fadeCurveLabel.easeOut": "Ease out",
+  "chaser.fadeCurveLabel.exponential": "Exponential",
+  "chaser.fadeCurveLabel.logarithmic": "Logarithmic",
+  "chaser.subdivisionLabel.16": "1/16",
+  "chaser.subdivisionLabel.8": "1/8",
+  "chaser.subdivisionLabel.4": "1/4",
+  "chaser.subdivisionLabel.2": "1/2",
+  "chaser.subdivisionLabel.1": "1/1",
+  "chaser.patternLabel.allTogether": "All together",
+  "chaser.patternLabel.alternate": "Alternate",
+  "chaser.patternLabel.chase": "Chase →",
+  "chaser.patternLabel.chaseReverse": "Chase ←",
+  "chaser.patternLabel.pingPong": "Ping-pong",
+  "chaser.patternLabel.wave": "Wave →",
+  "chaser.patternLabel.waveReverse": "Wave ←",
+  "chaser.patternLabel.build": "Build",
+  "chaser.patternLabel.buildReverse": "Build reverse",
+  "chaser.patternLabel.centerOut": "Center out",
+  "chaser.patternLabel.symmetric": "Symmetric",
+  "chaser.patternLabel.random": "Random",
+  "chaser.cadenceLabel.everyStep": "Every step (A B A B…)",
+  "chaser.cadenceLabel.everyN": "Every N steps (AAAA BBBB)",
+  "chaser.cadenceLabel.perSlot": "Per slot (half A, half B)",
+  "chaser.cadenceLabel.alternateSlots": "Alternate slots (zebra)",
+  "chaser.cadenceLabel.chasePerColor": "One chase A, next chase B",
+  "chaser.rotationLabel.perStep": "Per step",
+  "chaser.rotationLabel.perCycle": "Per cycle (every chase)",
+  "chaser.rotationLabel.perSlot": "Per slot (static)",
+  "chaser.colorModeLabel.disabled": "Disabled (intensity only)",
+  "chaser.colorModeLabel.single": "Single colour",
+  "chaser.colorModeLabel.twoColor": "Two-colour cadence",
+  "chaser.colorModeLabel.palette": "Palette",
+  "chaser.colorModeLabel.rainbow": "Rainbow",
+
+  "movement.title": "Movement Generators",
+  "movement.addNew": "+ Add movement",
+  "movement.empty":
+    "No movements. Create one to start — the first maps to Launchpad pad 21 (row 2). Subsequent ones take the 7 pads to its right.",
+  "movement.delete": "Delete",
+  "movement.deleteConfirm": "Delete \"{name}\"?",
+  "movement.lpHint": "Launchpad pad {pad} (row 2)",
+  "movement.legend.fixtures": "Fixtures ({count})",
+  "movement.legend.shape": "Shape",
+  "movement.legend.canon": "Canon",
+  "movement.legend.timing": "Timing",
+  "movement.legend.transform": "Transform",
+  "movement.fixtures.empty": "No fixtures assigned.",
+  "movement.fixtures.invertPan": "Inv P",
+  "movement.fixtures.invertTilt": "Inv T",
+  "movement.fixtures.add": "+ Add fixture…",
+  "movement.fixtures.fixtureFmt": "{label} (U{universe}/{address})",
+  "movement.shape.sides": "Sides",
+  "movement.shape.points": "Points",
+  "movement.shape.innerRatio": "Inner ratio",
+  "movement.timing.bpm": "BPM",
+  "movement.timing.loopLength": "Loop length",
+  "movement.transform.sizeX": "Size X",
+  "movement.transform.sizeY": "Size Y",
+  "movement.transform.centerX": "Center X",
+  "movement.transform.centerY": "Center Y",
+  "movement.transform.rotation": "Rotation",
+  "movement.transform.reset": "Reset transform",
+  "movement.previewHint":
+    "Sub-phase A: only Circle. More shapes (Polygon, Star, Lissajous, Sine combos…) in sub-phases C and D.",
+  "movement.previewBadgeOff": "OFF",
+  "movement.previewMeta": "{count} fixtures · phase {phase}%",
+  "movement.previewPaused": "{count} fixtures · paused",
+  "movement.wave.pan": "Pan",
+  "movement.wave.tilt": "Tilt",
+  "movement.wave.waveform": "Waveform",
+  "movement.wave.frequency": "Frequency",
+  "movement.wave.phaseShift": "Phase shift",
+  "movement.wave.amplitude": "Amplitude",
+  "movement.wave.offset": "Offset",
+  "movement.preset.label": "Presets:",
+  "movement.preset.loadHint": "Load {name} preset",
+  "movement.shapeLabel.circle": "Circle",
+  "movement.shapeLabel.polygon": "Polygon",
+  "movement.shapeLabel.star": "Star",
+  "movement.shapeLabel.figureEight": "Figure 8",
+  "movement.shapeLabel.lineH": "Line ⇄",
+  "movement.shapeLabel.lineV": "Line ⇅",
+  "movement.shapeLabel.sineCombo": "Sine combo",
+  "movement.spreadLabel.none": "None (all in phase)",
+  "movement.spreadLabel.even": "Even (canon)",
+  "movement.spreadLabel.symmetric": "Symmetric",
+  "movement.spreadLabel.pairs": "Pairs",
+  "movement.spreadLabel.manual": "Manual",
+  "movement.directionLabel.forward": "Forward →",
+  "movement.directionLabel.reverse": "Reverse ←",
+  "movement.directionLabel.pingPong": "Ping-pong ↔",
+  "movement.subdivLabel.16": "1/16 (very fast)",
+  "movement.subdivLabel.8": "1/8",
+  "movement.subdivLabel.1beat": "1 beat",
+  "movement.subdivLabel.2beats": "2 beats",
+  "movement.subdivLabel.4beats": "4 beats",
+  "movement.waveformLabel.sine": "Sine",
+  "movement.waveformLabel.cosine": "Cosine",
+  "movement.waveformLabel.triangle": "Triangle",
+  "movement.waveformLabel.square": "Square",
+  "movement.waveformLabel.sawtooth": "Sawtooth",
+  "movement.waveformLabel.rampUp": "Ramp ↑",
+  "movement.waveformLabel.rampDown": "Ramp ↓",
+  "movement.presetLabel.circle": "Circle",
+  "movement.presetLabel.figureEight": "Figure 8 (1:2)",
+  "movement.presetLabel.lissajous32": "Lissajous 3:2",
+  "movement.presetLabel.lissajous54": "Lissajous 5:4",
+  "movement.presetLabel.wavePan": "Wave (pan only)",
+
+  "stage.title": "Stage",
+  "stage.meta": "{count} fixtures · grid {grid}px",
+  "stage.metaSelected": " · {count} selected",
+  "stage.empty": "No fixtures.",
+  "stage.sidebar.placeholder":
+    "Select a fixture or a type to open its encoders. ⌘/Ctrl-click adds or removes from the selection.",
+  "stage.fixture.untouchAria": "Remove from touched ({count} channels)",
+  "stage.fixture.untouchTitle": "Click to remove from touched · channels: {labels}",
+  "stage.type.selectHint": "Select the {count} units (⌘/Ctrl-click to add)",
+  "stage.editor.unavailable": "Definition not available.",
+  "stage.editor.multiHeading": "{fixtures} fixtures · {types} types",
+  "stage.editor.multiBadge": "×{count}",
+  "stage.editor.mixedHint": "Showing only the controls common to every selected unit.",
+  "stage.editor.activeFx": "Active effects",
+  "stage.editor.fxKindChaser": "Chaser",
+  "stage.editor.fxKindMove": "Move",
+  "stage.editor.fxTooltipChaser": "Chaser: {name} · affects {touches}/{total}",
+  "stage.editor.fxTooltipMovement": "Movement: {name} · affects {touches}/{total}",
+  "stage.editor.center": "Center",
+  "stage.editor.home": "Home",
+  "stage.editor.section.intStrobe": "Intensity & strobe",
+  "stage.editor.section.color": "Color",
+  "stage.editor.section.extras": "Extras",
+  "stage.fxbar.scenes": "Scenes",
+  "stage.fxbar.movements": "Movements",
+  "stage.fxbar.chasers": "Chasers",
+  "stage.fxbar.releaseHint": "Release — the rig stays in its current state",
+  "stage.fxbar.idle": "— no scene active",
+  "stage.fxbar.openScenes": "Open scenes panel",
+  "stage.fxbar.closeScenes": "Close scenes panel",
+  "stage.fxbar.scenesBtnClose": "Close",
+  "stage.fxbar.scenesBtnOpen": "Scenes…",
+  "stage.fxbar.morePill": "+{n} more",
+  "stage.fxbar.scenePillTitle": "▶ {name} ({count} step{plural})",
+  "stage.fxbar.disableMovement": "Disable {name}",
+  "stage.fxbar.enableMovement": "Enable {name} ({slots} slots)",
+  "stage.fxbar.disableChaser": "Disable {name}",
+  "stage.fxbar.enableChaser": "Enable {name} ({slots} slots)",
+  "stage.fxbar.stepName": "{name}",
+  "stage.fxbar.stepFmt": "step {step}/{total}",
+  "stage.sqp.aria": "Scene panel",
+  "stage.sqp.title": "Scenes",
+  "stage.sqp.metaFmt": "{scenes} · {touched} touched",
+  "stage.sqp.list": "List",
+  "stage.sqp.newScene": "+ New",
+  "stage.sqp.empty": "No scenes. Build a look and tap + New to record it.",
+  "stage.sqp.recallTitle": "Recall ({count} step{plural})",
+  "stage.sqp.editSceneTitle": "Edit steps for this scene",
+  "stage.sqp.sceneStepFmt": "{count} step{plural}",
+  "stage.sqp.sceneLive": " · live",
+  "stage.sqp.releaseActive": "Release active scene",
+  "stage.sqp.stepsHeading": "Steps for {name}",
+  "stage.sqp.tagLive": "LIVE",
+  "stage.sqp.tagStopped": "STOPPED",
+  "stage.sqp.followActive": "Follow active",
+  "stage.sqp.followActiveHint": "Resume following the active scene",
+  "stage.sqp.stepPlaceholder": "Step {n}",
+  "stage.sqp.fadeTitle": "Fade in (ms)",
+  "stage.sqp.holdTitle": "Hold (ms)",
+  "stage.sqp.overwriteAll": "Overwrite this step with the rig's current state",
+  "stage.sqp.overwriteTouched": "Overwrite only the touched fixtures",
+  "stage.sqp.removeStep": "Remove step",
+  "stage.sqp.removeOnlyHint": "Cannot remove the only step",
+  "stage.sqp.recordHeadingNew": "Record new scene",
+  "stage.sqp.recordHeadingAdd": "Add step to \"{name}\"",
+  "stage.sqp.fade": "Fade",
+  "stage.sqp.hold": "Hold",
+  "stage.sqp.ms": "ms",
+  "stage.sqp.touchedOnly": "Touched only ({count})",
+  "stage.sqp.addStep": "+ Add step",
+  "stage.sqp.recordNew": "● Record",
+  "stage.sqp.touchedHelperOn": "Hide touched halos in the canvas",
+  "stage.sqp.touchedHelperOff":
+    "Show touched halos in the canvas while this panel is open",
+  "stage.sqp.touchedToggle": "👁 Touched",
+  "stage.sqp.locateHint": "Pulse the touched fixtures to find them on the canvas",
+  "stage.sqp.locate": "📍 Locate",
+  "stage.sqp.clearProg": "Clear PROG",
+  "stage.sqp.errRecord": "Could not record: {err}",
+  "stage.sqp.errAddStep": "Could not add the step: {err}",
+  "stage.sqp.errCreate": "Could not create: {err}",
+  "stage.sqp.errNoTouched": "No fixtures touched; move a slider to mark them.",
+  "stage.menu.fixtureSingular": "Fixture",
+  "stage.menu.fixturePlural": "{count} fixtures",
+  "stage.menu.centerPanTilt": "Center Pan/Tilt",
+  "stage.menu.park": "Park (defaults)",
+  "stage.menu.fullIntensity": "Full intensity",
+  "stage.menu.blackoutFixture": "Blackout (intensity 0)",
+  "stage.menu.rename": "Rename…",
+  "stage.menu.duplicate": "Duplicate",
+  "stage.menu.untouch": "Untouch",
+  "stage.menu.remove": "Remove",
+  "stage.confirm.removeOne": "Remove \"{name}\"?",
+  "stage.confirm.removeMany": "Remove {count} fixtures?",
+
+  "aiGen.aria": "Generate scene with AI",
+  "aiGen.title": "Generate scene with AI",
+  "aiGen.titleIterating": "Iterating: {name}",
+  "aiGen.errPromptEmpty": "Write a prompt — e.g. 'warm amber with slow fade'.",
+  "aiGen.errScopeEmpty":
+    "Tick at least one fixture in the list or switch the scope to 'all'.",
+  "aiGen.errRefineEmpty": "Write what you want to change (e.g. 'step 2 faster').",
+  "aiGen.field.prompt": "Prompt",
+  "aiGen.field.promptPlaceholder":
+    "e.g. 'sync warm amber pulses, fade 600ms, hold 400ms' · 'slow cold blue sweep left to right' · 'punk red alternating strobe'",
+  "aiGen.field.stepCount": "Step count",
+  "aiGen.field.scope": "Scope",
+  "aiGen.scope.all": "All fixtures ({count})",
+  "aiGen.scope.selected": "Selected only",
+  "aiGen.scope.fixturesHint":
+    "Tick the fixtures you want the AI to move. The rest stay as they are.",
+  "aiGen.disabledHint": "Add fixtures to the patch first",
+  "aiGen.activeHint": "Generate scene (may take 5-15 seconds)",
+  "aiGen.generating": "Generating…",
+  "aiGen.generate": "✨ Generate",
+  "aiGen.preview.stepCount": "{count} step{plural}",
+  "aiGen.preview.stepPlaceholder": "Step {n}",
+  "aiGen.preview.stepMeta":
+    "fade {fade}ms · hold {hold}ms · {count} fixture{plural}",
+  "aiGen.refine": "Refine",
+  "aiGen.refinePlaceholder":
+    "e.g. 'step 2 faster' · 'less blue, more amber' · 'add strobe on the last one'",
+  "aiGen.refineHint": "Apply the change on top of the current draft without losing the good parts",
+  "aiGen.refining": "Thinking…",
+  "aiGen.refineLabel": "↻ Refine",
+  "aiGen.resetFromScratch": "Start over",
+  "aiGen.replaceOriginal": "Replace original",
+  "aiGen.replaceOriginalHint": "Overwrite the steps of \"{name}\" with this draft",
+  "aiGen.replacing": "Replacing…",
+  "aiGen.applyNew": "Apply as new scene",
+  "aiGen.applying": "Applying…",
 };
 
 export const es: Translation = {
@@ -1132,6 +1709,300 @@ export const es: Translation = {
   "scenes.fx.disable": "Apagar",
   "scenes.fx.enable": "Encender:",
   "scenes.fx.noOptions": "— sin opciones —",
+
+  "chaser.title": "Ambient Chaser ({count})",
+  "chaser.addExample": "+ Chasers de ejemplo",
+  "chaser.addNew": "+ Nuevo chaser",
+  "chaser.empty":
+    "Sin chasers. Creá uno y asignale fixtures, o probá + Chasers de ejemplo para empezar con presets ya configurados.",
+  "chaser.exampleNoticeNoFixtures":
+    "Se agregaron {count} chasers de ejemplo. Patcheá fixtures y agregalos a sus slots para verlos en acción.",
+  "chaser.exampleNoticeWithFixtures":
+    "Se agregaron {count} chasers de ejemplo con tus {fixtures} fixture(s) ya asignados.",
+  "chaser.toggle.on": "ON",
+  "chaser.toggle.off": "OFF",
+  "chaser.toggle.disable": "Apagar chaser",
+  "chaser.toggle.enable": "Encender chaser",
+  "chaser.lpHint": "Launchpad pad {pad} (fila inferior)",
+  "chaser.summary": "{bpm} BPM · {slots} slots",
+  "chaser.summary.fade": " · fade",
+  "chaser.hide": "Ocultar",
+  "chaser.edit": "Editar",
+  "chaser.del": "Del",
+  "chaser.tab.pattern": "Pattern & Color",
+  "chaser.tab.timing": "Timing & Fade",
+  "chaser.tab.slots": "Slots ({count})",
+  "chaser.section.pattern": "Pattern",
+  "chaser.section.colorMode": "Modo de color",
+  "chaser.section.tempo": "Tempo",
+  "chaser.section.levels": "Niveles",
+  "chaser.section.fade": "Fade entre steps",
+  "chaser.bpm": "BPM",
+  "chaser.subdivision": "Subdivisión",
+  "chaser.master": "Master",
+  "chaser.background": "Background",
+  "chaser.fadeEnabled": "Habilitado",
+  "chaser.fadeAmount": "Amount (% del step)",
+  "chaser.fadeCurve": "Curva",
+  "chaser.fadeHint":
+    "0% = snap (off→on instantáneo). 90% = casi todo el step crossfading. La curva define el shape de la transición.",
+  "chaser.preview.empty": "Sin slots — agregá fixtures para ver el efecto.",
+  "chaser.slots.empty": "Sin slots — agregá fixtures abajo.",
+  "chaser.slots.intLabel": "Int",
+  "chaser.slots.colorLabel": "Color",
+  "chaser.slots.add": "+ Agregar slot",
+  "chaser.slots.fixtureFmt": "{label} (U{universe}/{address})",
+  "chaser.cadence": "Cadence",
+  "chaser.cadenceN": "N steps",
+  "chaser.rotation": "Rotación",
+  "chaser.removeColor": "Quitar color",
+  "chaser.addColor": "+ Agregar color",
+  "chaser.rainbowSpeed": "Velocidad (deg/step)",
+  "chaser.rainbowSpread": "Spread (largo del arcoiris)",
+  "chaser.fadeCurveLabel.linear": "Linear",
+  "chaser.fadeCurveLabel.easeInOut": "Ease in/out",
+  "chaser.fadeCurveLabel.easeIn": "Ease in",
+  "chaser.fadeCurveLabel.easeOut": "Ease out",
+  "chaser.fadeCurveLabel.exponential": "Exponential",
+  "chaser.fadeCurveLabel.logarithmic": "Logarithmic",
+  "chaser.subdivisionLabel.16": "1/16",
+  "chaser.subdivisionLabel.8": "1/8",
+  "chaser.subdivisionLabel.4": "1/4",
+  "chaser.subdivisionLabel.2": "1/2",
+  "chaser.subdivisionLabel.1": "1/1",
+  "chaser.patternLabel.allTogether": "Todos juntos",
+  "chaser.patternLabel.alternate": "Alternar",
+  "chaser.patternLabel.chase": "Chase →",
+  "chaser.patternLabel.chaseReverse": "Chase ←",
+  "chaser.patternLabel.pingPong": "Ping-pong",
+  "chaser.patternLabel.wave": "Wave →",
+  "chaser.patternLabel.waveReverse": "Wave ←",
+  "chaser.patternLabel.build": "Build",
+  "chaser.patternLabel.buildReverse": "Build reverse",
+  "chaser.patternLabel.centerOut": "Centro hacia afuera",
+  "chaser.patternLabel.symmetric": "Simétrico",
+  "chaser.patternLabel.random": "Random",
+  "chaser.cadenceLabel.everyStep": "Cada step (A B A B…)",
+  "chaser.cadenceLabel.everyN": "Cada N steps (AAAA BBBB)",
+  "chaser.cadenceLabel.perSlot": "Por slot (mitad A, mitad B)",
+  "chaser.cadenceLabel.alternateSlots": "Alternar slots (cebra)",
+  "chaser.cadenceLabel.chasePerColor": "Un chase A, próximo chase B",
+  "chaser.rotationLabel.perStep": "Por step",
+  "chaser.rotationLabel.perCycle": "Por ciclo (cada chase)",
+  "chaser.rotationLabel.perSlot": "Por slot (estático)",
+  "chaser.colorModeLabel.disabled": "Sin color (sólo intensidad)",
+  "chaser.colorModeLabel.single": "Color único",
+  "chaser.colorModeLabel.twoColor": "Cadencia de dos colores",
+  "chaser.colorModeLabel.palette": "Paleta",
+  "chaser.colorModeLabel.rainbow": "Arcoiris",
+
+  "movement.title": "Movement Generators",
+  "movement.addNew": "+ Agregar movement",
+  "movement.empty":
+    "Sin movements. Creá uno para empezar — el primero queda mapeado al pad 21 del Launchpad (fila 2). Los siguientes ocupan los 7 pads a la derecha.",
+  "movement.delete": "Eliminar",
+  "movement.deleteConfirm": "¿Eliminar \"{name}\"?",
+  "movement.lpHint": "Launchpad pad {pad} (fila 2)",
+  "movement.legend.fixtures": "Fixtures ({count})",
+  "movement.legend.shape": "Shape",
+  "movement.legend.canon": "Canon",
+  "movement.legend.timing": "Timing",
+  "movement.legend.transform": "Transform",
+  "movement.fixtures.empty": "Sin fixtures asignados.",
+  "movement.fixtures.invertPan": "Inv P",
+  "movement.fixtures.invertTilt": "Inv T",
+  "movement.fixtures.add": "+ Agregar fixture…",
+  "movement.fixtures.fixtureFmt": "{label} (U{universe}/{address})",
+  "movement.shape.sides": "Lados",
+  "movement.shape.points": "Puntas",
+  "movement.shape.innerRatio": "Inner ratio",
+  "movement.timing.bpm": "BPM",
+  "movement.timing.loopLength": "Largo del loop",
+  "movement.transform.sizeX": "Size X",
+  "movement.transform.sizeY": "Size Y",
+  "movement.transform.centerX": "Center X",
+  "movement.transform.centerY": "Center Y",
+  "movement.transform.rotation": "Rotación",
+  "movement.transform.reset": "Reset transform",
+  "movement.previewHint":
+    "Sub-fase A: solo Circle. Más shapes (Polygon, Star, Lissajous, Sine combos…) en sub-fases C y D.",
+  "movement.previewBadgeOff": "OFF",
+  "movement.previewMeta": "{count} fixtures · phase {phase}%",
+  "movement.previewPaused": "{count} fixtures · pausado",
+  "movement.wave.pan": "Pan",
+  "movement.wave.tilt": "Tilt",
+  "movement.wave.waveform": "Waveform",
+  "movement.wave.frequency": "Frecuencia",
+  "movement.wave.phaseShift": "Phase shift",
+  "movement.wave.amplitude": "Amplitud",
+  "movement.wave.offset": "Offset",
+  "movement.preset.label": "Presets:",
+  "movement.preset.loadHint": "Cargar preset {name}",
+  "movement.shapeLabel.circle": "Círculo",
+  "movement.shapeLabel.polygon": "Polígono",
+  "movement.shapeLabel.star": "Estrella",
+  "movement.shapeLabel.figureEight": "Figure 8",
+  "movement.shapeLabel.lineH": "Línea ⇄",
+  "movement.shapeLabel.lineV": "Línea ⇅",
+  "movement.shapeLabel.sineCombo": "Sine combo",
+  "movement.spreadLabel.none": "Sin spread (todos en fase)",
+  "movement.spreadLabel.even": "Parejo (canon)",
+  "movement.spreadLabel.symmetric": "Simétrico",
+  "movement.spreadLabel.pairs": "De a pares",
+  "movement.spreadLabel.manual": "Manual",
+  "movement.directionLabel.forward": "Forward →",
+  "movement.directionLabel.reverse": "Reverse ←",
+  "movement.directionLabel.pingPong": "Ping-pong ↔",
+  "movement.subdivLabel.16": "1/16 (muy rápido)",
+  "movement.subdivLabel.8": "1/8",
+  "movement.subdivLabel.1beat": "1 beat",
+  "movement.subdivLabel.2beats": "2 beats",
+  "movement.subdivLabel.4beats": "4 beats",
+  "movement.waveformLabel.sine": "Sine",
+  "movement.waveformLabel.cosine": "Cosine",
+  "movement.waveformLabel.triangle": "Triangle",
+  "movement.waveformLabel.square": "Square",
+  "movement.waveformLabel.sawtooth": "Sawtooth",
+  "movement.waveformLabel.rampUp": "Ramp ↑",
+  "movement.waveformLabel.rampDown": "Ramp ↓",
+  "movement.presetLabel.circle": "Círculo",
+  "movement.presetLabel.figureEight": "Figure 8 (1:2)",
+  "movement.presetLabel.lissajous32": "Lissajous 3:2",
+  "movement.presetLabel.lissajous54": "Lissajous 5:4",
+  "movement.presetLabel.wavePan": "Wave (sólo pan)",
+
+  "stage.title": "Stage",
+  "stage.meta": "{count} fixtures · grid {grid}px",
+  "stage.metaSelected": " · {count} seleccionados",
+  "stage.empty": "Sin fixtures.",
+  "stage.sidebar.placeholder":
+    "Seleccioná un fixture o un tipo para abrir sus encoders. ⌘/Ctrl-click suma o quita de la selección.",
+  "stage.fixture.untouchAria": "Quitar de touched ({count} canales)",
+  "stage.fixture.untouchTitle": "Click para quitar de touched · canales: {labels}",
+  "stage.type.selectHint": "Seleccionar las {count} unidades (⌘/Ctrl-click para sumar)",
+  "stage.editor.unavailable": "Definición no disponible.",
+  "stage.editor.multiHeading": "{fixtures} fixtures · {types} tipos",
+  "stage.editor.multiBadge": "×{count}",
+  "stage.editor.mixedHint":
+    "Mostrando solo los controles comunes a todas las unidades seleccionadas.",
+  "stage.editor.activeFx": "Efectos activos",
+  "stage.editor.fxKindChaser": "Chaser",
+  "stage.editor.fxKindMove": "Move",
+  "stage.editor.fxTooltipChaser": "Chaser: {name} · afecta {touches}/{total}",
+  "stage.editor.fxTooltipMovement": "Movement: {name} · afecta {touches}/{total}",
+  "stage.editor.center": "Centro",
+  "stage.editor.home": "Home",
+  "stage.editor.section.intStrobe": "Intensidad y estrobo",
+  "stage.editor.section.color": "Color",
+  "stage.editor.section.extras": "Extras",
+  "stage.fxbar.scenes": "Escenas",
+  "stage.fxbar.movements": "Movements",
+  "stage.fxbar.chasers": "Chasers",
+  "stage.fxbar.releaseHint": "Liberar — la rig queda en su estado actual",
+  "stage.fxbar.idle": "— sin escena activa",
+  "stage.fxbar.openScenes": "Abrir panel de escenas",
+  "stage.fxbar.closeScenes": "Cerrar panel de escenas",
+  "stage.fxbar.scenesBtnClose": "Cerrar",
+  "stage.fxbar.scenesBtnOpen": "Escenas…",
+  "stage.fxbar.morePill": "+{n} más",
+  "stage.fxbar.scenePillTitle": "▶ {name} ({count} step{plural})",
+  "stage.fxbar.disableMovement": "Apagar {name}",
+  "stage.fxbar.enableMovement": "Encender {name} ({slots} slots)",
+  "stage.fxbar.disableChaser": "Apagar {name}",
+  "stage.fxbar.enableChaser": "Encender {name} ({slots} slots)",
+  "stage.fxbar.stepName": "{name}",
+  "stage.fxbar.stepFmt": "paso {step}/{total}",
+  "stage.sqp.aria": "Panel de escenas",
+  "stage.sqp.title": "Escenas",
+  "stage.sqp.metaFmt": "{scenes} · {touched} touched",
+  "stage.sqp.list": "Lista",
+  "stage.sqp.newScene": "+ Nueva",
+  "stage.sqp.empty": "Sin escenas. Armá un look y tocá + Nueva para grabarlo.",
+  "stage.sqp.recallTitle": "Recall ({count} step{plural})",
+  "stage.sqp.editSceneTitle": "Editar steps de esta escena",
+  "stage.sqp.sceneStepFmt": "{count} step{plural}",
+  "stage.sqp.sceneLive": " · live",
+  "stage.sqp.releaseActive": "Liberar escena activa",
+  "stage.sqp.stepsHeading": "Steps de {name}",
+  "stage.sqp.tagLive": "EN VIVO",
+  "stage.sqp.tagStopped": "FRENADA",
+  "stage.sqp.followActive": "Seguir activa",
+  "stage.sqp.followActiveHint": "Volver a seguir la escena activa",
+  "stage.sqp.stepPlaceholder": "Step {n}",
+  "stage.sqp.fadeTitle": "Fade in (ms)",
+  "stage.sqp.holdTitle": "Hold (ms)",
+  "stage.sqp.overwriteAll": "Sobreescribir este step con el estado actual del rig",
+  "stage.sqp.overwriteTouched": "Sobreescribir solo los fixtures touched",
+  "stage.sqp.removeStep": "Eliminar step",
+  "stage.sqp.removeOnlyHint": "No se puede eliminar el único step",
+  "stage.sqp.recordHeadingNew": "Grabar nueva escena",
+  "stage.sqp.recordHeadingAdd": "Agregar step a \"{name}\"",
+  "stage.sqp.fade": "Fade",
+  "stage.sqp.hold": "Hold",
+  "stage.sqp.ms": "ms",
+  "stage.sqp.touchedOnly": "Solo touched ({count})",
+  "stage.sqp.addStep": "+ Add step",
+  "stage.sqp.recordNew": "● Record",
+  "stage.sqp.touchedHelperOn": "Ocultar halos de fixtures touched en la canvas",
+  "stage.sqp.touchedHelperOff":
+    "Mostrar halos de fixtures touched en la canvas mientras este panel esté abierto",
+  "stage.sqp.touchedToggle": "👁 Touched",
+  "stage.sqp.locateHint": "Hacer un pulse en los fixtures touched para encontrarlos en la canvas",
+  "stage.sqp.locate": "📍 Localizar",
+  "stage.sqp.clearProg": "Clear PROG",
+  "stage.sqp.errRecord": "No se pudo grabar: {err}",
+  "stage.sqp.errAddStep": "No se pudo agregar el step: {err}",
+  "stage.sqp.errCreate": "No se pudo crear: {err}",
+  "stage.sqp.errNoTouched": "No hay fixtures tocados; movés un slider para marcarlos.",
+  "stage.menu.fixtureSingular": "Fixture",
+  "stage.menu.fixturePlural": "{count} fixtures",
+  "stage.menu.centerPanTilt": "Centrar Pan/Tilt",
+  "stage.menu.park": "Park (defaults)",
+  "stage.menu.fullIntensity": "Intensidad al máximo",
+  "stage.menu.blackoutFixture": "Blackout (intensity 0)",
+  "stage.menu.rename": "Renombrar…",
+  "stage.menu.duplicate": "Duplicar",
+  "stage.menu.untouch": "Untouch",
+  "stage.menu.remove": "Eliminar",
+  "stage.confirm.removeOne": "¿Eliminar \"{name}\"?",
+  "stage.confirm.removeMany": "¿Eliminar {count} fixtures?",
+
+  "aiGen.aria": "Generar escena con IA",
+  "aiGen.title": "Generar escena con IA",
+  "aiGen.titleIterating": "Mejorando: {name}",
+  "aiGen.errPromptEmpty": "Escribí un prompt — ej: 'cálido amber con fade lento'.",
+  "aiGen.errScopeEmpty":
+    "Tildá al menos un fixture en la lista o cambiá el scope a 'todos'.",
+  "aiGen.errRefineEmpty": "Escribí qué querés cambiar (ej: 'el step 2 más rápido').",
+  "aiGen.field.prompt": "Prompt",
+  "aiGen.field.promptPlaceholder":
+    "ej: 'pulsos cálidos amber sincronizados, fade 600ms, hold 400ms' · 'recorrido frío azul lento de izquierda a derecha' · 'punk rojo strobe alterno'",
+  "aiGen.field.stepCount": "Cantidad de steps",
+  "aiGen.field.scope": "Scope",
+  "aiGen.scope.all": "Todos los fixtures ({count})",
+  "aiGen.scope.selected": "Solo seleccionados",
+  "aiGen.scope.fixturesHint":
+    "Tildá los fixtures que querés que la IA mueva. Los demás quedan como están.",
+  "aiGen.disabledHint": "Agregá fixtures al patch primero",
+  "aiGen.activeHint": "Generar escena (puede tardar 5-15 segundos)",
+  "aiGen.generating": "Generando…",
+  "aiGen.generate": "✨ Generar",
+  "aiGen.preview.stepCount": "{count} step{plural}",
+  "aiGen.preview.stepPlaceholder": "Step {n}",
+  "aiGen.preview.stepMeta":
+    "fade {fade}ms · hold {hold}ms · {count} fixture{plural}",
+  "aiGen.refine": "Refinar",
+  "aiGen.refinePlaceholder":
+    "ej: 'el step 2 más rápido' · 'menos azul, más amber' · 'agregá strobe en el último'",
+  "aiGen.refineHint": "Aplicar el cambio sobre el draft actual sin perder lo bueno",
+  "aiGen.refining": "Pensando…",
+  "aiGen.refineLabel": "↻ Refinar",
+  "aiGen.resetFromScratch": "Empezar de cero",
+  "aiGen.replaceOriginal": "Reemplazar original",
+  "aiGen.replaceOriginalHint": "Sobrescribir los steps de \"{name}\" con este draft",
+  "aiGen.replacing": "Reemplazando…",
+  "aiGen.applyNew": "Aplicar como escena nueva",
+  "aiGen.applying": "Aplicando…",
 };
 
 export type LanguageCode = "en" | "es";

@@ -2,7 +2,10 @@ import type { DraftScene } from "@bindings/DraftScene";
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
 import { useEffect, useMemo, useState } from "react";
+import { useT } from "../i18n";
 import { useShowStore } from "../stores/show";
+
+const plural = (n: number) => (n === 1 ? "" : "s");
 
 /// Modal triggered from Scenes header (new) or from a scene's
 /// "Mejorar con IA" button (iterate). Two-stage flow:
@@ -34,6 +37,7 @@ export function AiGenerateModal({
   onClose: () => void;
   initialSeed?: AiGenerateModalSeed;
 }) {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const aiGenerateSceneDraft = useShowStore((s) => s.aiGenerateSceneDraft);
   const aiApplyDraftScene = useShowStore((s) => s.aiApplyDraftScene);
@@ -91,7 +95,7 @@ export function AiGenerateModal({
 
   const onGenerate = async () => {
     if (!prompt.trim()) {
-      setError("Escribí un prompt — ej: 'cálido amber con fade lento'.");
+      setError(t("aiGen.errPromptEmpty"));
       return;
     }
     setError(null);
@@ -100,7 +104,7 @@ export function AiGenerateModal({
     try {
       const ids = scope === "selected" ? Array.from(selectedIds) : null;
       if (scope === "selected" && (!ids || ids.length === 0)) {
-        setError("Tildá al menos un fixture en la lista o cambiá el scope a 'todos'.");
+        setError(t("aiGen.errScopeEmpty"));
         return;
       }
       const result = await aiGenerateSceneDraft(prompt.trim(), stepCount, ids, null);
@@ -116,7 +120,7 @@ export function AiGenerateModal({
   const onRefine = async () => {
     if (!seedForLlm) return;
     if (!refinePrompt.trim()) {
-      setError("Escribí qué querés cambiar (ej: 'el step 2 más rápido').");
+      setError(t("aiGen.errRefineEmpty"));
       return;
     }
     setError(null);
@@ -179,19 +183,19 @@ export function AiGenerateModal({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <section className="ai-modal" aria-label="Generar escena con IA">
+      <section className="ai-modal" aria-label={t("aiGen.aria")}>
         <header className="ai-modal-head">
           <h3>
             {originalSceneName
-              ? `Mejorando: ${originalSceneName}`
-              : "Generar escena con IA"}
+              ? t("aiGen.titleIterating", { name: originalSceneName })
+              : t("aiGen.title")}
           </h3>
           <span className="ai-modal-meta">{providerLabel}</span>
           <button
             type="button"
             className="ai-modal-close"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             ×
           </button>
@@ -273,21 +277,22 @@ function PromptForm({
   generating: boolean;
   onGenerate: () => void;
 }) {
+  const t = useT();
   return (
     <div className="ai-modal-body">
       <label className="ai-modal-field">
-        <span>Prompt</span>
+        <span>{t("aiGen.field.prompt")}</span>
         <textarea
           rows={4}
           value={prompt}
           onChange={(e) => onPrompt(e.currentTarget.value)}
-          placeholder="ej: 'pulsos cálidos amber sincronizados, fade 600ms, hold 400ms' · 'recorrido frío azul lento de izquierda a derecha' · 'punk rojo strobe alterno'"
+          placeholder={t("aiGen.field.promptPlaceholder")}
           disabled={generating}
         />
       </label>
       <div className="ai-modal-row">
         <label className="ai-modal-field-inline">
-          <span>Cantidad de steps</span>
+          <span>{t("aiGen.field.stepCount")}</span>
           <input
             type="number"
             min={1}
@@ -300,23 +305,23 @@ function PromptForm({
           />
         </label>
         <label className="ai-modal-field-inline">
-          <span>Scope</span>
+          <span>{t("aiGen.field.scope")}</span>
           <select
             value={scope}
             onChange={(e) => onScope(e.currentTarget.value as "all" | "selected")}
             disabled={generating}
           >
-            <option value="all">Todos los fixtures ({fixtures.length})</option>
-            <option value="selected">Solo seleccionados</option>
+            <option value="all">
+              {t("aiGen.scope.all", { count: fixtures.length })}
+            </option>
+            <option value="selected">{t("aiGen.scope.selected")}</option>
           </select>
         </label>
       </div>
 
       {scope === "selected" ? (
         <div className="ai-modal-fixtures">
-          <p className="hint">
-            Tildá los fixtures que querés que la IA mueva. Los demás quedan como están.
-          </p>
+          <p className="hint">{t("aiGen.scope.fixturesHint")}</p>
           <ul className="ai-fixture-list">
             {fixtures.map((f) => {
               const def = libraryById[f.definition_id];
@@ -348,13 +353,9 @@ function PromptForm({
           className="ai-primary"
           onClick={onGenerate}
           disabled={generating || fixtures.length === 0}
-          title={
-            fixtures.length === 0
-              ? "Agregá fixtures al patch primero"
-              : "Generar escena (puede tardar 5-15 segundos)"
-          }
+          title={fixtures.length === 0 ? t("aiGen.disabledHint") : t("aiGen.activeHint")}
         >
-          {generating ? "Generando…" : "✨ Generar"}
+          {generating ? t("aiGen.generating") : t("aiGen.generate")}
         </button>
       </div>
     </div>
@@ -388,6 +389,7 @@ function DraftPreview({
   onReplaceOriginal?: () => void;
   originalSceneName?: string;
 }) {
+  const t = useT();
   const fixtureLabel = (id: string): string => {
     const f = fixtures.find((x) => x.id === id);
     if (!f) return id;
@@ -400,7 +402,10 @@ function DraftPreview({
       <div className="ai-draft-head">
         <strong>{draft.name}</strong>
         <span className="hint">
-          {draft.steps.length} step{draft.steps.length === 1 ? "" : "s"}
+          {t("aiGen.preview.stepCount", {
+            count: draft.steps.length,
+            plural: plural(draft.steps.length),
+          })}
         </span>
       </div>
       <ul className="ai-draft-steps">
@@ -408,11 +413,16 @@ function DraftPreview({
           <li key={i} className="ai-draft-step">
             <header>
               <span className="ai-step-num">{i + 1}</span>
-              <strong>{step.name ?? `Step ${i + 1}`}</strong>
+              <strong>
+                {step.name ?? t("aiGen.preview.stepPlaceholder", { n: i + 1 })}
+              </strong>
               <span className="hint">
-                fade {step.fade_in_ms}ms · hold {step.hold_ms}ms ·{" "}
-                {step.fixtures.length} fixture
-                {step.fixtures.length === 1 ? "" : "s"}
+                {t("aiGen.preview.stepMeta", {
+                  fade: step.fade_in_ms,
+                  hold: step.hold_ms,
+                  count: step.fixtures.length,
+                  plural: plural(step.fixtures.length),
+                })}
               </span>
             </header>
             <ul className="ai-draft-fixtures">
@@ -431,12 +441,12 @@ function DraftPreview({
 
       <div className="ai-refine">
         <label className="ai-modal-field">
-          <span>Refinar</span>
+          <span>{t("aiGen.refine")}</span>
           <textarea
             rows={2}
             value={refinePrompt}
             onChange={(e) => onRefinePrompt(e.currentTarget.value)}
-            placeholder="ej: 'el step 2 más rápido' · 'menos azul, más amber' · 'agregá strobe en el último'"
+            placeholder={t("aiGen.refinePlaceholder")}
             disabled={busy}
           />
         </label>
@@ -444,24 +454,26 @@ function DraftPreview({
           type="button"
           onClick={onRefine}
           disabled={busy || !refinePrompt.trim()}
-          title="Aplicar el cambio sobre el draft actual sin perder lo bueno"
+          title={t("aiGen.refineHint")}
         >
-          {generating ? "Pensando…" : "↻ Refinar"}
+          {generating ? t("aiGen.refining") : t("aiGen.refineLabel")}
         </button>
       </div>
 
       <div className="ai-modal-actions">
         <button type="button" onClick={onResetFromScratch} disabled={busy}>
-          Empezar de cero
+          {t("aiGen.resetFromScratch")}
         </button>
         {onReplaceOriginal ? (
           <button
             type="button"
             onClick={onReplaceOriginal}
             disabled={busy}
-            title={`Sobrescribir los steps de "${originalSceneName ?? "la escena"}" con este draft`}
+            title={t("aiGen.replaceOriginalHint", {
+              name: originalSceneName ?? "—",
+            })}
           >
-            {applying ? "Reemplazando…" : "Reemplazar original"}
+            {applying ? t("aiGen.replacing") : t("aiGen.replaceOriginal")}
           </button>
         ) : null}
         <button
@@ -470,7 +482,7 @@ function DraftPreview({
           onClick={onApplyAsNew}
           disabled={busy}
         >
-          {applying ? "Aplicando…" : "Aplicar como escena nueva"}
+          {applying ? t("aiGen.applying") : t("aiGen.applyNew")}
         </button>
       </div>
     </div>

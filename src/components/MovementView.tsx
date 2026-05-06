@@ -9,49 +9,51 @@ import type { TempoSource } from "@bindings/TempoSource";
 import type { WaveFunction } from "@bindings/WaveFunction";
 import type { Waveform } from "@bindings/Waveform";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 import { movementColor } from "../lib/launchpadColors";
 import { useShowStore } from "../stores/show";
 
-const SUBDIVISIONS: Array<{ value: Subdivision; label: string }> = [
-  { value: "quarter", label: "1/16 (very fast)" },
-  { value: "half", label: "1/8" },
-  { value: "one", label: "1 beat" },
-  { value: "two", label: "2 beats" },
-  { value: "four", label: "4 beats" },
+const SUBDIVISIONS: Array<{ value: Subdivision; labelKey: keyof Translation }> = [
+  { value: "quarter", labelKey: "movement.subdivLabel.16" },
+  { value: "half", labelKey: "movement.subdivLabel.8" },
+  { value: "one", labelKey: "movement.subdivLabel.1beat" },
+  { value: "two", labelKey: "movement.subdivLabel.2beats" },
+  { value: "four", labelKey: "movement.subdivLabel.4beats" },
 ];
 
-const SHAPES: Array<{ value: Shape["type"]; label: string }> = [
-  { value: "circle", label: "Circle" },
-  { value: "polygon", label: "Polygon" },
-  { value: "star", label: "Star" },
-  { value: "figure_eight", label: "Figure 8" },
-  { value: "line_horizontal", label: "Line ⇄" },
-  { value: "line_vertical", label: "Line ⇅" },
-  { value: "sine_combo", label: "Sine combo" },
+const SHAPES: Array<{ value: Shape["type"]; labelKey: keyof Translation }> = [
+  { value: "circle", labelKey: "movement.shapeLabel.circle" },
+  { value: "polygon", labelKey: "movement.shapeLabel.polygon" },
+  { value: "star", labelKey: "movement.shapeLabel.star" },
+  { value: "figure_eight", labelKey: "movement.shapeLabel.figureEight" },
+  { value: "line_horizontal", labelKey: "movement.shapeLabel.lineH" },
+  { value: "line_vertical", labelKey: "movement.shapeLabel.lineV" },
+  { value: "sine_combo", labelKey: "movement.shapeLabel.sineCombo" },
 ];
 
-const SPREAD_MODES: Array<{ value: SpreadMode; label: string }> = [
-  { value: "none", label: "None (all in phase)" },
-  { value: "even", label: "Even (canon)" },
-  { value: "symmetric", label: "Symmetric" },
-  { value: "pairs", label: "Pairs" },
-  { value: "manual", label: "Manual" },
+const SPREAD_MODES: Array<{ value: SpreadMode; labelKey: keyof Translation }> = [
+  { value: "none", labelKey: "movement.spreadLabel.none" },
+  { value: "even", labelKey: "movement.spreadLabel.even" },
+  { value: "symmetric", labelKey: "movement.spreadLabel.symmetric" },
+  { value: "pairs", labelKey: "movement.spreadLabel.pairs" },
+  { value: "manual", labelKey: "movement.spreadLabel.manual" },
 ];
 
-const DIRECTIONS: Array<{ value: Direction; label: string }> = [
-  { value: "forward", label: "Forward →" },
-  { value: "reverse", label: "Reverse ←" },
-  { value: "ping_pong", label: "Ping-pong ↔" },
+const DIRECTIONS: Array<{ value: Direction; labelKey: keyof Translation }> = [
+  { value: "forward", labelKey: "movement.directionLabel.forward" },
+  { value: "reverse", labelKey: "movement.directionLabel.reverse" },
+  { value: "ping_pong", labelKey: "movement.directionLabel.pingPong" },
 ];
 
-const WAVEFORMS: Array<{ value: Waveform; label: string }> = [
-  { value: "sine", label: "Sine" },
-  { value: "cosine", label: "Cosine" },
-  { value: "triangle", label: "Triangle" },
-  { value: "square", label: "Square" },
-  { value: "sawtooth", label: "Sawtooth" },
-  { value: "ramp_up", label: "Ramp ↑" },
-  { value: "ramp_down", label: "Ramp ↓" },
+const WAVEFORMS: Array<{ value: Waveform; labelKey: keyof Translation }> = [
+  { value: "sine", labelKey: "movement.waveformLabel.sine" },
+  { value: "cosine", labelKey: "movement.waveformLabel.cosine" },
+  { value: "triangle", labelKey: "movement.waveformLabel.triangle" },
+  { value: "square", labelKey: "movement.waveformLabel.square" },
+  { value: "sawtooth", labelKey: "movement.waveformLabel.sawtooth" },
+  { value: "ramp_up", labelKey: "movement.waveformLabel.rampUp" },
+  { value: "ramp_down", labelKey: "movement.waveformLabel.rampDown" },
 ];
 
 /// Sensible defaults when the user picks a new shape from the dropdown.
@@ -90,29 +92,29 @@ function makeDefaultShape(type: Shape["type"]): Shape {
   }
 }
 
-const SINE_PRESETS: Array<{ label: string; pan: WaveFunction; tilt: WaveFunction }> = [
+const SINE_PRESETS: Array<{ labelKey: keyof Translation; pan: WaveFunction; tilt: WaveFunction }> = [
   {
-    label: "Circle",
+    labelKey: "movement.presetLabel.circle",
     pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
     tilt: { waveform: "cosine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
   },
   {
-    label: "Figure 8 (1:2)",
+    labelKey: "movement.presetLabel.figureEight",
     pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
     tilt: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
   },
   {
-    label: "Lissajous 3:2",
+    labelKey: "movement.presetLabel.lissajous32",
     pan: { waveform: "sine", frequency: 3, phase_shift: 0, amplitude: 1, offset: 0 },
     tilt: { waveform: "sine", frequency: 2, phase_shift: 0.25, amplitude: 1, offset: 0 },
   },
   {
-    label: "Lissajous 5:4",
+    labelKey: "movement.presetLabel.lissajous54",
     pan: { waveform: "sine", frequency: 5, phase_shift: 0, amplitude: 1, offset: 0 },
     tilt: { waveform: "sine", frequency: 4, phase_shift: 0.125, amplitude: 1, offset: 0 },
   },
   {
-    label: "Wave (pan only)",
+    labelKey: "movement.presetLabel.wavePan",
     pan: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
     tilt: { waveform: "sine", frequency: 0, phase_shift: 0, amplitude: 0, offset: 0 },
   },
@@ -266,28 +268,29 @@ function WaveEditor({
   wave,
   onChange,
 }: {
-  axis: "Pan" | "Tilt";
+  axis: "pan" | "tilt";
   wave: WaveFunction;
   onChange: (next: WaveFunction) => void;
 }) {
+  const t = useT();
   return (
     <div className="wave-editor">
-      <strong>{axis}</strong>
+      <strong>{axis === "pan" ? t("movement.wave.pan") : t("movement.wave.tilt")}</strong>
       <label>
-        Waveform
+        {t("movement.wave.waveform")}
         <select
           value={wave.waveform}
           onChange={(e) => onChange({ ...wave, waveform: e.currentTarget.value as Waveform })}
         >
           {WAVEFORMS.map((w) => (
             <option key={w.value} value={w.value}>
-              {w.label}
+              {t(w.labelKey)}
             </option>
           ))}
         </select>
       </label>
       <label>
-        Frequency
+        {t("movement.wave.frequency")}
         <input
           type="range"
           min={0}
@@ -299,7 +302,7 @@ function WaveEditor({
         <span className="val">{wave.frequency.toFixed(2)}×</span>
       </label>
       <label>
-        Phase shift
+        {t("movement.wave.phaseShift")}
         <input
           type="range"
           min={0}
@@ -311,7 +314,7 @@ function WaveEditor({
         <span className="val">{wave.phase_shift.toFixed(2)}</span>
       </label>
       <label>
-        Amplitude
+        {t("movement.wave.amplitude")}
         <input
           type="range"
           min={0}
@@ -323,7 +326,7 @@ function WaveEditor({
         <span className="val">{wave.amplitude.toFixed(2)}</span>
       </label>
       <label>
-        Offset
+        {t("movement.wave.offset")}
         <input
           type="range"
           min={-1}
@@ -347,24 +350,28 @@ function SineComboEditor({
   tilt: WaveFunction;
   onChange: (pan: WaveFunction, tilt: WaveFunction) => void;
 }) {
+  const t = useT();
   return (
     <div className="sine-combo-editor">
       <div className="sine-presets">
-        <span className="sine-presets-label">Presets:</span>
-        {SINE_PRESETS.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            onClick={() => onChange(p.pan, p.tilt)}
-            title={`Load ${p.label} preset`}
-          >
-            {p.label}
-          </button>
-        ))}
+        <span className="sine-presets-label">{t("movement.preset.label")}</span>
+        {SINE_PRESETS.map((p) => {
+          const label = t(p.labelKey);
+          return (
+            <button
+              key={p.labelKey}
+              type="button"
+              onClick={() => onChange(p.pan, p.tilt)}
+              title={t("movement.preset.loadHint", { name: label })}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
       <div className="sine-combo-grid">
-        <WaveEditor axis="Pan" wave={pan} onChange={(next) => onChange(next, tilt)} />
-        <WaveEditor axis="Tilt" wave={tilt} onChange={(next) => onChange(pan, next)} />
+        <WaveEditor axis="pan" wave={pan} onChange={(next) => onChange(next, tilt)} />
+        <WaveEditor axis="tilt" wave={tilt} onChange={(next) => onChange(pan, next)} />
       </div>
     </div>
   );
@@ -381,6 +388,7 @@ function Preview({
   fixtures: FixtureInstance[];
   onCommit: (gen: MovementGenerator) => void;
 }) {
+  const t = useT();
   const total = gen.fixtures.length;
   const bpm = bpmOf(gen.tempo);
   const beatsPerLoop = SUBDIVISION_BEATS[gen.subdivision];
@@ -563,7 +571,9 @@ function Preview({
 
   return (
     <div className={`movement-preview${gen.enabled ? "" : " off"}`}>
-      {!gen.enabled ? <div className="movement-preview-badge">OFF</div> : null}
+      {!gen.enabled ? (
+        <div className="movement-preview-badge">{t("movement.previewBadgeOff")}</div>
+      ) : null}
       <svg
         ref={svgRef}
         viewBox={`-${padded} -${padded} ${padded * 2} ${padded * 2}`}
@@ -688,8 +698,9 @@ function Preview({
         })}
       </svg>
       <div className="movement-preview-meta">
-        {total} fixtures
-        {gen.enabled ? ` · phase ${(phase * 100).toFixed(0)}%` : " · paused"}
+        {gen.enabled
+          ? t("movement.previewMeta", { count: total, phase: (phase * 100).toFixed(0) })
+          : t("movement.previewPaused", { count: total })}
         {drag ? ` · ${drag.kind}` : ""}
       </div>
     </div>
@@ -697,6 +708,7 @@ function Preview({
 }
 
 export function MovementView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const library = useShowStore((s) => s.library);
   const updateMovement = useShowStore((s) => s.updateMovement);
@@ -719,7 +731,7 @@ export function MovementView() {
     }
   }, [movements, selectedId]);
 
-  if (!show) return <main className="page">Cargando…</main>;
+  if (!show) return <main className="page">{t("common.loading")}</main>;
   const fixtures = show.fixtures;
   const selectedMovement = movements.find((m) => m.id === selectedId) ?? null;
 
@@ -727,7 +739,7 @@ export function MovementView() {
     return (
       <main className="page movement-view">
         <header className="page-head">
-          <h2>Movement Generators</h2>
+          <h2>{t("movement.title")}</h2>
           <div className="actions">
             <button
               type="button"
@@ -735,20 +747,17 @@ export function MovementView() {
                 createMovement().then((m) => setSelectedId(m.id));
               }}
             >
-              + Add movement
+              {t("movement.addNew")}
             </button>
           </div>
         </header>
-        <p className="empty">
-          Sin movements. Creá uno para empezar — el primero queda mapeado al pad 21 del Launchpad
-          (fila 2). Los siguientes ocupan los 7 pads a la derecha.
-        </p>
+        <p className="empty">{t("movement.empty")}</p>
       </main>
     );
   }
 
   if (!selectedMovement) {
-    return <main className="page">Cargando…</main>;
+    return <main className="page">{t("common.loading")}</main>;
   }
 
   const gen = selectedMovement;
@@ -821,7 +830,7 @@ export function MovementView() {
   return (
     <main className="page movement-view">
       <header className="page-head">
-        <h2>Movement Generators</h2>
+        <h2>{t("movement.title")}</h2>
         <div className="actions">
           <button
             type="button"
@@ -829,18 +838,18 @@ export function MovementView() {
               createMovement().then((m) => setSelectedId(m.id));
             }}
           >
-            + Add movement
+            {t("movement.addNew")}
           </button>
           <button
             type="button"
             className="danger"
             onClick={() => {
-              if (window.confirm(`Eliminar "${gen.name}"?`)) {
+              if (window.confirm(t("movement.deleteConfirm", { name: gen.name }))) {
                 deleteMovement(gen.id);
               }
             }}
           >
-            Delete
+            {t("movement.delete")}
           </button>
         </div>
       </header>
@@ -866,7 +875,7 @@ export function MovementView() {
                   <span
                     className="lp-pad-badge"
                     style={{ background: color }}
-                    title={`Launchpad pad ${i + 1} (fila 2)`}
+                    title={t("movement.lpHint", { pad: i + 1 })}
                     aria-hidden="true"
                   />
                 ) : null}
@@ -889,13 +898,13 @@ export function MovementView() {
                   : { borderColor: padColor, color: padColor }
               }
             >
-              {gen.enabled ? "ON" : "OFF"}
+              {gen.enabled ? t("chaser.toggle.on") : t("chaser.toggle.off")}
             </button>
             {showsOnLaunchpad ? (
               <span
                 className="lp-pad-badge"
                 style={{ background: padColor }}
-                title={`Launchpad pad ${selectedIndex + 1} (fila 2)`}
+                title={t("movement.lpHint", { pad: selectedIndex + 1 })}
                 aria-hidden="true"
               />
             ) : null}
@@ -909,9 +918,9 @@ export function MovementView() {
           <div className="movement-grid">
             <section className="movement-column">
               <fieldset className="chaser-fieldset">
-                <legend>Fixtures ({gen.fixtures.length})</legend>
+                <legend>{t("movement.legend.fixtures", { count: gen.fixtures.length })}</legend>
                 {gen.fixtures.length === 0 ? (
-                  <p className="empty">Sin fixtures asignados.</p>
+                  <p className="empty">{t("movement.fixtures.empty")}</p>
                 ) : (
                   <div className="movement-slots">
                     {gen.fixtures.map((slot, i) => {
@@ -925,7 +934,7 @@ export function MovementView() {
                               checked={slot.invert_pan}
                               onChange={(e) => setSlot(i, { invert_pan: e.currentTarget.checked })}
                             />
-                            Inv P
+                            {t("movement.fixtures.invertPan")}
                           </label>
                           <label>
                             <input
@@ -933,10 +942,10 @@ export function MovementView() {
                               checked={slot.invert_tilt}
                               onChange={(e) => setSlot(i, { invert_tilt: e.currentTarget.checked })}
                             />
-                            Inv T
+                            {t("movement.fixtures.invertTilt")}
                           </label>
                           <button type="button" className="danger" onClick={() => removeSlot(i)}>
-                            Del
+                            {t("chaser.del")}
                           </button>
                         </div>
                       );
@@ -950,30 +959,34 @@ export function MovementView() {
                     e.currentTarget.value = "";
                   }}
                 >
-                  <option value="">+ Add fixture…</option>
+                  <option value="">{t("movement.fixtures.add")}</option>
                   {available.map((f) => (
                     <option key={f.id} value={f.id}>
-                      {f.label ?? f.id} (U{f.universe}/{f.address})
+                      {t("movement.fixtures.fixtureFmt", {
+                        label: f.label ?? f.id,
+                        universe: f.universe,
+                        address: f.address,
+                      })}
                     </option>
                   ))}
                 </select>
               </fieldset>
 
               <fieldset className="chaser-fieldset">
-                <legend>Shape</legend>
+                <legend>{t("movement.legend.shape")}</legend>
                 <select
                   value={gen.shape.type}
                   onChange={(e) => setShapeType(e.currentTarget.value as Shape["type"])}
                 >
                   {SHAPES.map((s) => (
                     <option key={s.value} value={s.value}>
-                      {s.label}
+                      {t(s.labelKey)}
                     </option>
                   ))}
                 </select>
                 {gen.shape.type === "polygon" ? (
                   <label>
-                    Sides
+                    {t("movement.shape.sides")}
                     <input
                       type="number"
                       min={3}
@@ -991,7 +1004,7 @@ export function MovementView() {
                 {gen.shape.type === "star" ? (
                   <>
                     <label>
-                      Points
+                      {t("movement.shape.points")}
                       <input
                         type="number"
                         min={3}
@@ -1007,7 +1020,7 @@ export function MovementView() {
                       />
                     </label>
                     <label>
-                      Inner ratio
+                      {t("movement.shape.innerRatio")}
                       <input
                         type="range"
                         min={0.05}
@@ -1036,14 +1049,14 @@ export function MovementView() {
               </fieldset>
 
               <fieldset className="chaser-fieldset">
-                <legend>Canon</legend>
+                <legend>{t("movement.legend.canon")}</legend>
                 <select
                   value={gen.spread_mode}
                   onChange={(e) => setSpreadMode(e.currentTarget.value as SpreadMode)}
                 >
                   {SPREAD_MODES.map((m) => (
                     <option key={m.value} value={m.value}>
-                      {m.label}
+                      {t(m.labelKey)}
                     </option>
                   ))}
                 </select>
@@ -1080,9 +1093,9 @@ export function MovementView() {
               </fieldset>
 
               <fieldset className="chaser-fieldset">
-                <legend>Timing</legend>
+                <legend>{t("movement.legend.timing")}</legend>
                 <label>
-                  BPM
+                  {t("movement.timing.bpm")}
                   <input
                     type="number"
                     min={20}
@@ -1093,14 +1106,14 @@ export function MovementView() {
                   />
                 </label>
                 <label>
-                  Loop length
+                  {t("movement.timing.loopLength")}
                   <select
                     value={gen.subdivision}
                     onChange={(e) => setSubdivision(e.currentTarget.value as Subdivision)}
                   >
                     {SUBDIVISIONS.map((s) => (
                       <option key={s.value} value={s.value}>
-                        {s.label}
+                        {t(s.labelKey)}
                       </option>
                     ))}
                   </select>
@@ -1113,16 +1126,16 @@ export function MovementView() {
                       className={`movement-direction-btn${gen.direction === d.value ? " active" : ""}`}
                       onClick={() => setDirection(d.value)}
                     >
-                      {d.label}
+                      {t(d.labelKey)}
                     </button>
                   ))}
                 </div>
               </fieldset>
 
               <fieldset className="chaser-fieldset">
-                <legend>Transform</legend>
+                <legend>{t("movement.legend.transform")}</legend>
                 <label>
-                  Size X
+                  {t("movement.transform.sizeX")}
                   <input
                     type="range"
                     min={0}
@@ -1134,7 +1147,7 @@ export function MovementView() {
                   <span className="val">{gen.size_x.toFixed(2)}</span>
                 </label>
                 <label>
-                  Size Y
+                  {t("movement.transform.sizeY")}
                   <input
                     type="range"
                     min={0}
@@ -1146,7 +1159,7 @@ export function MovementView() {
                   <span className="val">{gen.size_y.toFixed(2)}</span>
                 </label>
                 <label>
-                  Center X
+                  {t("movement.transform.centerX")}
                   <input
                     type="range"
                     min={-1}
@@ -1158,7 +1171,7 @@ export function MovementView() {
                   <span className="val">{gen.center_x.toFixed(2)}</span>
                 </label>
                 <label>
-                  Center Y
+                  {t("movement.transform.centerY")}
                   <input
                     type="range"
                     min={-1}
@@ -1170,7 +1183,7 @@ export function MovementView() {
                   <span className="val">{gen.center_y.toFixed(2)}</span>
                 </label>
                 <label>
-                  Rotation
+                  {t("movement.transform.rotation")}
                   <input
                     type="range"
                     min={0}
@@ -1194,17 +1207,14 @@ export function MovementView() {
                     })
                   }
                 >
-                  Reset transform
+                  {t("movement.transform.reset")}
                 </button>
               </fieldset>
             </section>
 
             <section className="movement-column">
               <Preview gen={gen} fixtures={fixtures} onCommit={updateMovement} />
-              <p className="hint">
-                Sub-fase A: solo Circle. Más shapes (Polygon, Star, Lissajous, Sine combos…) en
-                sub-fases C y D.
-              </p>
+              <p className="hint">{t("movement.previewHint")}</p>
             </section>
           </div>
         </section>

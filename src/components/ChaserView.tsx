@@ -10,16 +10,18 @@ import type { Rgb } from "@bindings/Rgb";
 import type { Subdivision } from "@bindings/Subdivision";
 import type { TempoSource } from "@bindings/TempoSource";
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 import { chaserColor } from "../lib/launchpadColors";
 import { useShowStore } from "../stores/show";
 
-const FADE_CURVES: Array<{ value: FadeCurve; label: string }> = [
-  { value: "linear", label: "Linear" },
-  { value: "ease_in_out", label: "Ease in/out" },
-  { value: "ease_in", label: "Ease in" },
-  { value: "ease_out", label: "Ease out" },
-  { value: "exponential", label: "Exponential" },
-  { value: "logarithmic", label: "Logarithmic" },
+const FADE_CURVES: Array<{ value: FadeCurve; labelKey: keyof Translation }> = [
+  { value: "linear", labelKey: "chaser.fadeCurveLabel.linear" },
+  { value: "ease_in_out", labelKey: "chaser.fadeCurveLabel.easeInOut" },
+  { value: "ease_in", labelKey: "chaser.fadeCurveLabel.easeIn" },
+  { value: "ease_out", labelKey: "chaser.fadeCurveLabel.easeOut" },
+  { value: "exponential", labelKey: "chaser.fadeCurveLabel.exponential" },
+  { value: "logarithmic", labelKey: "chaser.fadeCurveLabel.logarithmic" },
 ];
 
 /// Map a backend FadeCurve to a CSS timing function so the preview's CSS
@@ -42,49 +44,49 @@ function cssCurveFor(curve: FadeCurve): string {
   }
 }
 
-const SUBDIVISIONS: Array<{ value: Subdivision; label: string }> = [
-  { value: "quarter", label: "1/16" },
-  { value: "half", label: "1/8" },
-  { value: "one", label: "1/4" },
-  { value: "two", label: "1/2" },
-  { value: "four", label: "1/1" },
+const SUBDIVISIONS: Array<{ value: Subdivision; labelKey: keyof Translation }> = [
+  { value: "quarter", labelKey: "chaser.subdivisionLabel.16" },
+  { value: "half", labelKey: "chaser.subdivisionLabel.8" },
+  { value: "one", labelKey: "chaser.subdivisionLabel.4" },
+  { value: "two", labelKey: "chaser.subdivisionLabel.2" },
+  { value: "four", labelKey: "chaser.subdivisionLabel.1" },
 ];
 
-const PATTERNS: Array<{ value: Pattern["type"]; label: string }> = [
-  { value: "all_together", label: "All together" },
-  { value: "alternate", label: "Alternate" },
-  { value: "chase", label: "Chase →" },
-  { value: "chase_reverse", label: "Chase ←" },
-  { value: "ping_pong", label: "Ping-pong" },
-  { value: "wave", label: "Wave →" },
-  { value: "wave_reverse", label: "Wave ←" },
-  { value: "build", label: "Build" },
-  { value: "build_reverse", label: "Build reverse" },
-  { value: "center_out", label: "Center out" },
-  { value: "symmetric", label: "Symmetric" },
-  { value: "random", label: "Random" },
+const PATTERNS: Array<{ value: Pattern["type"]; labelKey: keyof Translation }> = [
+  { value: "all_together", labelKey: "chaser.patternLabel.allTogether" },
+  { value: "alternate", labelKey: "chaser.patternLabel.alternate" },
+  { value: "chase", labelKey: "chaser.patternLabel.chase" },
+  { value: "chase_reverse", labelKey: "chaser.patternLabel.chaseReverse" },
+  { value: "ping_pong", labelKey: "chaser.patternLabel.pingPong" },
+  { value: "wave", labelKey: "chaser.patternLabel.wave" },
+  { value: "wave_reverse", labelKey: "chaser.patternLabel.waveReverse" },
+  { value: "build", labelKey: "chaser.patternLabel.build" },
+  { value: "build_reverse", labelKey: "chaser.patternLabel.buildReverse" },
+  { value: "center_out", labelKey: "chaser.patternLabel.centerOut" },
+  { value: "symmetric", labelKey: "chaser.patternLabel.symmetric" },
+  { value: "random", labelKey: "chaser.patternLabel.random" },
 ];
 
-const CADENCES: Array<{ value: Cadence["type"]; label: string }> = [
-  { value: "every_step", label: "Every step (A B A B…)" },
-  { value: "every_n_steps", label: "Every N steps (AAAA BBBB)" },
-  { value: "per_slot", label: "Per slot (half A, half B)" },
-  { value: "alternate_slots", label: "Alternate slots (zebra)" },
-  { value: "chase_per_color", label: "One chase A, next chase B" },
+const CADENCES: Array<{ value: Cadence["type"]; labelKey: keyof Translation }> = [
+  { value: "every_step", labelKey: "chaser.cadenceLabel.everyStep" },
+  { value: "every_n_steps", labelKey: "chaser.cadenceLabel.everyN" },
+  { value: "per_slot", labelKey: "chaser.cadenceLabel.perSlot" },
+  { value: "alternate_slots", labelKey: "chaser.cadenceLabel.alternateSlots" },
+  { value: "chase_per_color", labelKey: "chaser.cadenceLabel.chasePerColor" },
 ];
 
-const PALETTE_ROTATIONS: Array<{ value: PaletteRotation; label: string }> = [
-  { value: "per_step", label: "Per step" },
-  { value: "per_cycle", label: "Per cycle (every chase)" },
-  { value: "per_slot", label: "Per slot (static)" },
+const PALETTE_ROTATIONS: Array<{ value: PaletteRotation; labelKey: keyof Translation }> = [
+  { value: "per_step", labelKey: "chaser.rotationLabel.perStep" },
+  { value: "per_cycle", labelKey: "chaser.rotationLabel.perCycle" },
+  { value: "per_slot", labelKey: "chaser.rotationLabel.perSlot" },
 ];
 
-const COLOR_MODE_TYPES: Array<{ value: ColorMode["type"]; label: string }> = [
-  { value: "disabled", label: "Disabled (intensity only)" },
-  { value: "single", label: "Single colour" },
-  { value: "two_color_cadence", label: "Two-colour cadence" },
-  { value: "palette", label: "Palette" },
-  { value: "rainbow", label: "Rainbow" },
+const COLOR_MODE_TYPES: Array<{ value: ColorMode["type"]; labelKey: keyof Translation }> = [
+  { value: "disabled", labelKey: "chaser.colorModeLabel.disabled" },
+  { value: "single", labelKey: "chaser.colorModeLabel.single" },
+  { value: "two_color_cadence", labelKey: "chaser.colorModeLabel.twoColor" },
+  { value: "palette", labelKey: "chaser.colorModeLabel.palette" },
+  { value: "rainbow", labelKey: "chaser.colorModeLabel.rainbow" },
 ];
 
 function bpmOf(t: TempoSource): number {
@@ -352,6 +354,7 @@ function TwoColorCadenceEditor({
   mode: Extract<ColorMode, { type: "two_color_cadence" }>;
   onChange: (m: ColorMode) => void;
 }) {
+  const t = useT();
   return (
     <div className="color-mode-block">
       <div className="color-pair">
@@ -371,7 +374,7 @@ function TwoColorCadenceEditor({
         </span>
       </div>
       <label>
-        Cadence
+        {t("chaser.cadence")}
         <select
           value={mode.cadence.type}
           onChange={(e) => {
@@ -383,14 +386,14 @@ function TwoColorCadenceEditor({
         >
           {CADENCES.map((c) => (
             <option key={c.value} value={c.value}>
-              {c.label}
+              {t(c.labelKey)}
             </option>
           ))}
         </select>
       </label>
       {mode.cadence.type === "every_n_steps" ? (
         <label>
-          N steps
+          {t("chaser.cadenceN")}
           <input
             type="number"
             min={1}
@@ -416,10 +419,11 @@ function PaletteEditor({
   mode: Extract<ColorMode, { type: "palette" }>;
   onChange: (m: ColorMode) => void;
 }) {
+  const t = useT();
   return (
     <div className="color-mode-block">
       <label>
-        Rotation
+        {t("chaser.rotation")}
         <select
           value={mode.rotation}
           onChange={(e) =>
@@ -428,7 +432,7 @@ function PaletteEditor({
         >
           {PALETTE_ROTATIONS.map((r) => (
             <option key={r.value} value={r.value}>
-              {r.label}
+              {t(r.labelKey)}
             </option>
           ))}
         </select>
@@ -450,7 +454,7 @@ function PaletteEditor({
               className="danger"
               onClick={() => onChange({ ...mode, colors: mode.colors.filter((_, j) => j !== i) })}
               disabled={mode.colors.length <= 1}
-              title="Remove colour"
+              title={t("chaser.removeColor")}
             >
               ×
             </button>
@@ -462,7 +466,7 @@ function PaletteEditor({
             onChange({ ...mode, colors: [...mode.colors, { r: 255, g: 255, b: 255 }] })
           }
         >
-          + Add colour
+          {t("chaser.addColor")}
         </button>
       </div>
     </div>
@@ -476,10 +480,11 @@ function RainbowEditor({
   mode: Extract<ColorMode, { type: "rainbow" }>;
   onChange: (m: ColorMode) => void;
 }) {
+  const t = useT();
   return (
     <div className="color-mode-block">
       <label>
-        Speed (deg/step)
+        {t("chaser.rainbowSpeed")}
         <input
           type="range"
           min={0}
@@ -491,7 +496,7 @@ function RainbowEditor({
         <span className="val">{mode.speed.toFixed(0)}°</span>
       </label>
       <label>
-        Spread (rainbow length)
+        {t("chaser.rainbowSpread")}
         <input
           type="range"
           min={0}
@@ -513,6 +518,7 @@ function ChaserPreview({
   chaser: AmbientChaser;
   fixtures: FixtureInstance[];
 }) {
+  const t = useT();
   const total = chaser.slots.length;
   const bpm = bpmOf(chaser.tempo);
   const stepMs = stepDurationMs(bpm, chaser.subdivision);
@@ -530,9 +536,7 @@ function ChaserPreview({
   }, [stepMs]);
 
   if (total === 0) {
-    return (
-      <div className="chaser-preview empty">Sin slots — agregá fixtures para ver el efecto.</div>
-    );
+    return <div className="chaser-preview empty">{t("chaser.preview.empty")}</div>;
   }
 
   // When fade is on, mirror the engine's fade duration via a CSS
@@ -581,6 +585,7 @@ function ChaserCard({
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
+  const t = useT();
   const padColor = chaserColor(index);
   const showsOnLaunchpad = index < 8;
   const updateChaser = useShowStore((s) => s.updateChaser);
@@ -637,19 +642,19 @@ function ChaserCard({
           type="button"
           className={`chaser-toggle${chaser.enabled ? " on" : ""}`}
           onClick={() => toggleChaser(chaser.id, !chaser.enabled)}
-          aria-label={chaser.enabled ? "Disable chaser" : "Enable chaser"}
+          aria-label={chaser.enabled ? t("chaser.toggle.disable") : t("chaser.toggle.enable")}
           style={
             chaser.enabled
               ? { background: padColor, borderColor: padColor, color: "#0f0f10" }
               : { borderColor: padColor, color: padColor }
           }
         >
-          {chaser.enabled ? "ON" : "OFF"}
+          {chaser.enabled ? t("chaser.toggle.on") : t("chaser.toggle.off")}
         </button>
         {showsOnLaunchpad ? (
           <span
             className="lp-pad-badge"
-            title={`Launchpad pad ${index + 1} (fila inferior)`}
+            title={t("chaser.lpHint", { pad: index + 1 })}
             style={{ background: padColor }}
             aria-hidden="true"
           />
@@ -660,8 +665,8 @@ function ChaserCard({
           onChange={(e) => setName(e.currentTarget.value)}
         />
         <span className="chaser-summary">
-          {bpm.toFixed(0)} BPM · {chaser.slots.length} slots
-          {chaser.fade.enabled ? " · fade" : ""}
+          {t("chaser.summary", { bpm: bpm.toFixed(0), slots: chaser.slots.length })}
+          {chaser.fade.enabled ? t("chaser.summary.fade") : ""}
         </span>
         {colorPreview ? (
           <span
@@ -671,10 +676,10 @@ function ChaserCard({
           />
         ) : null}
         <button type="button" onClick={onToggleExpanded}>
-          {expanded ? "Hide" : "Edit"}
+          {expanded ? t("chaser.hide") : t("chaser.edit")}
         </button>
         <button type="button" className="danger" onClick={() => deleteChaser(chaser.id)}>
-          Del
+          {t("chaser.del")}
         </button>
       </div>
 
@@ -685,18 +690,20 @@ function ChaserCard({
           <nav className="chaser-tabs">
             {(
               [
-                { id: "pattern", label: "Pattern & Color" },
-                { id: "timing", label: "Timing & Fade" },
-                { id: "slots", label: `Slots (${chaser.slots.length})` },
-              ] as Array<{ id: EditTab; label: string }>
-            ).map((t) => (
+                { id: "pattern", labelKey: "chaser.tab.pattern" as const },
+                { id: "timing", labelKey: "chaser.tab.timing" as const },
+                { id: "slots", labelKey: "chaser.tab.slots" as const },
+              ] as Array<{ id: EditTab; labelKey: keyof Translation }>
+            ).map((meta) => (
               <button
-                key={t.id}
+                key={meta.id}
                 type="button"
-                className={`chaser-tab${tab === t.id ? " active" : ""}`}
-                onClick={() => setTab(t.id)}
+                className={`chaser-tab${tab === meta.id ? " active" : ""}`}
+                onClick={() => setTab(meta.id)}
               >
-                {t.label}
+                {meta.id === "slots"
+                  ? t(meta.labelKey, { count: chaser.slots.length })
+                  : t(meta.labelKey)}
               </button>
             ))}
           </nav>
@@ -704,7 +711,7 @@ function ChaserCard({
           {tab === "pattern" ? (
             <div className="chaser-tab-body">
               <div className="chaser-section">
-                <h5>Pattern</h5>
+                <h5>{t("chaser.section.pattern")}</h5>
                 <div className="chaser-pattern-list">
                   {PATTERNS.map((p) => (
                     <label key={p.value}>
@@ -714,13 +721,13 @@ function ChaserCard({
                         checked={chaser.pattern.type === p.value}
                         onChange={() => setPattern(p.value)}
                       />
-                      {p.label}
+                      {t(p.labelKey)}
                     </label>
                   ))}
                 </div>
               </div>
               <div className="chaser-section">
-                <h5>Colour mode</h5>
+                <h5>{t("chaser.section.colorMode")}</h5>
                 <select
                   value={chaser.color_mode.type}
                   onChange={(e) =>
@@ -729,7 +736,7 @@ function ChaserCard({
                 >
                   {COLOR_MODE_TYPES.map((c) => (
                     <option key={c.value} value={c.value}>
-                      {c.label}
+                      {t(c.labelKey)}
                     </option>
                   ))}
                 </select>
@@ -758,10 +765,10 @@ function ChaserCard({
           {tab === "timing" ? (
             <div className="chaser-tab-body">
               <div className="chaser-section">
-                <h5>Tempo</h5>
+                <h5>{t("chaser.section.tempo")}</h5>
                 <div className="chaser-edit-grid">
                   <label>
-                    BPM
+                    {t("chaser.bpm")}
                     <input
                       type="number"
                       min={20}
@@ -772,14 +779,14 @@ function ChaserCard({
                     />
                   </label>
                   <label>
-                    Subdivision
+                    {t("chaser.subdivision")}
                     <select
                       value={chaser.subdivision}
                       onChange={(e) => setSubdivision(e.currentTarget.value as Subdivision)}
                     >
                       {SUBDIVISIONS.map((s) => (
                         <option key={s.value} value={s.value}>
-                          {s.label}
+                          {t(s.labelKey)}
                         </option>
                       ))}
                     </select>
@@ -787,10 +794,10 @@ function ChaserCard({
                 </div>
               </div>
               <div className="chaser-section">
-                <h5>Levels</h5>
+                <h5>{t("chaser.section.levels")}</h5>
                 <div className="chaser-edit-grid">
                   <label>
-                    Master
+                    {t("chaser.master")}
                     <input
                       type="range"
                       min={0}
@@ -802,7 +809,7 @@ function ChaserCard({
                     <span className="val">{Math.round(chaser.master * 100)}%</span>
                   </label>
                   <label>
-                    Background
+                    {t("chaser.background")}
                     <input
                       type="range"
                       min={0}
@@ -816,7 +823,7 @@ function ChaserCard({
               </div>
               <div className="chaser-section">
                 <h5>
-                  Fade between steps
+                  {t("chaser.section.fade")}
                   <label className="chaser-fade-toggle">
                     <input
                       type="checkbox"
@@ -825,12 +832,12 @@ function ChaserCard({
                         setFade({ ...chaser.fade, enabled: e.currentTarget.checked })
                       }
                     />
-                    Enabled
+                    {t("chaser.fadeEnabled")}
                   </label>
                 </h5>
                 <div className="chaser-edit-grid">
                   <label>
-                    Amount (% of step)
+                    {t("chaser.fadeAmount")}
                     <input
                       type="range"
                       min={0}
@@ -845,7 +852,7 @@ function ChaserCard({
                     <span className="val">{Math.round(chaser.fade.amount * 100)}%</span>
                   </label>
                   <label>
-                    Curve
+                    {t("chaser.fadeCurve")}
                     <select
                       value={chaser.fade.curve}
                       disabled={!chaser.fade.enabled}
@@ -858,16 +865,13 @@ function ChaserCard({
                     >
                       {FADE_CURVES.map((c) => (
                         <option key={c.value} value={c.value}>
-                          {c.label}
+                          {t(c.labelKey)}
                         </option>
                       ))}
                     </select>
                   </label>
                 </div>
-                <p className="chaser-hint">
-                  0% = snap (off→on instantáneo). 90% = casi todo el step crossfading. La curva
-                  define el shape de la transición.
-                </p>
+                <p className="chaser-hint">{t("chaser.fadeHint")}</p>
               </div>
             </div>
           ) : null}
@@ -876,7 +880,7 @@ function ChaserCard({
             <div className="chaser-tab-body">
               <div className="chaser-section">
                 {chaser.slots.length === 0 ? (
-                  <p className="empty">Sin slots — agregá fixtures abajo.</p>
+                  <p className="empty">{t("chaser.slots.empty")}</p>
                 ) : (
                   <div className="chaser-slots">
                     {chaser.slots.map((slot, i) => (
@@ -887,7 +891,11 @@ function ChaserCard({
                         >
                           {fixtures.map((f) => (
                             <option key={f.id} value={f.id}>
-                              {fixtureLabel(f)} (U{f.universe}/{f.address})
+                              {t("chaser.slots.fixtureFmt", {
+                                label: fixtureLabel(f),
+                                universe: f.universe,
+                                address: f.address,
+                              })}
                             </option>
                           ))}
                         </select>
@@ -897,7 +905,7 @@ function ChaserCard({
                             checked={slot.use_intensity}
                             onChange={(e) => setSlot(i, { use_intensity: e.currentTarget.checked })}
                           />
-                          Int
+                          {t("chaser.slots.intLabel")}
                         </label>
                         <label>
                           <input
@@ -905,10 +913,10 @@ function ChaserCard({
                             checked={slot.use_color}
                             onChange={(e) => setSlot(i, { use_color: e.currentTarget.checked })}
                           />
-                          Color
+                          {t("chaser.slots.colorLabel")}
                         </label>
                         <button type="button" className="danger" onClick={() => removeSlot(i)}>
-                          Del
+                          {t("chaser.del")}
                         </button>
                       </div>
                     ))}
@@ -919,7 +927,7 @@ function ChaserCard({
                   onClick={addSlot}
                   disabled={chaser.slots.length >= fixtures.length}
                 >
-                  + Add slot
+                  {t("chaser.slots.add")}
                 </button>
               </div>
             </div>
@@ -931,13 +939,14 @@ function ChaserCard({
 }
 
 export function ChaserView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const createChaser = useShowStore((s) => s.createChaser);
   const addExampleChasers = useShowStore((s) => s.addExampleChasers);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [exampleNotice, setExampleNotice] = useState<string | null>(null);
 
-  if (!show) return <main className="page">Cargando…</main>;
+  if (!show) return <main className="page">{t("common.loading")}</main>;
   const chasers: AmbientChaser[] = show.chasers ?? [];
   const fixtures = show.fixtures;
 
@@ -949,12 +958,10 @@ export function ChaserView() {
   const onAddExamples = async () => {
     const n = await addExampleChasers();
     if (fixtures.length === 0) {
-      setExampleNotice(
-        `Se agregaron ${n} chasers de ejemplo. Patcheá fixtures y agregalos a sus slots para verlos en acción.`,
-      );
+      setExampleNotice(t("chaser.exampleNoticeNoFixtures", { count: n }));
     } else {
       setExampleNotice(
-        `Se agregaron ${n} chasers de ejemplo con tus ${fixtures.length} fixture(s) ya asignados.`,
+        t("chaser.exampleNoticeWithFixtures", { count: n, fixtures: fixtures.length }),
       );
     }
   };
@@ -962,13 +969,13 @@ export function ChaserView() {
   return (
     <main className="page chaser-view">
       <header className="page-head">
-        <h2>Ambient Chaser ({chasers.length})</h2>
+        <h2>{t("chaser.title", { count: chasers.length })}</h2>
         <div className="actions">
           <button type="button" onClick={onAddExamples}>
-            + Example chasers
+            {t("chaser.addExample")}
           </button>
           <button type="button" onClick={onNew}>
-            + New chaser
+            {t("chaser.addNew")}
           </button>
         </div>
       </header>
@@ -979,17 +986,14 @@ export function ChaserView() {
             type="button"
             className="chaser-notice-dismiss"
             onClick={() => setExampleNotice(null)}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             ×
           </button>
         </output>
       ) : null}
       {chasers.length === 0 ? (
-        <p className="empty">
-          Sin chasers. Creá uno y asignale fixtures, o probá <em>+ Example chasers</em> para empezar
-          con presets ya configurados.
-        </p>
+        <p className="empty">{t("chaser.empty")}</p>
       ) : (
         <div className="chaser-list">
           {chasers.map((c, i) => (

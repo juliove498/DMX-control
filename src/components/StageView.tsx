@@ -10,6 +10,7 @@ import {
 } from "@dnd-kit/core";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useT } from "../i18n";
 import { fixtureImageSrc } from "../lib/fixtureImage";
 import { chaserColor, movementColor } from "../lib/launchpadColors";
 import { useShowStore } from "../stores/show";
@@ -62,6 +63,7 @@ function StageFixture({
    *  clicks the corner badge. Only wired when the helper is on. */
   onUntouch: (fixtureId: string) => void;
 }) {
+  const t = useT();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: fixture.id,
   });
@@ -133,8 +135,8 @@ function StageFixture({
           role="button"
           tabIndex={0}
           className="touched-badge clickable"
-          aria-label={`Quitar de touched (${touchedCount} canales)`}
-          title={`Click para quitar de touched · canales: ${touchedLabels.join(", ")}`}
+          aria-label={t("stage.fixture.untouchAria", { count: touchedCount })}
+          title={t("stage.fixture.untouchTitle", { labels: touchedLabels.join(", ") })}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
@@ -173,12 +175,13 @@ function TypeCard({
   active: boolean;
   onSelect: (e: React.MouseEvent) => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
       className={`type-card${active ? " active" : ""}`}
       onClick={(e) => onSelect(e)}
-      title={`Seleccionar las ${count} unidades (⌘/Ctrl-click para sumar)`}
+      title={t("stage.type.selectHint", { count })}
     >
       <div className="type-thumb">
         {imageUrl ? (
@@ -412,6 +415,7 @@ function FixtureChannelEditor({
   libraryById: Record<string, FixtureDefinition>;
   effectsByFixture: Record<string, FxHit[]>;
 }) {
+  const t = useT();
   const setFixtureChannel = useShowStore((s) => s.setFixtureChannel);
   const getFixtureValues = useShowStore((s) => s.getFixtureValues);
   const libraryDir = useShowStore((s) => s.libraryDir);
@@ -487,7 +491,7 @@ function FixtureChannelEditor({
     return list;
   }, [ctxs]);
 
-  if (!primary) return <div className="channel-editor">Definición no disponible.</div>;
+  if (!primary) return <div className="channel-editor">{t("stage.editor.unavailable")}</div>;
 
   const writeRole = (role: RoleKey, value: number) =>
     Promise.all(
@@ -684,18 +688,19 @@ function FixtureChannelEditor({
             {primary.def.manufacturer} {primary.def.name} — {primary.mode.name}
           </>
         ) : (
-          <>
-            {ctxs.length} fixtures · {distinctDefs.length} tipos
-          </>
+          t("stage.editor.multiHeading", {
+            fixtures: ctxs.length,
+            types: distinctDefs.length,
+          })
         )}
-        {ctxs.length > 1 ? <span className="multi-badge">×{ctxs.length}</span> : null}
+        {ctxs.length > 1 ? (
+          <span className="multi-badge">
+            {t("stage.editor.multiBadge", { count: ctxs.length })}
+          </span>
+        ) : null}
       </h4>
 
-      {!sameDef ? (
-        <p className="mixed-hint">
-          Mostrando solo los controles comunes a todas las unidades seleccionadas.
-        </p>
-      ) : null}
+      {!sameDef ? <p className="mixed-hint">{t("stage.editor.mixedHint")}</p> : null}
 
       {(() => {
         // Aggregate every distinct effect (chaser/movement) currently
@@ -716,18 +721,25 @@ function FixtureChannelEditor({
         if (entries.length === 0) return null;
         return (
           <section className="editor-active-fx">
-            <h5>Efectos activos</h5>
+            <h5>{t("stage.editor.activeFx")}</h5>
             <div className="editor-active-fx-list">
               {entries.map(({ hit, touches }) => (
                 <span
                   key={`${hit.kind}-${hit.index}`}
                   className={`editor-fx-chip ${hit.kind}`}
                   style={{ borderColor: hit.color }}
-                  title={`${hit.kind === "chaser" ? "Chaser" : "Movement"}: ${hit.name} · afecta ${touches}/${fixtures.length}`}
+                  title={t(
+                    hit.kind === "chaser"
+                      ? "stage.editor.fxTooltipChaser"
+                      : "stage.editor.fxTooltipMovement",
+                    { name: hit.name, touches, total: fixtures.length },
+                  )}
                 >
                   <span className="editor-fx-chip-dot" style={{ background: hit.color }} />
                   <span className="editor-fx-chip-kind">
-                    {hit.kind === "chaser" ? "Chaser" : "Move"}
+                    {hit.kind === "chaser"
+                      ? t("stage.editor.fxKindChaser")
+                      : t("stage.editor.fxKindMove")}
                   </span>
                   <span className="editor-fx-chip-name">{hit.name}</span>
                   {fixtures.length > 1 ? (
@@ -751,10 +763,10 @@ function FixtureChannelEditor({
                 <span>P {primaryPan}</span>
                 <span>T {primaryTilt}</span>
                 <button type="button" onClick={() => writePanTilt(128, 128)}>
-                  Center
+                  {t("stage.editor.center")}
                 </button>
                 <button type="button" onClick={() => writePanTilt(0, 0)}>
-                  Home
+                  {t("stage.editor.home")}
                 </button>
               </div>
             </div>
@@ -813,7 +825,7 @@ function FixtureChannelEditor({
 
       {showIntStrobeSection ? (
         <section className="editor-subsection">
-          <h5>Intensidad y estrobo</h5>
+          <h5>{t("stage.editor.section.intStrobe")}</h5>
           <div className="editor-channels">
             {hasIntensity ? (
               <label className="ch">
@@ -854,14 +866,14 @@ function FixtureChannelEditor({
 
       {colorChannels.length > 0 ? (
         <section className="editor-subsection">
-          <h5>Color</h5>
+          <h5>{t("stage.editor.section.color")}</h5>
           <div className="editor-channels">{colorChannels.map(renderChannelControl)}</div>
         </section>
       ) : null}
 
       {extrasChannels.length > 0 ? (
         <section className="editor-subsection">
-          <h5>Extras</h5>
+          <h5>{t("stage.editor.section.extras")}</h5>
           <div className="editor-channels">{extrasChannels.map(renderChannelControl)}</div>
         </section>
       ) : null}
@@ -896,6 +908,7 @@ function StageFxBar({
   activeSceneId: string | null;
   activeStepIdx: number | null;
 }) {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const toggleChaser = useShowStore((s) => s.toggleChaser);
   const toggleMovement = useShowStore((s) => s.toggleMovement);
@@ -908,10 +921,17 @@ function StageFxBar({
   const activeStepLabel = (() => {
     if (!activeScene || activeStepIdx === null) return null;
     const step = activeScene.steps[activeStepIdx];
-    if (!step) return `paso ${activeStepIdx + 1}`;
+    if (!step)
+      return t("stage.fxbar.stepFmt", {
+        step: activeStepIdx + 1,
+        total: activeScene.steps.length,
+      });
     return step.name && step.name.trim() !== ""
-      ? `${step.name}`
-      : `paso ${activeStepIdx + 1}/${activeScene.steps.length}`;
+      ? t("stage.fxbar.stepName", { name: step.name })
+      : t("stage.fxbar.stepFmt", {
+          step: activeStepIdx + 1,
+          total: activeScene.steps.length,
+        });
   })();
 
   if (chasers.length === 0 && movements.length === 0 && scenes.length === 0) return null;
@@ -920,28 +940,30 @@ function StageFxBar({
     <footer className="stage-fx-bar" aria-label="Active effects">
       {scenes.length > 0 ? (
         <div className="stage-fx-section stage-fx-scenes">
-          <span className="stage-fx-label">Escenas</span>
+          <span className="stage-fx-label">{t("stage.fxbar.scenes")}</span>
           {activeScene ? (
             <button
               type="button"
               className="stage-fx-toggle scene-active on"
               onClick={() => releaseScene()}
-              title="Liberar — la rig queda en su estado actual"
+              title={t("stage.fxbar.releaseHint")}
             >
               <span className="stage-fx-led active-pulse" aria-hidden="true" />
               <span className="stage-fx-name">{activeScene.name}</span>
               {activeStepLabel ? <span className="stage-fx-meta">{activeStepLabel}</span> : null}
             </button>
           ) : (
-            <span className="stage-fx-idle-hint">— sin escena activa</span>
+            <span className="stage-fx-idle-hint">{t("stage.fxbar.idle")}</span>
           )}
           <button
             type="button"
             className={`stage-fx-scenes-btn${scenePopupOpen ? " open" : ""}`}
             onClick={onToggleScenePopup}
-            title={scenePopupOpen ? "Cerrar panel de escenas" : "Abrir panel de escenas"}
+            title={
+              scenePopupOpen ? t("stage.fxbar.closeScenes") : t("stage.fxbar.openScenes")
+            }
           >
-            {scenePopupOpen ? "Cerrar" : "Escenas…"}
+            {scenePopupOpen ? t("stage.fxbar.scenesBtnClose") : t("stage.fxbar.scenesBtnOpen")}
           </button>
           {scenes.slice(0, 6).map((s) => (
             <button
@@ -949,19 +971,25 @@ function StageFxBar({
               type="button"
               className={`stage-fx-scene-pill${s.id === activeSceneId ? " active" : ""}`}
               onClick={() => recallScene(s.id)}
-              title={`▶ ${s.name} (${s.steps.length} step${s.steps.length === 1 ? "" : "s"})`}
+              title={t("stage.fxbar.scenePillTitle", {
+                name: s.name,
+                count: s.steps.length,
+                plural: s.steps.length === 1 ? "" : "s",
+              })}
             >
               ▶ {s.name}
             </button>
           ))}
           {scenes.length > 6 ? (
-            <span className="stage-fx-meta">+{scenes.length - 6} más</span>
+            <span className="stage-fx-meta">
+              {t("stage.fxbar.morePill", { n: scenes.length - 6 })}
+            </span>
           ) : null}
         </div>
       ) : null}
       {movements.length > 0 ? (
         <div className="stage-fx-section">
-          <span className="stage-fx-label">Movements</span>
+          <span className="stage-fx-label">{t("stage.fxbar.movements")}</span>
           {movements.map((m, i) => {
             const padColor = movementColor(i);
             return (
@@ -971,7 +999,9 @@ function StageFxBar({
                 className={`stage-fx-toggle${m.enabled ? " on" : ""}`}
                 onClick={() => toggleMovement(m.id, !m.enabled)}
                 title={
-                  m.enabled ? `Disable ${m.name}` : `Enable ${m.name} (${m.fixtures.length} slots)`
+                  m.enabled
+                    ? t("stage.fxbar.disableMovement", { name: m.name })
+                    : t("stage.fxbar.enableMovement", { name: m.name, slots: m.fixtures.length })
                 }
                 style={
                   m.enabled
@@ -993,7 +1023,7 @@ function StageFxBar({
       ) : null}
       {chasers.length > 0 ? (
         <div className="stage-fx-section">
-          <span className="stage-fx-label">Chasers</span>
+          <span className="stage-fx-label">{t("stage.fxbar.chasers")}</span>
           {chasers.map((c, i) => {
             const padColor = chaserColor(i);
             const colorPip =
@@ -1007,7 +1037,9 @@ function StageFxBar({
                 className={`stage-fx-toggle${c.enabled ? " on" : ""}`}
                 onClick={() => toggleChaser(c.id, !c.enabled)}
                 title={
-                  c.enabled ? `Disable ${c.name}` : `Enable ${c.name} (${c.slots.length} slots)`
+                  c.enabled
+                    ? t("stage.fxbar.disableChaser", { name: c.name })
+                    : t("stage.fxbar.enableChaser", { name: c.name, slots: c.slots.length })
                 }
                 style={
                   c.enabled
@@ -1080,6 +1112,7 @@ function SceneQuickPanel({
   touchedHelperOn: boolean;
   onToggleTouchedHelper: () => void;
 }) {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const recallScene = useShowStore((s) => s.recallScene);
   const releaseScene = useShowStore((s) => s.releaseScene);
@@ -1215,18 +1248,18 @@ function SceneQuickPanel({
         const s = await createScene("", [], fade, touchedOnly, true, true);
         await recallScene(s.id);
       } catch (e) {
-        setError(`No se pudo grabar: ${stringifyError(e)}`);
+        setError(t("stage.sqp.errRecord", { err: stringifyError(e) }));
       }
       return;
     }
     if (touchedOnly && touched.length === 0) {
-      setError("No hay fixtures tocados; movés un slider para marcarlos.");
+      setError(t("stage.sqp.errNoTouched"));
       return;
     }
     try {
       await addStep(selectedScene.id, [], fade, hold, touchedOnly);
     } catch (e) {
-      setError(`No se pudo agregar el step: ${stringifyError(e)}`);
+      setError(t("stage.sqp.errAddStep", { err: stringifyError(e) }));
     }
   };
 
@@ -1236,7 +1269,7 @@ function SceneQuickPanel({
       const s = await createScene("", [], fade, touchedOnly, true, true);
       await recallScene(s.id);
     } catch (e) {
-      setError(`No se pudo crear: ${stringifyError(e)}`);
+      setError(t("stage.sqp.errCreate", { err: stringifyError(e) }));
     }
   };
 
@@ -1244,17 +1277,17 @@ function SceneQuickPanel({
     <div
       className="scene-quick-panel"
       style={{ left: pos.x, top: pos.y }}
-      aria-label="Panel de escenas"
+      aria-label={t("stage.sqp.aria")}
     >
       <div className="sqp-title" onPointerDown={onTitlePointerDown}>
         <span className="sqp-grip" aria-hidden="true">
           ⠿
         </span>
-        <strong>Escenas</strong>
+        <strong>{t("stage.sqp.title")}</strong>
         <span className="sqp-meta">
-          {scenes.length} · {touched.length} touched
+          {t("stage.sqp.metaFmt", { scenes: scenes.length, touched: touched.length })}
         </span>
-        <button type="button" className="sqp-close" onClick={onClose} aria-label="Cerrar">
+        <button type="button" className="sqp-close" onClick={onClose} aria-label={t("common.close")}>
           ×
         </button>
       </div>
@@ -1267,15 +1300,13 @@ function SceneQuickPanel({
 
       <div className="sqp-section">
         <div className="sqp-section-head">
-          <span>Lista</span>
+          <span>{t("stage.sqp.list")}</span>
           <button type="button" className="sqp-btn primary" onClick={onCreateNew}>
-            + Nueva
+            {t("stage.sqp.newScene")}
           </button>
         </div>
         {scenes.length === 0 ? (
-          <p className="sqp-empty">
-            Sin escenas. Armá un look y tocá <strong>+ Nueva</strong> para grabarlo.
-          </p>
+          <p className="sqp-empty">{t("stage.sqp.empty")}</p>
         ) : (
           <ul className="sqp-scene-list">
             {scenes.map((s) => {
@@ -1290,7 +1321,10 @@ function SceneQuickPanel({
                     type="button"
                     className="sqp-go"
                     onClick={() => recallScene(s.id)}
-                    title={`Recall (${s.steps.length} step${s.steps.length === 1 ? "" : "s"})`}
+                    title={t("stage.sqp.recallTitle", {
+                      count: s.steps.length,
+                      plural: s.steps.length === 1 ? "" : "s",
+                    })}
                   >
                     ▶
                   </button>
@@ -1301,12 +1335,15 @@ function SceneQuickPanel({
                       setSelectedSceneId(s.id);
                       setManualSelection(true);
                     }}
-                    title="Editar steps de esta escena"
+                    title={t("stage.sqp.editSceneTitle")}
                   >
                     <span className="sqp-scene-name">{s.name}</span>
                     <span className="sqp-scene-meta">
-                      {s.steps.length} step{s.steps.length === 1 ? "" : "s"}
-                      {isAct ? " · live" : ""}
+                      {t("stage.sqp.sceneStepFmt", {
+                        count: s.steps.length,
+                        plural: s.steps.length === 1 ? "" : "s",
+                      })}
+                      {isAct ? t("stage.sqp.sceneLive") : ""}
                     </span>
                   </button>
                 </li>
@@ -1316,7 +1353,7 @@ function SceneQuickPanel({
         )}
         {activeScene ? (
           <button type="button" className="sqp-btn ghost full" onClick={() => releaseScene()}>
-            Liberar escena activa
+            {t("stage.sqp.releaseActive")}
           </button>
         ) : null}
       </div>
@@ -1325,11 +1362,11 @@ function SceneQuickPanel({
         <div className="sqp-section">
           <div className="sqp-section-head">
             <span>
-              Steps de <strong>{selectedScene.name}</strong>
+              {t("stage.sqp.stepsHeading", { name: selectedScene.name })}
               {isSelectedActive ? (
-                <span className="sqp-section-tag live">EN VIVO</span>
+                <span className="sqp-section-tag live">{t("stage.sqp.tagLive")}</span>
               ) : (
-                <span className="sqp-section-tag">FRENADA</span>
+                <span className="sqp-section-tag">{t("stage.sqp.tagStopped")}</span>
               )}
             </span>
             {manualSelection && !isSelectedActive ? (
@@ -1337,9 +1374,9 @@ function SceneQuickPanel({
                 type="button"
                 className="sqp-mini"
                 onClick={() => setManualSelection(false)}
-                title="Volver a seguir la escena activa"
+                title={t("stage.sqp.followActiveHint")}
               >
-                Seguir activa
+                {t("stage.sqp.followActive")}
               </button>
             ) : null}
           </div>
@@ -1352,7 +1389,7 @@ function SceneQuickPanel({
                 <span className="sqp-step-num">{i + 1}</span>
                 <input
                   className="sqp-step-name"
-                  placeholder={`Step ${i + 1}`}
+                  placeholder={t("stage.sqp.stepPlaceholder", { n: i + 1 })}
                   defaultValue={step.name ?? ""}
                   onBlur={(e) => {
                     const next = e.currentTarget.value.trim();
@@ -1381,7 +1418,7 @@ function SceneQuickPanel({
                       ),
                     });
                   }}
-                  title="Fade in (ms)"
+                  title={t("stage.sqp.fadeTitle")}
                 />
                 <input
                   className="sqp-step-time"
@@ -1399,13 +1436,13 @@ function SceneQuickPanel({
                       ),
                     });
                   }}
-                  title="Hold (ms)"
+                  title={t("stage.sqp.holdTitle")}
                 />
                 <button
                   type="button"
                   className="sqp-mini"
                   onClick={() => updateStepFromState(selectedScene.id, step.id, false)}
-                  title="Sobreescribir este step con el estado actual del rig"
+                  title={t("stage.sqp.overwriteAll")}
                 >
                   ⟳
                 </button>
@@ -1414,7 +1451,7 @@ function SceneQuickPanel({
                   className="sqp-mini touched"
                   onClick={() => updateStepFromState(selectedScene.id, step.id, true)}
                   disabled={touched.length === 0}
-                  title="Sobreescribir solo los fixtures touched"
+                  title={t("stage.sqp.overwriteTouched")}
                 >
                   ⟳T
                 </button>
@@ -1425,8 +1462,8 @@ function SceneQuickPanel({
                   disabled={selectedScene.steps.length <= 1}
                   title={
                     selectedScene.steps.length <= 1
-                      ? "No se puede eliminar el único step"
-                      : "Eliminar step"
+                      ? t("stage.sqp.removeOnlyHint")
+                      : t("stage.sqp.removeStep")
                   }
                 >
                   ×
@@ -1440,12 +1477,14 @@ function SceneQuickPanel({
       <div className="sqp-section sqp-record">
         <div className="sqp-section-head">
           <span>
-            {selectedScene ? `Agregar step a "${selectedScene.name}"` : "Grabar nueva escena"}
+            {selectedScene
+              ? t("stage.sqp.recordHeadingAdd", { name: selectedScene.name })
+              : t("stage.sqp.recordHeadingNew")}
           </span>
         </div>
         <div className="sqp-record-row">
           <label>
-            Fade
+            {t("stage.sqp.fade")}
             <input
               type="number"
               min={0}
@@ -1453,10 +1492,10 @@ function SceneQuickPanel({
               value={fade}
               onChange={(e) => setFade(Math.max(0, Number(e.currentTarget.value)))}
             />
-            ms
+            {t("stage.sqp.ms")}
           </label>
           <label>
-            Hold
+            {t("stage.sqp.hold")}
             <input
               type="number"
               min={0}
@@ -1464,7 +1503,7 @@ function SceneQuickPanel({
               value={hold}
               onChange={(e) => setHold(Math.max(0, Number(e.currentTarget.value)))}
             />
-            ms
+            {t("stage.sqp.ms")}
           </label>
           <label className="sqp-touched-toggle">
             <input
@@ -1472,7 +1511,7 @@ function SceneQuickPanel({
               checked={touchedOnly}
               onChange={(e) => setTouchedOnly(e.currentTarget.checked)}
             />
-            Solo touched ({touched.length})
+            {t("stage.sqp.touchedOnly", { count: touched.length })}
           </label>
         </div>
         <div className="sqp-record-actions">
@@ -1482,7 +1521,7 @@ function SceneQuickPanel({
             onClick={onAddStep}
             disabled={touchedOnly && touched.length === 0}
           >
-            {selectedScene ? "+ Add step" : "● Record"}
+            {selectedScene ? t("stage.sqp.addStep") : t("stage.sqp.recordNew")}
           </button>
           <button
             type="button"
@@ -1490,26 +1529,26 @@ function SceneQuickPanel({
             onClick={onToggleTouchedHelper}
             title={
               touchedHelperOn
-                ? "Ocultar halos de fixtures touched en la canvas"
-                : "Mostrar halos de fixtures touched en la canvas mientras este panel esté abierto"
+                ? t("stage.sqp.touchedHelperOn")
+                : t("stage.sqp.touchedHelperOff")
             }
             aria-pressed={touchedHelperOn}
           >
-            👁 Touched
+            {t("stage.sqp.touchedToggle")}
           </button>
           {touched.length > 0 && touchedHelperOn ? (
             <button
               type="button"
               className="sqp-btn ghost"
               onClick={onLocateTouched}
-              title="Hacer un pulse en los fixtures touched para encontrarlos en la canvas"
+              title={t("stage.sqp.locateHint")}
             >
-              📍 Localizar
+              {t("stage.sqp.locate")}
             </button>
           ) : null}
           {touched.length > 0 ? (
             <button type="button" className="sqp-btn ghost" onClick={() => programmerClear()}>
-              Clear PROG
+              {t("stage.sqp.clearProg")}
             </button>
           ) : null}
         </div>
@@ -1555,6 +1594,7 @@ function FixtureContextMenu({
   onUntouch: () => void;
   onRemove: () => void;
 }) {
+  const t = useT();
   const ref = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const onDocPointerDown = (e: PointerEvent) => {
@@ -1581,45 +1621,53 @@ function FixtureContextMenu({
 
   return (
     <div ref={ref} className="fixture-context-menu" style={{ left, top }} role="menu">
-      <div className="fcm-header">{multi ? `${count} fixtures` : "Fixture"}</div>
+      <div className="fcm-header">
+        {multi
+          ? t("stage.menu.fixturePlural", { count })
+          : t("stage.menu.fixtureSingular")}
+      </div>
       <button type="button" className="fcm-item" onClick={onCenterPanTilt}>
-        Centrar Pan/Tilt
+        {t("stage.menu.centerPanTilt")}
       </button>
       <button type="button" className="fcm-item" onClick={onPark}>
-        Park (defaults)
+        {t("stage.menu.park")}
       </button>
       <div className="fcm-sep" aria-hidden="true" />
       <button type="button" className="fcm-item" onClick={onFullIntensity}>
-        Intensidad al máximo
+        {t("stage.menu.fullIntensity")}
       </button>
       <button type="button" className="fcm-item" onClick={onBlackout}>
-        Blackout (intensity 0)
+        {t("stage.menu.blackoutFixture")}
       </button>
       <div className="fcm-sep" aria-hidden="true" />
       {!multi ? (
         <button type="button" className="fcm-item" onClick={onRename}>
-          Renombrar…
+          {t("stage.menu.rename")}
         </button>
       ) : null}
       <button type="button" className="fcm-item" onClick={onDuplicate}>
-        Duplicar{multi ? ` (×${count})` : ""}
+        {t("stage.menu.duplicate")}
+        {multi ? ` (×${count})` : ""}
       </button>
       {touchedCount > 0 ? (
         <>
           <div className="fcm-sep" aria-hidden="true" />
           <button type="button" className="fcm-item" onClick={onUntouch}>
-            Untouch{touchedCount > 1 ? ` (×${touchedCount})` : ""}
+            {t("stage.menu.untouch")}
+            {touchedCount > 1 ? ` (×${touchedCount})` : ""}
           </button>
         </>
       ) : null}
       <button type="button" className="fcm-item danger" onClick={onRemove}>
-        Eliminar{multi ? ` (×${count})` : ""}
+        {t("stage.menu.remove")}
+        {multi ? ` (×${count})` : ""}
       </button>
     </div>
   );
 }
 
 export function StageView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const library = useShowStore((s) => s.library);
   const libraryDir = useShowStore((s) => s.libraryDir);
@@ -1974,7 +2022,7 @@ export function StageView() {
     return out;
   }, [show, libraryById, universesData]);
 
-  if (!show) return <main className="page">Cargando…</main>;
+  if (!show) return <main className="page">{t("common.loading")}</main>;
 
   const onDragEnd = (e: DragEndEvent) => {
     const id = String(e.active.id);
@@ -2200,8 +2248,8 @@ export function StageView() {
     if (targets.length === 0) return closeMenu();
     const ok = window.confirm(
       targets.length === 1
-        ? `¿Eliminar "${targets[0].label ?? targets[0].id}"?`
-        : `¿Eliminar ${targets.length} fixtures?`,
+        ? t("stage.confirm.removeOne", { name: targets[0].label ?? targets[0].id })
+        : t("stage.confirm.removeMany", { count: targets.length }),
     );
     if (!ok) return closeMenu();
     for (const f of targets) {
@@ -2245,16 +2293,18 @@ export function StageView() {
   return (
     <main className="page stage-view">
       <header className="page-head">
-        <h2>Stage</h2>
+        <h2>{t("stage.title")}</h2>
         <span className="meta">
-          {show.fixtures.length} fixtures · grid {GRID_SIZE}px
-          {selectedIds.size > 0 ? ` · ${selectedIds.size} seleccionados` : ""}
+          {t("stage.meta", { count: show.fixtures.length, grid: GRID_SIZE })}
+          {selectedIds.size > 0
+            ? t("stage.metaSelected", { count: selectedIds.size })
+            : ""}
         </span>
       </header>
       <div className="stage-and-panel">
         <aside className="stage-types">
           {groups.length === 0 ? (
-            <p className="empty">Sin fixtures.</p>
+            <p className="empty">{t("stage.empty")}</p>
           ) : (
             groups.map(({ defId, def, fixtures }) => {
               const allSelected =
@@ -2354,10 +2404,7 @@ export function StageView() {
               effectsByFixture={effectsByFixture}
             />
           ) : (
-            <p>
-              Seleccioná un fixture o un tipo para abrir sus encoders. ⌘/Ctrl-click suma o quita de
-              la selección.
-            </p>
+            <p>{t("stage.sidebar.placeholder")}</p>
           )}
         </aside>
       </div>

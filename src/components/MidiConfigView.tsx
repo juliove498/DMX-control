@@ -1,6 +1,7 @@
 import type { MidiStatus } from "@bindings/MidiStatus";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
 import { useShowStore } from "../stores/show";
 
 type Device = { name: string; has_input: boolean; has_output: boolean };
@@ -23,6 +24,7 @@ const LAUNCHPAD_MK2_TEST_VELOCITIES = [
 ];
 
 export function MidiConfigView() {
+  const t = useT();
   const listMidiDevices = useShowStore((s) => s.listMidiDevices);
   const connectMidiDevice = useShowStore((s) => s.connectMidiDevice);
   const disconnectMidi = useShowStore((s) => s.disconnectMidi);
@@ -40,7 +42,7 @@ export function MidiConfigView() {
     try {
       setDevices(await listMidiDevices());
     } catch (e) {
-      setError(`No se pudo listar dispositivos MIDI: ${stringifyError(e)}`);
+      setError(t("midi.errListing", { err: stringifyError(e) }));
     }
   };
 
@@ -56,11 +58,11 @@ export function MidiConfigView() {
   useEffect(() => {
     listMidiDevices()
       .then(setDevices)
-      .catch((e) => setError(`No se pudo listar dispositivos MIDI: ${stringifyError(e)}`));
+      .catch((e) => setError(t("midi.errListing", { err: stringifyError(e) })));
     invoke<MidiStatus>("get_midi_status")
       .then(setStatus)
       .catch(() => {});
-  }, [listMidiDevices]);
+  }, [listMidiDevices, t]);
 
   const onConnect = async (name: string) => {
     setError(null);
@@ -68,7 +70,7 @@ export function MidiConfigView() {
       await connectMidiDevice(name);
       await refreshStatus();
     } catch (e) {
-      setError(`No se pudo conectar a ${name}: ${stringifyError(e)}`);
+      setError(t("midi.errConnect", { name, err: stringifyError(e) }));
     }
   };
 
@@ -78,7 +80,7 @@ export function MidiConfigView() {
       await disconnectMidi();
       await refreshStatus();
     } catch (e) {
-      setError(`No se pudo desconectar: ${stringifyError(e)}`);
+      setError(t("midi.errDisconnect", { err: stringifyError(e) }));
     }
   };
 
@@ -92,7 +94,7 @@ export function MidiConfigView() {
         Promise.all(LAUNCHPAD_MK2_TEST_NOTES.map((n) => sendMidiRaw([0x90, n, 0]))).catch(() => {});
       }, 1500);
     } catch (e) {
-      setError(`Falló el test de pads: ${stringifyError(e)}`);
+      setError(t("midi.errTest", { err: stringifyError(e) }));
     }
   };
 
@@ -101,19 +103,15 @@ export function MidiConfigView() {
   return (
     <main className="page midi-config-view">
       <header className="page-head">
-        <h2>MIDI</h2>
+        <h2>{t("midi.title")}</h2>
         <div className="actions">
           <button type="button" onClick={refreshDevices}>
-            Refresh
+            {t("midi.refresh")}
           </button>
         </div>
       </header>
 
-      <p className="hint">
-        Conectá un controlador MIDI (Launchpad MK2, etc.) para usarlo como surface. Cuando conectás
-        un Launchpad, el surface controller toma la fila inferior (8 chasers, uno por pad) y los
-        scene buttons del lateral derecho (rojo = blackout, blanco = blind momentáneo).
-      </p>
+      <p className="hint">{t("midi.refreshHint")}</p>
 
       {error ? (
         <output className="lib-error" aria-live="polite">
@@ -122,30 +120,29 @@ export function MidiConfigView() {
       ) : null}
 
       <section className="config-section">
-        <h3>Dispositivos detectados ({devices.length})</h3>
+        <h3>{t("midi.detectedDevices", { count: devices.length })}</h3>
         {devices.length === 0 ? (
-          <p className="empty">
-            No se detectó ningún MIDI. Conectá el Launchpad por USB y tocá Refresh.
-          </p>
+          <p className="empty">{t("midi.empty")}</p>
         ) : (
           <ul className="midi-device-list">
             {devices.map((d) => {
               const isConnected = status.connected === d.name;
+              const ioLabel = [
+                d.has_input ? t("midi.in") : "",
+                d.has_input && d.has_output ? " · " : "",
+                d.has_output ? t("midi.out") : "",
+              ].join("");
               return (
                 <li key={d.name} className={isConnected ? "connected" : ""}>
                   <span className="midi-device-name">{d.name}</span>
-                  <span className="midi-device-meta">
-                    {d.has_input ? "in" : ""}
-                    {d.has_input && d.has_output ? " · " : ""}
-                    {d.has_output ? "out" : ""}
-                  </span>
+                  <span className="midi-device-meta">{ioLabel}</span>
                   {isConnected ? (
                     <button type="button" onClick={onDisconnect}>
-                      Disconnect
+                      {t("midi.disconnect")}
                     </button>
                   ) : (
                     <button type="button" onClick={() => onConnect(d.name)}>
-                      Connect
+                      {t("midi.connect")}
                     </button>
                   )}
                 </li>
@@ -157,15 +154,17 @@ export function MidiConfigView() {
 
       {status.connected ? (
         <section className="config-section">
-          <h3>Estado</h3>
+          <h3>{t("midi.statusSection")}</h3>
           <p>
-            Conectado a <strong>{status.connected}</strong>
-            {status.has_output ? " (in + out)" : " (sólo in)"}
-            {isLaunchpad ? " · surface activo" : ""}
+            {t("midi.connectedToFmt", {
+              name: status.connected,
+              io: status.has_output ? t("midi.bothIO") : t("midi.onlyIn"),
+              surface: isLaunchpad ? ` · ${t("midi.surfaceActive")}` : "",
+            })}
           </p>
           <div className="midi-controls">
             <button type="button" onClick={onTestPads} disabled={!status.has_output}>
-              Test pads (Launchpad MK2)
+              {t("midi.testPads")}
             </button>
           </div>
         </section>

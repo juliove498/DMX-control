@@ -2,6 +2,7 @@ import type { BlackoutFixture } from "@bindings/BlackoutFixture";
 import type { BlindFixture } from "@bindings/BlindFixture";
 import type { ChannelRole } from "@bindings/ChannelRole";
 import type { GlobalsConfig } from "@bindings/GlobalsConfig";
+import { useT } from "../i18n";
 import { useShowStore } from "../stores/show";
 
 const DEFAULT_GLOBALS: GlobalsConfig = {
@@ -22,11 +23,12 @@ function roleLabel(role: ChannelRole | unknown): string {
 }
 
 export function ButtonsConfigView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const library = useShowStore((s) => s.library);
   const updateGlobals = useShowStore((s) => s.updateGlobals);
 
-  if (!show) return <main className="page">Cargando…</main>;
+  if (!show) return <main className="page">{t("common.loading")}</main>;
   const fixtures = show.fixtures;
   const cfg = show.globals ?? DEFAULT_GLOBALS;
 
@@ -93,23 +95,16 @@ export function ButtonsConfigView() {
   return (
     <main className="page buttons-config-view">
       <header className="page-head">
-        <h2>Botones omnipresentes</h2>
-        <span className="meta">Fades en milisegundos · in/out independientes</span>
+        <h2>{t("buttons.title")}</h2>
+        <span className="meta">{t("buttons.subhead")}</span>
       </header>
 
       <section className="config-section">
-        <h3>Blackout</h3>
-        <p className="hint">
-          Apaga (con cross-fade) los canales que elijas de cada fixture.{" "}
-          <em>Sin fixtures asignados</em> = modo automático: todos los fixtures patcheados apagan
-          intensidad (o RGB si no tienen dimmer) + strobe; pan/tilt/zoom no se tocan para que los
-          cabezales no salten al piso. Si querés algo específico (matar solo intensity, o también un
-          canal de macro custom), agregá los fixtures abajo y tildá los canales que tienen que ir a
-          0.
-        </p>
+        <h3>{t("buttons.section.blackout")}</h3>
+        <p className="hint">{t("buttons.blackoutIntro")}</p>
         <div className="config-grid">
           <label>
-            Fade in (ms)
+            {t("buttons.fadeIn")}
             <input
               type="number"
               min={0}
@@ -120,7 +115,7 @@ export function ButtonsConfigView() {
             />
           </label>
           <label>
-            Fade out (ms)
+            {t("buttons.fadeOut")}
             <input
               type="number"
               min={0}
@@ -132,14 +127,12 @@ export function ButtonsConfigView() {
           </label>
         </div>
         <h4>
-          Fixtures asignados al Blackout (
           {cfg.blackout.fixtures.length === 0
-            ? `auto · ${fixtures.length}`
-            : cfg.blackout.fixtures.length}
-          )
+            ? t("buttons.assignedBlackoutAuto", { count: fixtures.length })
+            : t("buttons.assignedBlackout", { count: cfg.blackout.fixtures.length })}
         </h4>
         {fixtures.length === 0 ? (
-          <p className="empty">Patcheá fixtures primero para poder asignarlos al blackout.</p>
+          <p className="empty">{t("buttons.emptyBlackout")}</p>
         ) : (
           <ul className="blind-fixture-list">
             {fixtures.map((f) => {
@@ -163,8 +156,8 @@ export function ButtonsConfigView() {
                     <div className="blind-fixture-channels">
                       <span className="blind-channels-hint">
                         {assigned.channels_to_zero.length === 0
-                          ? "Auto: intensity (o RGB si no hay) + strobe → 0. Pan/tilt intactos."
-                          : "Solo estos canales se llevan a 0."}
+                          ? t("buttons.blackoutHintAuto")
+                          : t("buttons.blackoutHintCustom")}
                       </span>
                       <div className="blind-channels-chips">
                         {mode.channels.map((ch, i) => {
@@ -195,18 +188,11 @@ export function ButtonsConfigView() {
       </section>
 
       <section className="config-section">
-        <h3>Blind (halógeno)</h3>
-        <p className="hint">
-          Hold-to-flash con cross-fade contra el estado actual de cada luz. Mantené el botón: los
-          fixtures asignados encienden con un fade-in rápido en color halógeno; al soltar, fade-out
-          lento que vuelve al color que tenía antes (si era verde a 50%, vuelve al verde). Por
-          defecto el blind escribe warm-white sobre intensity + RGB. Si querés que se active otro
-          canal específico (strobe, shutter, función custom), tildalo en la fila del fixture y ese
-          canal va a slamearse a 255 en lugar del halógeno default.
-        </p>
+        <h3>{t("buttons.section.blind")}</h3>
+        <p className="hint">{t("buttons.blindIntro")}</p>
         <div className="config-grid">
           <label>
-            Fade in (ms)
+            {t("buttons.fadeIn")}
             <input
               type="number"
               min={0}
@@ -217,7 +203,7 @@ export function ButtonsConfigView() {
             />
           </label>
           <label>
-            Fade out (ms)
+            {t("buttons.fadeOut")}
             <input
               type="number"
               min={0}
@@ -228,9 +214,9 @@ export function ButtonsConfigView() {
             />
           </label>
         </div>
-        <h4>Fixtures asignados al Blind ({cfg.blind.fixtures.length})</h4>
+        <h4>{t("buttons.assignedBlind", { count: cfg.blind.fixtures.length })}</h4>
         {fixtures.length === 0 ? (
-          <p className="empty">Patcheá fixtures primero para poder asignarlos al blind.</p>
+          <p className="empty">{t("buttons.emptyBlind")}</p>
         ) : (
           <ul className="blind-fixture-list">
             {fixtures.map((f) => {
@@ -254,8 +240,8 @@ export function ButtonsConfigView() {
                     <div className="blind-fixture-channels">
                       <span className="blind-channels-hint">
                         {assigned.channels_at_full.length === 0
-                          ? "Halógeno default (warm-white sobre intensity + RGB)."
-                          : "Solo estos canales se mandan a 255 (sin halógeno)."}
+                          ? t("buttons.blindHintAuto")
+                          : t("buttons.blindHintCustom")}
                       </span>
                       <div className="blind-channels-chips">
                         {mode.channels.map((ch, i) => {

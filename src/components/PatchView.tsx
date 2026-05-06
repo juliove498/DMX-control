@@ -1,6 +1,7 @@
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
 import { useEffect, useMemo, useState } from "react";
+import { useT } from "../i18n";
 import { fixtureImageSrc } from "../lib/fixtureImage";
 import { useShowStore } from "../stores/show";
 
@@ -56,6 +57,7 @@ function AddFixtureForm({
   onAddBulk: (fixtures: FixtureInstance[]) => Promise<void>;
   defaultUniverse: number;
 }) {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const [defId, setDefId] = useState<string>(library[0]?.id ?? "");
   const [modeIndex, setModeIndex] = useState(0);
@@ -128,12 +130,12 @@ function AddFixtureForm({
       >
         {def?.modes.map((m, i) => (
           <option key={m.name} value={i}>
-            {m.name} ({m.channels.length}ch)
+            {t("patch.modeFmt", { name: m.name, count: m.channels.length })}
           </option>
         ))}
       </select>
       <label>
-        Qty
+        {t("patch.qty")}
         <input
           type="number"
           min={1}
@@ -143,7 +145,7 @@ function AddFixtureForm({
         />
       </label>
       <label>
-        U
+        {t("patch.universe")}
         <input
           type="number"
           min={0}
@@ -155,7 +157,7 @@ function AddFixtureForm({
         />
       </label>
       <label>
-        Addr
+        {t("patch.address")}
         <input
           type="number"
           min={1}
@@ -168,18 +170,19 @@ function AddFixtureForm({
         />
       </label>
       <input
-        placeholder="Label (opcional)"
+        placeholder={t("patch.labelPlaceholder")}
         value={label}
         onChange={(e) => setLabel(e.currentTarget.value)}
       />
       <button type="button" onClick={submit} disabled={!def || channelCount === 0}>
-        Add
+        {t("patch.add")}
       </button>
     </div>
   );
 }
 
 export function PatchView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const library = useShowStore((s) => s.library);
   const libraryDir = useShowStore((s) => s.libraryDir);
@@ -203,7 +206,7 @@ export function PatchView() {
     return m;
   }, [library, libraryDir]);
 
-  if (!show) return <main className="page">Cargando…</main>;
+  if (!show) return <main className="page">{t("common.loading")}</main>;
 
   const conflictsByFixture = new Set<string>();
   for (const c of patch.conflicts) {
@@ -215,11 +218,14 @@ export function PatchView() {
   return (
     <main className="page patch-view">
       <header className="page-head">
-        <h2>Patch ({show.fixtures.length} fixtures)</h2>
+        <h2>{t("patch.title", { count: show.fixtures.length })}</h2>
         <span className={patch.conflicts.length || patch.problems.length ? "warn" : "ok"}>
           {patch.conflicts.length === 0 && patch.problems.length === 0
-            ? "✓ patch limpio"
-            : `${patch.conflicts.length} conflictos · ${patch.problems.length} problemas`}
+            ? t("patch.statusClean")
+            : t("patch.statusIssues", {
+                conflicts: patch.conflicts.length,
+                problems: patch.problems.length,
+              })}
         </span>
       </header>
 
@@ -233,13 +239,13 @@ export function PatchView() {
       <table className="fixtures">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Label</th>
-            <th>Fixture</th>
-            <th>Mode</th>
-            <th>U</th>
-            <th>Addr</th>
-            <th>Range</th>
+            <th>{t("patch.col.id")}</th>
+            <th>{t("patch.col.label")}</th>
+            <th>{t("patch.col.fixture")}</th>
+            <th>{t("patch.col.mode")}</th>
+            <th>{t("patch.col.universe")}</th>
+            <th>{t("patch.col.address")}</th>
+            <th>{t("patch.col.range")}</th>
             <th />
           </tr>
         </thead>
@@ -271,7 +277,11 @@ export function PatchView() {
                     ) : (
                       <span className="patch-fixture-icon placeholder" aria-hidden="true" />
                     )}
-                    <span>{def ? `${def.manufacturer} ${def.name}` : `?? ${f.definition_id}`}</span>
+                    <span>
+                      {def
+                        ? `${def.manufacturer} ${def.name}`
+                        : t("patch.unknownDef", { id: f.definition_id })}
+                    </span>
                   </div>
                 </td>
                 <td>{mode?.name ?? "?"}</td>
@@ -301,7 +311,7 @@ export function PatchView() {
                 </td>
                 <td>
                   <button type="button" className="danger" onClick={() => removeFixture(f.id)}>
-                    Del
+                    {t("patch.del")}
                   </button>
                 </td>
               </tr>
@@ -325,8 +335,11 @@ export function PatchView() {
               <strong>
                 {c.fixture_a} ↔ {c.fixture_b}
               </strong>{" "}
-              overlap on universe {c.universe} channels {c.overlap_start}…
-              {c.overlap_start + c.overlap_len - 1}
+              {t("patch.conflictFmt", {
+                u: c.universe,
+                start: c.overlap_start,
+                end: c.overlap_start + c.overlap_len - 1,
+              })}
             </div>
           ))}
         </section>

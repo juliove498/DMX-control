@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { FixedSizeList as List } from "react-window";
+import { useT } from "../i18n";
 import { useEngineStore } from "../stores/engine";
 
 const ROW_HEIGHT = 32;
 const VISIBLE_ROWS = 18;
 
 export function DirectOutput() {
+  const t = useT();
   const channels = useEngineStore((s) => s.channels);
   const master = useEngineStore((s) => s.master);
   const blackout = useEngineStore((s) => s.blackout);
@@ -48,15 +50,18 @@ export function DirectOutput() {
   return (
     <main className="direct-output">
       <header className="toolbar">
-        <div className="title">DMX Control — Direct Output (universe 0)</div>
+        <div className="title">{t("direct.title")}</div>
         <div className="status">
           <span className={`fps ${stats && stats.fps > 13 ? "ok" : "warn"}`}>
-            {stats ? `${stats.fps.toFixed(1)} FPS` : "— FPS"}
+            {stats ? t("direct.fpsValue", { fps: stats.fps.toFixed(1) }) : t("direct.fpsNone")}
           </span>
           {stats ? (
             <span className="meta">
-              frames {stats.frames_total} · late {stats.late_frames} · max{" "}
-              {(stats.max_frame_micros / 1000).toFixed(1)} ms
+              {t("direct.statsMeta", {
+                frames: stats.frames_total,
+                late: stats.late_frames,
+                ms: (stats.max_frame_micros / 1000).toFixed(1),
+              })}
             </span>
           ) : null}
         </div>
@@ -64,7 +69,7 @@ export function DirectOutput() {
 
       <section className="master">
         <label>
-          Master
+          {t("direct.master")}
           <input
             type="range"
             min={0}
@@ -79,10 +84,10 @@ export function DirectOutput() {
           className={blackout ? "blackout active" : "blackout"}
           onClick={() => setBlackout(!blackout)}
         >
-          {blackout ? "Blackout ON" : "Blackout"}
+          {blackout ? t("direct.blackoutOn") : t("direct.blackout")}
         </button>
         <button type="button" onClick={() => clearAll()}>
-          Clear all
+          {t("direct.clearAll")}
         </button>
       </section>
 

@@ -3,6 +3,8 @@ import type { OutputBindingConfig } from "@bindings/OutputBindingConfig";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { SerialPortInfo } from "@bindings/SerialPortInfo";
 import { useState } from "react";
+import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 import { useShowStore } from "../stores/show";
 
 /// Best-effort OS sniff for UI hints. We can't query the Tauri backend
@@ -15,13 +17,15 @@ function isWindows(): boolean {
 
 type Kind = OutputBindingConfig["kind"];
 
-const KIND_LABELS: Record<Kind, string> = {
-  mock: "Mock (logging)",
-  art_net: "Art-Net",
-  sacn: "sACN (E1.31)",
-  enttec_usb: "Enttec DMX USB Pro",
-  open_dmx: "Open DMX (OS serial — fallback)",
-  open_dmx_ftdi: "Open DMX / ElectroTAS (FTDI directo, recomendado)",
+// Mapping kind → translation key. The actual labels resolve at render
+// time so a language flip repaints the rows immediately.
+const KIND_KEYS: Record<Kind, keyof Translation> = {
+  mock: "outputs.kind.mock",
+  art_net: "outputs.kind.artNet",
+  sacn: "outputs.kind.sacn",
+  enttec_usb: "outputs.kind.enttec",
+  open_dmx: "outputs.kind.openDmx",
+  open_dmx_ftdi: "outputs.kind.openDmxFtdi",
 };
 
 function newId(kind: Kind, existing: OutputBindingConfig[]): string {
@@ -74,25 +78,26 @@ function BindingRow({
   serialPorts: SerialPortInfo[];
   ftdiDevices: D2xxDeviceInfo[];
 }) {
+  const t = useT();
   const universes = universesToString(binding.universes);
   const setUniverses = (v: string) => onChange({ ...binding, universes: parseUniverses(v) });
   return (
     <div className="binding-row">
       <div className="binding-head">
-        <span className="binding-kind">{KIND_LABELS[binding.kind]}</span>
+        <span className="binding-kind">{t(KIND_KEYS[binding.kind])}</span>
         <input
           className="binding-id"
           value={binding.id}
           onChange={(e) => onChange({ ...binding, id: e.currentTarget.value })}
         />
         <button type="button" className="danger" onClick={onRemove}>
-          Remove
+          {t("outputs.remove")}
         </button>
       </div>
       <div className="binding-fields">
         {binding.kind === "art_net" ? (
           <label>
-            Target IP:Port
+            {t("outputs.field.target")}
             <input
               value={binding.target}
               onChange={(e) => onChange({ ...binding, target: e.currentTarget.value })}
@@ -103,14 +108,14 @@ function BindingRow({
         {binding.kind === "sacn" ? (
           <>
             <label>
-              Source name
+              {t("outputs.field.sourceName")}
               <input
                 value={binding.source_name}
                 onChange={(e) => onChange({ ...binding, source_name: e.currentTarget.value })}
               />
             </label>
             <label>
-              Priority
+              {t("outputs.field.priority")}
               <input
                 type="number"
                 min={1}
@@ -123,21 +128,23 @@ function BindingRow({
         ) : null}
         {binding.kind === "enttec_usb" || binding.kind === "open_dmx" ? (
           <label>
-            Serial port
+            {t("outputs.field.serialPort")}
             <select
               value={binding.port}
               onChange={(e) => onChange({ ...binding, port: e.currentTarget.value })}
             >
-              <option value="">— select —</option>
+              <option value="">{t("outputs.placeholder.select")}</option>
               {serialPorts.map((p) => (
                 <option key={p.name} value={p.name}>
                   {p.name}
-                  {p.looks_like_enttec ? " (FTDI)" : ""}
+                  {p.looks_like_enttec ? ` ${t("outputs.tag.ftdi")}` : ""}
                   {p.product ? ` — ${p.product}` : ""}
                 </option>
               ))}
               {binding.port && !serialPorts.some((p) => p.name === binding.port) ? (
-                <option value={binding.port}>{binding.port} (offline)</option>
+                <option value={binding.port}>
+                  {binding.port} {t("outputs.tag.offline")}
+                </option>
               ) : null}
             </select>
           </label>
@@ -145,30 +152,29 @@ function BindingRow({
         {binding.kind === "open_dmx_ftdi" ? (
           <>
             <label>
-              FTDI device (by serial)
+              {t("outputs.field.ftdiDevice")}
               <select
                 value={binding.serial}
                 onChange={(e) => onChange({ ...binding, serial: e.currentTarget.value })}
               >
-                <option value="">— select —</option>
+                <option value="">{t("outputs.placeholder.select")}</option>
                 {ftdiDevices.map((d) => (
                   <option key={d.serial_number} value={d.serial_number}>
                     {d.serial_number}
                     {d.description ? ` — ${d.description}` : ""}
-                    {d.port_open ? " (in use)" : ""}
+                    {d.port_open ? ` ${t("outputs.tag.inUse")}` : ""}
                   </option>
                 ))}
                 {binding.serial && !ftdiDevices.some((d) => d.serial_number === binding.serial) ? (
-                  <option value={binding.serial}>{binding.serial} (offline)</option>
+                  <option value={binding.serial}>
+                    {binding.serial} {t("outputs.tag.offline")}
+                  </option>
                 ) : null}
               </select>
             </label>
             {ftdiDevices.length === 0 && isWindows() ? (
               <p className="hint" style={{ fontSize: 11 }}>
-                En Windows, libusb solo ve dispositivos FTDI bindeados a WinUSB. Si tu DMX FTDI no
-                aparece, corré <strong>Zadig</strong> una vez y elegí el driver WinUSB para esa
-                interface (eso saca el COM port). Si preferís mantener el COM port, cambiá esta
-                salida a "Serial" y elegí el FTDI desde la lista de puertos.
+                {t("outputs.zadigHint")}
               </p>
             ) : null}
             <label>
@@ -177,7 +183,7 @@ function BindingRow({
                 checked={binding.dtr_high}
                 onChange={(e) => onChange({ ...binding, dtr_high: e.currentTarget.checked })}
               />
-              DTR high
+              {t("outputs.field.dtrHigh")}
             </label>
             <label>
               <input
@@ -185,12 +191,12 @@ function BindingRow({
                 checked={binding.rts_high}
                 onChange={(e) => onChange({ ...binding, rts_high: e.currentTarget.checked })}
               />
-              RTS high
+              {t("outputs.field.rtsHigh")}
             </label>
           </>
         ) : null}
         <label>
-          Universes (comma-separated)
+          {t("outputs.field.universes")}
           <input value={universes} onChange={(e) => setUniverses(e.currentTarget.value)} />
         </label>
       </div>
@@ -199,6 +205,7 @@ function BindingRow({
 }
 
 export function OutputsView() {
+  const t = useT();
   const show = useShowStore((s) => s.show);
   const serialPorts = useShowStore((s) => s.serialPorts);
   const ftdiDevices = useShowStore((s) => s.ftdiDevices);
@@ -212,7 +219,7 @@ export function OutputsView() {
   const dirty = !!draft;
 
   if (!config) {
-    return <main className="page">Cargando…</main>;
+    return <main className="page">{t("common.loading")}</main>;
   }
 
   const update = (next: OutputsConfig) => setDraft(next);
@@ -235,7 +242,7 @@ export function OutputsView() {
   return (
     <main className="page outputs-view">
       <header className="page-head">
-        <h2>Outputs</h2>
+        <h2>{t("outputs.title")}</h2>
         <div className="actions">
           <button
             type="button"
@@ -244,32 +251,32 @@ export function OutputsView() {
               refreshFtdiDevices();
             }}
           >
-            Re-scan ports
+            {t("outputs.rescan")}
           </button>
           <button type="button" onClick={() => addBinding("mock")}>
-            + Mock
+            {t("outputs.add.mock")}
           </button>
           <button type="button" onClick={() => addBinding("art_net")}>
-            + Art-Net
+            {t("outputs.add.artNet")}
           </button>
           <button type="button" onClick={() => addBinding("sacn")}>
-            + sACN
+            {t("outputs.add.sacn")}
           </button>
           <button type="button" onClick={() => addBinding("enttec_usb")}>
-            + Enttec USB
+            {t("outputs.add.enttec")}
           </button>
           <button type="button" onClick={() => addBinding("open_dmx_ftdi")}>
-            + Open DMX (FTDI directo)
+            {t("outputs.add.openDmxFtdi")}
           </button>
           <button type="button" onClick={() => addBinding("open_dmx")}>
-            + Open DMX (OS serial)
+            {t("outputs.add.openDmx")}
           </button>
         </div>
       </header>
 
       <section className="bindings">
         {config.bindings.length === 0 ? (
-          <p className="empty">Sin outputs. Agregá uno arriba.</p>
+          <p className="empty">{t("outputs.empty")}</p>
         ) : (
           config.bindings.map((b, i) => (
             <BindingRow
@@ -289,13 +296,15 @@ export function OutputsView() {
       </section>
 
       <footer className="page-foot">
-        <span className={dirty ? "dirty" : ""}>{dirty ? "Cambios sin aplicar" : "OK"}</span>
+        <span className={dirty ? "dirty" : ""}>
+          {dirty ? t("outputs.dirty") : t("outputs.ok")}
+        </span>
         <div className="actions">
           <button type="button" disabled={!dirty} onClick={revert}>
-            Descartar
+            {t("outputs.discard")}
           </button>
           <button type="button" disabled={!dirty} onClick={apply}>
-            Aplicar
+            {t("outputs.apply")}
           </button>
         </div>
       </footer>

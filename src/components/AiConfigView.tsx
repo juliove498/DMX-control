@@ -3,11 +3,13 @@ import type { AiConfig } from "@bindings/AiConfig";
 import type { AiModelOption } from "@bindings/AiModelOption";
 import type { AiProvider } from "@bindings/AiProvider";
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
 import { useShowStore } from "../stores/show";
 
 /// IA settings panel. Lives under Config → IA. Persists to OS
 /// app-config dir (off the show file — keys don't travel with shows).
 export function AiConfigView() {
+  const t = useT();
   const getAiConfig = useShowStore((s) => s.getAiConfig);
   const setAiConfigFn = useShowStore((s) => s.setAiConfig);
   const aiListModels = useShowStore((s) => s.aiListModels);
@@ -39,9 +41,9 @@ export function AiConfigView() {
     return (
       <main className="page ai-config-view">
         <header className="page-head">
-          <h2>IA</h2>
+          <h2>{t("ai.title")}</h2>
         </header>
-        <p className="empty">Cargando…</p>
+        <p className="empty">{t("common.loading")}</p>
       </main>
     );
   }
@@ -62,7 +64,7 @@ export function AiConfigView() {
     setStatus(null);
     try {
       await setAiConfigFn(config);
-      setStatus("Configuración guardada.");
+      setStatus(t("ai.savedToast"));
     } catch (e) {
       setError(stringifyError(e));
     }
@@ -92,19 +94,14 @@ export function AiConfigView() {
   return (
     <main className="page ai-config-view">
       <header className="page-head">
-        <h2>IA</h2>
-        <span className="meta">
-          Generación de escenas con LLM (Anthropic / OpenAI) — POC
-        </span>
+        <h2>{t("ai.title")}</h2>
+        <span className="meta">{t("ai.subhead")}</span>
       </header>
 
-      <p className="hint ai-warning">
-        Las API keys se guardan en texto plano en el directorio de configuración del SO
-        (fuera del archivo del show). En producción deberían moverse al keychain del SO.
-      </p>
+      <p className="hint ai-warning">{t("ai.warning")}</p>
 
       <section className="config-section">
-        <h3>Provider activo</h3>
+        <h3>{t("ai.providerActive")}</h3>
         <div className="ai-row">
           <label>
             <input
@@ -113,7 +110,7 @@ export function AiConfigView() {
               checked={config.provider === "none"}
               onChange={() => update({ provider: "none" as AiProvider })}
             />
-            Desactivado
+            {t("ai.provider.none")}
           </label>
           <label>
             <input
@@ -122,7 +119,7 @@ export function AiConfigView() {
               checked={config.provider === "anthropic"}
               onChange={() => update({ provider: "anthropic" as AiProvider })}
             />
-            Anthropic (Claude)
+            {t("ai.provider.anthropicLong")}
           </label>
           <label>
             <input
@@ -131,16 +128,16 @@ export function AiConfigView() {
               checked={config.provider === "openai"}
               onChange={() => update({ provider: "openai" as AiProvider })}
             />
-            OpenAI (GPT)
+            {t("ai.provider.openaiLong")}
           </label>
         </div>
       </section>
 
       <section className="config-section">
-        <h3>Anthropic</h3>
+        <h3>{t("ai.section.anthropic")}</h3>
         <div className="ai-row">
           <label className="ai-key-label">
-            API key
+            {t("ai.apiKey")}
             <input
               type={showAnthKey ? "text" : "password"}
               value={config.anthropic.api_key}
@@ -154,7 +151,7 @@ export function AiConfigView() {
             type="button"
             className="ai-eye-btn"
             onClick={() => setShowAnthKey((v) => !v)}
-            title={showAnthKey ? "Ocultar key" : "Mostrar key"}
+            title={showAnthKey ? t("ai.toggleKey.hide") : t("ai.toggleKey.show")}
           >
             {showAnthKey ? "🙈" : "👁"}
           </button>
@@ -165,16 +162,16 @@ export function AiConfigView() {
           onChange={(model) => updateAnthropic({ model })}
         />
         <p className="hint">
-          Conseguí una API key en{" "}
-          <code>https://console.anthropic.com/settings/keys</code>.
+          {t("ai.keyHint.anthropic")}{" "}
+          <code>https://console.anthropic.com/settings/keys</code>
         </p>
       </section>
 
       <section className="config-section">
-        <h3>OpenAI</h3>
+        <h3>{t("ai.section.openai")}</h3>
         <div className="ai-row">
           <label className="ai-key-label">
-            API key
+            {t("ai.apiKey")}
             <input
               type={showOpenAiKey ? "text" : "password"}
               value={config.openai.api_key}
@@ -188,7 +185,7 @@ export function AiConfigView() {
             type="button"
             className="ai-eye-btn"
             onClick={() => setShowOpenAiKey((v) => !v)}
-            title={showOpenAiKey ? "Ocultar key" : "Mostrar key"}
+            title={showOpenAiKey ? t("ai.toggleKey.hide") : t("ai.toggleKey.show")}
           >
             {showOpenAiKey ? "🙈" : "👁"}
           </button>
@@ -199,25 +196,23 @@ export function AiConfigView() {
           onChange={(model) => updateOpenAi({ model })}
         />
         <p className="hint">
-          Conseguí una API key en <code>https://platform.openai.com/api-keys</code>.
+          {t("ai.keyHint.openai")} <code>https://platform.openai.com/api-keys</code>
         </p>
       </section>
 
       <div className="ai-actions">
         <button type="button" onClick={onSave}>
-          Guardar
+          {t("ai.save")}
         </button>
         <button
           type="button"
           onClick={onTest}
           disabled={!activeProviderConfigured || testing}
           title={
-            !activeProviderConfigured
-              ? "Elegí un provider y completá la API key primero"
-              : "Hacer un request mínimo para verificar la API key + modelo"
+            !activeProviderConfigured ? t("ai.testDisabledHint") : t("ai.testActiveHint")
           }
         >
-          {testing ? "Probando…" : "Probar conexión"}
+          {testing ? t("ai.testing") : t("ai.test")}
         </button>
       </div>
 
@@ -228,7 +223,7 @@ export function AiConfigView() {
       ) : null}
       {error ? (
         <output className="ai-status err" aria-live="polite">
-          Error: {error}
+          {t("ai.errPrefix", { err: error })}
         </output>
       ) : null}
     </main>
@@ -244,12 +239,13 @@ function ModelPicker({
   options: AiModelOption[];
   onChange: (id: string) => void;
 }) {
+  const t = useT();
   const effective = value || (options[0]?.id ?? "");
   const hint = options.find((o) => o.id === effective)?.hint ?? "";
   return (
     <div className="ai-row">
       <label className="ai-model-label">
-        Modelo
+        {t("ai.model")}
         <select value={effective} onChange={(e) => onChange(e.currentTarget.value)}>
           {options.map((o) => (
             <option key={o.id} value={o.id}>

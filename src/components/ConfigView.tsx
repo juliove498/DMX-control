@@ -1,12 +1,16 @@
 import { useState } from "react";
+import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 import { AiConfigView } from "./AiConfigView";
 import { ButtonsConfigView } from "./ButtonsConfigView";
 import { DirectOutput } from "./DirectOutput";
+import { GeneralView } from "./GeneralView";
 import { LibraryView } from "./LibraryView";
 import { MidiConfigView } from "./MidiConfigView";
 import { OutputsView } from "./OutputsView";
 import { PatchView } from "./PatchView";
 import { RemoteBridgeView } from "./RemoteBridgeView";
+import { SyncView } from "./SyncView";
 
 type ConfigTab =
   | "library"
@@ -16,53 +20,54 @@ type ConfigTab =
   | "midi"
   | "ai"
   | "remote"
+  | "sync"
+  | "general"
   | "direct";
 
-// Grouped by setup flow: hardware → control surface → debug.
-// Order inside each group reflects the order a fresh user would touch them
-// (define fixtures → wire universes → patch addresses; then surface; debug last).
-const GROUPS: Array<{ id: string; items: Array<{ id: ConfigTab; label: string; hint: string }> }> =
-  [
-    {
-      id: "hardware",
-      items: [
-        { id: "library", label: "Library", hint: "Definiciones de fixtures" },
-        { id: "outputs", label: "Outputs", hint: "Universos y drivers DMX" },
-        { id: "patch", label: "Patch", hint: "Asignar fixtures a direcciones DMX" },
-      ],
-    },
-    {
-      id: "surface",
-      items: [
-        {
-          id: "blackout-blind",
-          label: "Blackout & Blind",
-          hint: "Fades y fixtures afectados por los botones globales",
-        },
-        { id: "midi", label: "MIDI", hint: "Superficie de control (Launchpad, etc.)" },
-        {
-          id: "ai",
-          label: "IA",
-          hint: "Provider, modelo y API key para generación de escenas con LLM",
-        },
-        {
-          id: "remote",
-          label: "Remote",
-          hint: "Bridge LAN para la app companion en iPhone (scenes / master / blackout)",
-        },
-      ],
-    },
-    {
-      id: "debug",
-      items: [
-        { id: "direct", label: "Direct", hint: "Faders crudos por canal — herramienta de debug" },
-      ],
-    },
-  ];
+// Tab metadata uses translation keys instead of literal strings; the
+// labels resolve at render time so a language flip immediately repaints
+// without remounting. Grouped by setup flow: hardware → surface → app
+// preferences → debug. Order inside each group reflects the order a
+// fresh user would touch them.
+type TabMeta = { id: ConfigTab; labelKey: keyof Translation; hintKey: keyof Translation };
+const GROUPS: Array<{ id: string; items: TabMeta[] }> = [
+  {
+    id: "hardware",
+    items: [
+      { id: "library", labelKey: "config.tabs.library", hintKey: "config.tabs.libraryHint" },
+      { id: "outputs", labelKey: "config.tabs.outputs", hintKey: "config.tabs.outputsHint" },
+      { id: "patch", labelKey: "config.tabs.patch", hintKey: "config.tabs.patchHint" },
+    ],
+  },
+  {
+    id: "surface",
+    items: [
+      {
+        id: "blackout-blind",
+        labelKey: "config.tabs.blackoutBlind",
+        hintKey: "config.tabs.blackoutBlindHint",
+      },
+      { id: "midi", labelKey: "config.tabs.midi", hintKey: "config.tabs.midiHint" },
+      { id: "ai", labelKey: "config.tabs.ai", hintKey: "config.tabs.aiHint" },
+      { id: "remote", labelKey: "config.tabs.remote", hintKey: "config.tabs.remoteHint" },
+      { id: "sync", labelKey: "config.tabs.sync", hintKey: "config.tabs.syncHint" },
+    ],
+  },
+  {
+    id: "app",
+    items: [
+      { id: "general", labelKey: "config.tabs.general", hintKey: "config.tabs.generalHint" },
+    ],
+  },
+  {
+    id: "debug",
+    items: [{ id: "direct", labelKey: "config.tabs.direct", hintKey: "config.tabs.directHint" }],
+  },
+];
 
 export function ConfigView() {
-  // Default to Library: that's where a fresh setup starts. Existing users can
-  // jump anywhere with a single click; not worth persisting last-used.
+  const t = useT();
+  // Default to Library: that's where a fresh setup starts.
   const [sub, setSub] = useState<ConfigTab>("library");
 
   return (
@@ -70,15 +75,15 @@ export function ConfigView() {
       <nav className="config-tabs">
         {GROUPS.map((group) => (
           <div key={group.id} className="config-tabs-group">
-            {group.items.map((t) => (
+            {group.items.map((tab) => (
               <button
-                key={t.id}
+                key={tab.id}
                 type="button"
-                className={`config-tab-btn${sub === t.id ? " active" : ""}`}
-                onClick={() => setSub(t.id)}
-                title={t.hint}
+                className={`config-tab-btn${sub === tab.id ? " active" : ""}`}
+                onClick={() => setSub(tab.id)}
+                title={t(tab.hintKey)}
               >
-                {t.label}
+                {t(tab.labelKey)}
               </button>
             ))}
           </div>
@@ -92,6 +97,8 @@ export function ConfigView() {
         {sub === "midi" && <MidiConfigView />}
         {sub === "ai" && <AiConfigView />}
         {sub === "remote" && <RemoteBridgeView />}
+        {sub === "sync" && <SyncView />}
+        {sub === "general" && <GeneralView />}
         {sub === "direct" && <DirectOutput />}
       </div>
     </main>

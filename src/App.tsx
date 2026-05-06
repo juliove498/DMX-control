@@ -1,9 +1,5 @@
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import {
-  ask,
-  open as openDialog,
-  save as saveDialog,
-} from "@tauri-apps/plugin-dialog";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { ChaserView } from "./components/ChaserView";
@@ -12,10 +8,12 @@ import { MovementView } from "./components/MovementView";
 import { Preview3D } from "./components/Preview3D";
 import { ScenesView } from "./components/ScenesView";
 import { StageView } from "./components/StageView";
+import { useT } from "./i18n";
+import type { Translation } from "./i18n/translations";
 import {
+  type PopoutView,
   closeAppCascade,
   openPopout,
-  type PopoutView,
   readPopoutView,
   toggleFullscreen,
 } from "./lib/windowing";
@@ -23,13 +21,13 @@ import { useShowStore } from "./stores/show";
 
 type Tab = PopoutView;
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "stage", label: "Stage" },
-  { id: "scenes", label: "Scenes" },
-  { id: "chaser", label: "Chaser" },
-  { id: "movement", label: "Movement" },
-  { id: "preview3d", label: "Preview 3D" },
-  { id: "config", label: "Config" },
+const TABS: { id: Tab; labelKey: keyof Translation }[] = [
+  { id: "stage", labelKey: "app.tab.stage" },
+  { id: "scenes", labelKey: "app.tab.scenes" },
+  { id: "chaser", labelKey: "app.tab.chaser" },
+  { id: "movement", labelKey: "app.tab.movement" },
+  { id: "preview3d", labelKey: "app.tab.preview3d" },
+  { id: "config", labelKey: "app.tab.config" },
 ];
 
 function renderTab(tab: Tab) {
@@ -50,6 +48,7 @@ function renderTab(tab: Tab) {
 }
 
 function App() {
+  const t = useT();
   // When the URL carries ?popout=<view>, this window is a single-view child
   // window meant for a second monitor. The tabs nav and Open/Save controls
   // collapse into a minimal header pinned to that view.
@@ -57,12 +56,9 @@ function App() {
   const [tab, setTab] = useState<Tab>(popoutView ?? "stage");
   const refresh = useShowStore((s) => s.refresh);
   const initListeners = useShowStore((s) => s.initListeners);
-  const newShow = useShowStore((s) => s.newShow);
-  const openShow = useShowStore((s) => s.openShow);
-  const saveShow = useShowStore((s) => s.saveShow);
   const renameShow = useShowStore((s) => s.renameShow);
   const showPath = useShowStore((s) => s.showPath);
-  const showName = useShowStore((s) => s.show?.name ?? "Untitled");
+  const showName = useShowStore((s) => s.show?.name ?? t("app.show.untitled"));
   const blackoutActive = useShowStore((s) => s.show?.globals?.blackout.active ?? false);
   const setBlackout = useShowStore((s) => s.setBlackout);
   const setBlind = useShowStore((s) => s.setBlind);
@@ -129,10 +125,10 @@ function App() {
         event.preventDefault();
         confirming = true;
         try {
-          const ok = await ask(
-            "¿Cerrar DMX Control?\nSe cerrarán también todas las ventanas popout abiertas.",
-            { title: "Cerrar aplicación", kind: "warning" },
-          );
+          const ok = await ask(t("app.dialog.closeBody"), {
+            title: t("app.dialog.closeTitle"),
+            kind: "warning",
+          });
           if (ok) await closeAppCascade();
         } finally {
           confirming = false;
@@ -142,7 +138,7 @@ function App() {
     return () => {
       unlisten?.();
     };
-  }, [popoutView]);
+  }, [popoutView, t]);
 
   // Safety net: if the user holds the Blind button and switches windows, the
   // pointer-up event may never reach us. Listening on the document keeps the
@@ -159,35 +155,6 @@ function App() {
     };
   }, [setBlind]);
 
-  const onOpen = async () => {
-    const picked = await openDialog({
-      multiple: false,
-      filters: [{ name: "DMX Show", extensions: ["json"] }],
-    });
-    if (typeof picked === "string") {
-      await openShow(picked);
-    }
-  };
-
-  const onSave = async () => {
-    try {
-      let saved: string;
-      if (showPath) {
-        saved = await saveShow();
-      } else {
-        const picked = await saveDialog({
-          filters: [{ name: "DMX Show", extensions: ["json"] }],
-          defaultPath: `${showName || "show"}.json`,
-        });
-        if (typeof picked !== "string") return; // user cancelled
-        saved = await saveShow(picked);
-      }
-      setToast(`Guardado en ${saved}`);
-    } catch (e) {
-      setToast(`Error al guardar: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  };
-
   const startRename = () => {
     setRenameDraft(showName);
     setRenaming(true);
@@ -199,50 +166,54 @@ function App() {
     try {
       await renameShow(next);
     } catch (e) {
-      setToast(`No se pudo renombrar: ${e instanceof Error ? e.message : String(e)}`);
+      setToast(t("app.toast.renameError", { err: e instanceof Error ? e.message : String(e) }));
     }
   };
 
-  const popoutLabel = popoutView ? TABS.find((t) => t.id === popoutView)?.label : null;
+  const popoutTab = popoutView ? TABS.find((tab) => tab.id === popoutView) : null;
+  const popoutLabel = popoutTab ? t(popoutTab.labelKey) : null;
 
   return (
     <div className={`app-root${popoutView ? " app-root--popout" : ""}`}>
       <nav className="tabs">
         <div className="tabs-left">
-          <span className="brand">{popoutLabel ? `DMX · ${popoutLabel}` : "DMX Control"}</span>
+          <span className="brand">{popoutLabel ? `DMX · ${popoutLabel}` : t("app.brand")}</span>
           {!popoutView &&
-            TABS.map((t) => (
-              <span key={t.id} className={`tab-group${tab === t.id ? " active" : ""}`}>
-                <button
-                  type="button"
-                  className={`tab${tab === t.id ? " active" : ""}`}
-                  onClick={() => setTab(t.id)}
-                >
-                  {t.label}
-                </button>
-                <button
-                  type="button"
-                  className="tab-popout-btn"
-                  title={`Abrir ${t.label} en otra ventana`}
-                  aria-label={`Abrir ${t.label} en otra ventana`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    openPopout(t.id);
-                  }}
-                >
-                  ↗
-                </button>
-              </span>
-            ))}
+            TABS.map((meta) => {
+              const label = t(meta.labelKey);
+              return (
+                <span key={meta.id} className={`tab-group${tab === meta.id ? " active" : ""}`}>
+                  <button
+                    type="button"
+                    className={`tab${tab === meta.id ? " active" : ""}`}
+                    onClick={() => setTab(meta.id)}
+                  >
+                    {label}
+                  </button>
+                  <button
+                    type="button"
+                    className="tab-popout-btn"
+                    title={t("app.openInOtherWindow", { name: label })}
+                    aria-label={t("app.openInOtherWindow", { name: label })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openPopout(meta.id);
+                    }}
+                  >
+                    ↗
+                  </button>
+                </span>
+              );
+            })}
         </div>
         <div className="tabs-globals">
           <button
             type="button"
             className={`global-btn blackout-btn${blackoutActive ? " active" : ""}`}
             onClick={() => setBlackout(!blackoutActive)}
-            title="Blackout (toggle, fades configurables)"
+            title={t("app.global.blackoutTitle")}
           >
-            BLACKOUT
+            {t("app.global.blackout")}
           </button>
           <button
             type="button"
@@ -260,17 +231,17 @@ function App() {
             }}
             onPointerLeave={() => setBlind(false)}
             onPointerCancel={() => setBlind(false)}
-            title="Blind / blinder (mantené presionado, halógeno con fade in/out)"
+            title={t("app.global.blindTitle")}
           >
-            BLIND
+            {t("app.global.blind")}
           </button>
         </div>
         <div className="tabs-right">
           <button
             type="button"
             className="fullscreen-btn"
-            title="Pantalla completa (F11)"
-            aria-label="Pantalla completa"
+            title={t("app.fullscreenHint")}
+            aria-label={t("app.fullscreen")}
             onClick={() => toggleFullscreen()}
           >
             ⛶
@@ -294,8 +265,8 @@ function App() {
                 className="show-name selectable"
                 title={
                   showPath
-                    ? `${showPath} · click para renombrar`
-                    : "(sin guardar) · click para renombrar"
+                    ? t("app.show.renameHint", { path: showPath })
+                    : t("app.show.renameHintEmpty")
                 }
                 onClick={startRename}
               >
@@ -303,19 +274,6 @@ function App() {
                 {showPath ? "" : " *"}
               </button>
             ))}
-          {!popoutView && (
-            <>
-              <button type="button" onClick={() => newShow()}>
-                New
-              </button>
-              <button type="button" onClick={onOpen}>
-                Open…
-              </button>
-              <button type="button" onClick={onSave}>
-                Save
-              </button>
-            </>
-          )}
         </div>
       </nav>
       <div className="tab-body">{renderTab(tab)}</div>

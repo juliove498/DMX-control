@@ -22,7 +22,7 @@ parking_lot = "0.12"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 tracing-appender = "0.2"
-ts-rs = { version = "10", features = ["serde-compat"] }
+ts-rs = { version = "10", features = ["serde-compat", "chrono-impl"] }
 crossbeam-channel = "0.5"
 serialport = "4"
 dirs = "5"
@@ -68,6 +68,12 @@ rand = "0.8"
 qrcodegen = "1.8"
 local-ip-address = "0.6"
 futures-util = { version = "0.3", default-features = false, features = ["std", "sink"] }
+# OS-native secrets store for the cross-machine sync PAT. Keychain on
+# macOS, Credential Manager on Windows, libsecret on Linux. Falls back
+# to an error (not a plaintext file) so a missing secret store never
+# silently exposes the token.
+keyring = { version = "3", features = ["apple-native", "windows-native", "sync-secret-service"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 
 [dev-dependencies]
 hex-literal = "0.4"

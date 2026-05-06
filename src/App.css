@@ -218,6 +218,14 @@ code,
   /* `output` defaults to inline-block, so center via translate above. */
   display: inline-block;
 }
+/* Inline variant: render where it sits in the flow rather than pinned
+   to the viewport. Used by per-section save/load feedback so the
+   message lives next to the buttons that produced it. */
+.app-toast--inline {
+  position: static;
+  transform: none;
+  margin-top: 10px;
+}
 
 .tabs button {
   background: #2a2a2a;
@@ -4024,4 +4032,482 @@ label {
   border-radius: 4px;
   color: #b8c4dc;
   font-size: 11px;
+}
+
+/* ===========================================================================
+ * Design system
+ *
+ * Single source of truth for spacing / radii / colors / shadows / focus.
+ * Lives at the bottom so source-order precedence lets these rules win over
+ * the older per-class definitions earlier in this file. Existing custom
+ * controls (faders, scenes grid, MIDI pads, 3D preview panel) keep their
+ * bespoke styling; this layer only modernises the chrome around them
+ * (buttons, inputs, cards, tabs, toolbars).
+ *
+ * Refactor strategy: only restyle selectors when the visual diff is desired.
+ * Vars are introduced incrementally — older `#1a1a1a` literals stay
+ * elsewhere until each view is migrated, and the colour tokens are tuned to
+ * match those existing values closely enough that swap-in is painless.
+ * ========================================================================= */
+
+:root {
+  /* Spacing scale (4-px grid). Use --sp-N for paddings/margins/gaps. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-7: 32px;
+
+  /* Radii. Default to --r-md for buttons/inputs, --r-lg for cards/modals. */
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-pill: 999px;
+
+  /* Surfaces — tuned so the existing literals (#161616 root, #1a-#2c surfaces)
+   * map cleanly onto these tokens during the gradual migration. */
+  --bg-0: #0d0d0d;
+  --bg-1: #161616;
+  --bg-2: #1c1c1c;
+  --bg-3: #232323;
+  --bg-4: #2c2c2c;
+  --bg-5: #353535;
+
+  /* Borders / dividers. */
+  --line-1: #232323;
+  --line-2: #2f2f2f;
+  --line-3: #3a3a3a;
+
+  /* Text ramp. */
+  --text-1: #f1f1f1;
+  --text-2: #cfcfcf;
+  --text-3: #9a9a9a;
+  --text-4: #6c6c6c;
+
+  /* Accents — keep the warm DJ-amber the brand already uses. */
+  --accent: #f5d896;
+  --accent-hi: #fae0a4;
+  --accent-lo: #3a2c0d;
+  --accent-bg: rgba(245, 216, 150, 0.12);
+  --accent-bg-strong: rgba(245, 216, 150, 0.22);
+
+  /* Status colours. */
+  --danger: #e04646;
+  --danger-bg: #4a1d1d;
+  --danger-border: #7a2a2a;
+  --ok: #6dd3a3;
+  --ok-bg: #0d3a1f;
+  --warn: #d9a900;
+  --warn-bg: #3a2c0d;
+  --info: #6aa6e8;
+
+  /* Elevation. Soft, dark-mode-friendly drop shadows — not the loud
+   * Material-style ones that hurt on a stage tool. */
+  --sh-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.25);
+  --sh-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 2px 4px rgba(0, 0, 0, 0.25);
+  --sh-3: 0 12px 28px rgba(0, 0, 0, 0.55), 0 6px 8px rgba(0, 0, 0, 0.3);
+  --sh-inset-1: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* Focus ring — keyboard users only via :focus-visible. */
+  --focus-ring: 0 0 0 2px rgba(245, 216, 150, 0.45);
+
+  /* Motion. Keep it short — operators are watching the rig, not the UI. */
+  --t-fast: 120ms ease;
+  --t-base: 180ms ease;
+}
+
+/* ---- Base elements ------------------------------------------------------ */
+
+/* Element-level (specificity 0,0,1,1 max) so single-class overrides like
+ * `.tab:hover` / `.config-tab-btn:hover` keep winning where the older
+ * stylesheet defined them. Disabled comes last on purpose: same specificity
+ * as :hover, so source order makes disabled the final word. Default look is
+ * intentionally flat — depth (shadow + press translate) is opt-in via the
+ * `.primary` / `.danger` classes so the existing chrome (tabs, toolbar
+ * pills, .config-tab-btn) doesn't suddenly grow shadows it never asked for. */
+button {
+  background: var(--bg-3);
+  color: var(--text-1);
+  border: 1px solid var(--line-3);
+  border-radius: var(--r-md);
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast),
+    box-shadow var(--t-fast), transform var(--t-fast), color var(--t-fast);
+}
+button:hover {
+  background: var(--bg-4);
+  border-color: var(--line-3);
+}
+button:active {
+  background: var(--bg-2);
+}
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+button:disabled,
+button:disabled:hover {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button.primary {
+  background: var(--accent);
+  color: #2a200a;
+  border-color: var(--accent-hi);
+  font-weight: 600;
+  box-shadow: var(--sh-1), var(--sh-inset-1);
+}
+button.primary:hover {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+}
+button.primary:active {
+  background: var(--accent);
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-2);
+}
+button.ghost:hover {
+  background: var(--bg-3);
+  border-color: var(--line-2);
+  color: var(--text-1);
+}
+
+button.danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: #ffd2d2;
+  box-shadow: var(--sh-1), var(--sh-inset-1);
+}
+button.danger:hover {
+  background: #5a2424;
+  border-color: #9a3a3a;
+}
+button.danger:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+input,
+select,
+textarea {
+  background: var(--bg-2);
+  color: var(--text-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast),
+    background var(--t-fast);
+}
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-4);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent-hi);
+  box-shadow: var(--focus-ring);
+  background: var(--bg-3);
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+input[type="number"] {
+  width: 88px;
+}
+
+/* Native checkbox/radio in dark mode look passable with `accent-color`,
+ * which is far less work than custom-skinning them. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+label {
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+code {
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-xs);
+  padding: 1px 5px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--line-2);
+  margin: var(--sp-3) 0;
+}
+
+/* ---- Utility classes used across views --------------------------------- */
+
+.card {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  box-shadow: var(--sh-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.card h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+
+.error {
+  background: rgba(224, 70, 70, 0.08);
+  border: 1px solid rgba(224, 70, 70, 0.4);
+  color: #ffb4b4;
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 13px;
+}
+
+.muted {
+  color: var(--text-3);
+}
+
+.hint {
+  color: var(--text-3);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ---- Selective chrome refinements --------------------------------------
+ * These override the older selectors earlier in the file via source order.
+ * Picked the ones with the highest visual surface area: the top tabbar,
+ * the config sub-tabs, the page header / footer, the toolbar FPS pill. */
+
+.tabs {
+  background: var(--bg-1);
+  border-bottom: 1px solid var(--line-1);
+}
+
+.tab,
+.tabs button {
+  font-size: 13px;
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  transition: background var(--t-fast), color var(--t-fast);
+}
+.tab.active,
+.tabs button.tab.active {
+  background: var(--bg-4);
+  color: var(--text-1);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+.tab:hover:not(.active),
+.tabs button.tab:hover:not(.active) {
+  background: var(--bg-3);
+}
+
+.global-btn {
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 7px 16px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  box-shadow: var(--sh-1);
+}
+.global-btn:hover {
+  background: var(--bg-3);
+  border-color: var(--line-3);
+}
+
+.config-tab-btn {
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background var(--t-fast), color var(--t-fast),
+    box-shadow var(--t-fast);
+}
+.config-tab-btn:hover {
+  background: var(--bg-3);
+}
+.config-tab-btn.active {
+  background: var(--accent-bg);
+  color: var(--accent-hi);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.page-head {
+  border-bottom: 1px solid var(--line-1);
+  padding-bottom: var(--sp-3);
+}
+.page-head h2 {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-1);
+}
+.page-foot {
+  border-top: 1px solid var(--line-1);
+  padding-top: var(--sp-3);
+}
+
+/* The Direct Output FPS pill: bumped radius + soft glow for the warn state. */
+.toolbar .fps {
+  border-radius: var(--r-pill);
+  padding: 3px 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Outputs / Patch row containers — pulled rounding up and added a subtle
+ * shadow so the bindings list reads as stacked cards instead of striped
+ * rows. */
+.binding-row {
+  background: var(--bg-2);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-1);
+  margin-bottom: var(--sp-2);
+}
+
+/* ---- Remote-bridge specific layout (uses the new utility classes) ------ */
+
+.remote-bridge-view {
+  gap: var(--sp-4);
+}
+.remote-bridge-view .card .row {
+  justify-content: flex-start;
+}
+.remote-bridge-view .card .row + .row {
+  border-top: 1px dashed var(--line-1);
+  padding-top: var(--sp-3);
+}
+.remote-bridge-view .card strong {
+  color: var(--text-2);
+  font-weight: 500;
+  min-width: 160px;
+}
+.remote-bridge-view .ok {
+  color: var(--ok);
+}
+.remote-bridge-view .pairing-active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-3) 0;
+}
+.remote-bridge-view .pin-big {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--accent-hi);
+  background: var(--bg-1);
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4);
+  box-shadow: var(--sh-1);
+}
+.remote-bridge-view .qr {
+  background: #fff;
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+  box-shadow: var(--sh-2);
+}
+.remote-bridge-view .devices-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.remote-bridge-view .devices-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  background: var(--bg-1);
+  border: 1px solid var(--line-1);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+}
+.remote-bridge-view .devices-list li small {
+  color: var(--text-4);
+  font-size: 11px;
+}
+
+/* ---- Sync view ---------------------------------------------------------- */
+
+.sync-view {
+  gap: var(--sp-4);
+}
+.sync-view .card .row {
+  justify-content: flex-start;
+}
+.sync-view .card strong {
+  color: var(--text-2);
+  font-weight: 500;
+  min-width: 200px;
+}
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.info-banner {
+  background: rgba(109, 211, 163, 0.08);
+  border: 1px solid rgba(109, 211, 163, 0.4);
+  color: #b1f5c7;
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 13px;
 }

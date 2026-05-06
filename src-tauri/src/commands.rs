@@ -2396,7 +2396,7 @@ pub fn ai_apply_draft_scene(
 /// survives a restart; additionally writes the user-named file (with rotating
 /// backups) when one is set. Errors writing the user path are propagated;
 /// autosave failures are logged so a missing config dir doesn't block edits.
-fn persist_show(show: &ShowState, _app: &AppHandle) -> Result<(), CommandError> {
+pub(crate) fn persist_show(show: &ShowState, _app: &AppHandle) -> Result<(), CommandError> {
     let (snapshot, target_path) = {
         let s = show.read();
         (s.show.clone(), s.path.clone())

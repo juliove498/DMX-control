@@ -9,6 +9,7 @@ pub mod movement;
 pub mod output;
 pub mod programmer;
 pub mod show;
+pub mod sync;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -500,6 +501,15 @@ pub fn run() {
             bridge::bridge_cancel_pairing,
             bridge::bridge_list_devices,
             bridge::bridge_revoke_device,
+            // Cross-machine config sync (private GitHub Gist)
+            sync::sync_status,
+            sync::sync_save_settings,
+            sync::sync_set_token,
+            sync::sync_clear_token,
+            sync::sync_whoami,
+            sync::sync_probe,
+            sync::sync_push,
+            sync::sync_pull,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

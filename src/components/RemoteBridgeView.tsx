@@ -2,6 +2,8 @@ import type { BridgeStatus } from "@bindings/BridgeStatus";
 import type { PairedDevice } from "@bindings/PairedDevice";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 
 /// Remote-bridge config tab. Lets the operator turn the LAN bridge on/
 /// off, surface the IP+port for manual entry on the phone, walk a paired
@@ -13,6 +15,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 /// countdowns and the running flag still need a tick — and 1 Hz is
 /// cheap.
 export function RemoteBridgeView() {
+  const t = useT();
   const [status, setStatus] = useState<BridgeStatus | null>(null);
   const [devices, setDevices] = useState<PairedDevice[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export function RemoteBridgeView() {
   };
 
   const revoke = async (id: string) => {
-    if (!confirm("¿Revocar este dispositivo? Va a perder la conexión.")) return;
+    if (!confirm(t("remote.devices.revokeConfirm"))) return;
     try {
       const s = await invoke<BridgeStatus>("bridge_revoke_device", { deviceId: id });
       setStatus(s);
@@ -116,38 +119,36 @@ export function RemoteBridgeView() {
   return (
     <main className="page remote-bridge-view">
       <header className="page-head">
-        <h2>Remote (mobile)</h2>
-        <p className="hint">
-          Bridge LAN para la app companion en iPhone. Sirve scenes / master / blackout / blind por
-          WiFi local. Sin TLS — usar solo en redes confiables. En Windows el firewall suele pedir
-          permiso la primera vez que arranca: aceptar al menos "redes privadas".
-        </p>
+        <h2>{t("remote.title")}</h2>
+        <p className="hint">{t("remote.intro")}</p>
       </header>
 
       {error && <div className="error">{error}</div>}
 
       <section className="card">
         <div className="row">
-          <strong>Status:</strong>
-          <span className={running ? "ok" : "muted"}>{running ? "running" : "stopped"}</span>
+          <strong>{t("remote.status")}</strong>
+          <span className={running ? "ok" : "muted"}>
+            {running ? t("remote.statusRunning") : t("remote.statusStopped")}
+          </span>
           {running ? (
-            <button type="button" onClick={stop} disabled={busy}>
-              Stop
+            <button type="button" onClick={stop} disabled={busy} className="danger">
+              {t("remote.stop")}
             </button>
           ) : (
-            <button type="button" onClick={start} disabled={busy}>
-              Start
+            <button type="button" onClick={start} disabled={busy} className="primary">
+              {t("remote.start")}
             </button>
           )}
         </div>
         {running && (
           <>
             <div className="row">
-              <strong>Conectar manualmente:</strong>
+              <strong>{t("remote.connectManually")}</strong>
               <code>{connectionString ?? "…"}</code>
             </div>
             <div className="row">
-              <strong>Clientes conectados:</strong>
+              <strong>{t("remote.clientsConnected")}</strong>
               <span>{status?.clients_connected ?? 0}</span>
             </div>
           </>
@@ -156,7 +157,7 @@ export function RemoteBridgeView() {
 
       {running && (
         <section className="card">
-          <h3>Pairing</h3>
+          <h3>{t("remote.pairing")}</h3>
           {pairing ? (
             <div className="pairing-active">
               <div className="pin-big" aria-label="PIN">
@@ -175,25 +176,24 @@ export function RemoteBridgeView() {
                 dangerouslySetInnerHTML={{ __html: pairing.qr_svg }}
               />
               <p className="hint">
-                Caduca en {String(pairing.remaining_secs)}s. Escaneá el QR desde la app o ingresá el
-                PIN.
+                {t("remote.pairing.expiresIn", { secs: String(pairing.remaining_secs) })}
               </p>
               <button type="button" onClick={cancelPairing}>
-                Cancelar
+                {t("remote.pairing.cancel")}
               </button>
             </div>
           ) : (
-            <button type="button" onClick={beginPairing}>
-              Pair new device
+            <button type="button" onClick={beginPairing} className="primary">
+              {t("remote.pairing.start")}
             </button>
           )}
         </section>
       )}
 
       <section className="card">
-        <h3>Devices pareados ({devices.length})</h3>
+        <h3>{t("remote.devices", { count: devices.length })}</h3>
         {devices.length === 0 ? (
-          <p className="empty">Ninguno todavía.</p>
+          <p className="empty">{t("remote.devices.empty")}</p>
         ) : (
           <ul className="devices-list">
             {devices.map((d) => (
@@ -202,14 +202,14 @@ export function RemoteBridgeView() {
                   <strong>{d.name}</strong>
                   <small>
                     {" "}
-                    pareado {formatRelative(Number(d.created_at))}
+                    {t("remote.devices.pairedAgo", { ago: formatRelative(t, Number(d.created_at)) })}
                     {d.last_seen != null
-                      ? ` · visto ${formatRelative(Number(d.last_seen))}`
+                      ? ` ${t("remote.devices.seenAgo", { ago: formatRelative(t, Number(d.last_seen)) })}`
                       : ""}
                   </small>
                 </div>
                 <button type="button" className="danger" onClick={() => revoke(d.id)}>
-                  Revoke
+                  {t("remote.devices.revoke")}
                 </button>
               </li>
             ))}
@@ -230,10 +230,13 @@ function stringifyError(e: unknown): string {
   }
 }
 
-function formatRelative(unixSecs: number): string {
+function formatRelative(
+  t: <K extends keyof Translation>(key: K, vars?: Record<string, string | number>) => string,
+  unixSecs: number,
+): string {
   const delta = Math.max(0, Math.floor(Date.now() / 1000) - unixSecs);
-  if (delta < 60) return `hace ${delta}s`;
-  if (delta < 3600) return `hace ${Math.floor(delta / 60)}m`;
-  if (delta < 86400) return `hace ${Math.floor(delta / 3600)}h`;
-  return `hace ${Math.floor(delta / 86400)}d`;
+  if (delta < 60) return t("remote.time.secAgo", { n: delta });
+  if (delta < 3600) return t("remote.time.minAgo", { n: Math.floor(delta / 60) });
+  if (delta < 86400) return t("remote.time.hAgo", { n: Math.floor(delta / 3600) });
+  return t("remote.time.dAgo", { n: Math.floor(delta / 86400) });
 }

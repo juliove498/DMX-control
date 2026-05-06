@@ -1,9 +1,11 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
+import { useT } from "../i18n";
 import { fixtureImageSrc } from "../lib/fixtureImage";
 import { useShowStore } from "../stores/show";
 
 export function LibraryView() {
+  const t = useT();
   const library = useShowStore((s) => s.library);
   const libraryDir = useShowStore((s) => s.libraryDir);
   const reload = useShowStore((s) => s.reloadLibrary);
@@ -28,7 +30,7 @@ export function LibraryView() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error("openDialog failed", e);
-      setImageError(`No se pudo abrir el diálogo: ${msg}`);
+      setImageError(t("library.errorOpenDialog", { err: msg }));
       return;
     }
     if (typeof picked !== "string") return;
@@ -44,22 +46,22 @@ export function LibraryView() {
         msg = String((e as { message: unknown }).message);
       else msg = JSON.stringify(e);
       console.error("set_fixture_image failed", e);
-      setImageError(`No se pudo cambiar la imagen: ${msg}`);
+      setImageError(t("library.errorSetImage", { err: msg }));
     }
   };
 
   return (
     <main className="page library-view">
       <header className="page-head">
-        <h2>Library ({library.length})</h2>
+        <h2>{t("library.title", { count: library.length })}</h2>
         <div className="actions">
           <input
-            placeholder="Search…"
+            placeholder={t("library.search")}
             value={filter}
             onChange={(e) => setFilter(e.currentTarget.value)}
           />
           <button type="button" onClick={() => reload()}>
-            Reload
+            {t("library.reload")}
           </button>
         </div>
       </header>
@@ -70,7 +72,7 @@ export function LibraryView() {
             type="button"
             className="lib-error-dismiss"
             onClick={() => setImageError(null)}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             ×
           </button>
@@ -100,14 +102,14 @@ export function LibraryView() {
                 <div className="lib-modes">
                   {d.modes.map((m) => (
                     <span key={m.name} className="mode-pill">
-                      {m.name} · {m.channels.length}ch
+                      {t("library.modeSummary", { name: m.name, count: m.channels.length })}
                     </span>
                   ))}
                 </div>
               </div>
               <div className="lib-actions">
                 <button type="button" onClick={() => pickImage(d.id)}>
-                  {d.image ? "Cambiar imagen" : "Subir imagen"}
+                  {d.image ? t("library.changeImage") : t("library.uploadImage")}
                 </button>
               </div>
             </div>
@@ -115,7 +117,9 @@ export function LibraryView() {
         })}
       </div>
       <p className="hint">
-        Los archivos JSON viven en <code>~/Library/Application Support/dmx-control/fixtures/</code>.
+        {t("library.filesPath", {
+          path: "~/Library/Application Support/dmx-control/fixtures/",
+        })}
       </p>
     </main>
   );

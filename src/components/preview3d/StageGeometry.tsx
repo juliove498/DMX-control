@@ -17,7 +17,7 @@ export function StageGeometry({ config }: { config: StageConfig }) {
           projections actually appear here. */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[floor.width, floor.depth]} />
-        <meshStandardMaterial color="#0c1218" roughness={0.85} metalness={0.05} />
+        <meshStandardMaterial color={floor.color} roughness={0.85} metalness={0.05} />
       </mesh>
 
       {/* Grid lines — drei's <Grid> draws an infinite grid by
@@ -43,7 +43,7 @@ export function StageGeometry({ config }: { config: StageConfig }) {
         // gobo projection to render on this surface.
         <mesh position={[0, backWall.height / 2, floor.depth / 2]} receiveShadow>
           <planeGeometry args={[floor.width, backWall.height]} />
-          <meshStandardMaterial color="#0a0d12" roughness={0.95} side={2} />
+          <meshStandardMaterial color={backWall.color} roughness={0.95} side={2} />
         </mesh>
       ) : null}
 

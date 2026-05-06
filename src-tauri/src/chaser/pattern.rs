@@ -24,6 +24,18 @@ pub fn evaluate(pattern: &Pattern, step: u64, slot: usize, total: usize) -> Slot
         Pattern::BuildReverse => build(step, slot, total, true),
         Pattern::CenterOut => center_out(step, slot, total),
         Pattern::Symmetric => symmetric(step, slot, total),
+        Pattern::OutsideIn => outside_in(step, slot, total),
+        Pattern::InvertedChase => inverted_chase(step, slot, total),
+        Pattern::GroupsOfTwo => groups_of_n(step, slot, total, 2),
+        Pattern::GroupsOfThree => groups_of_n(step, slot, total, 3),
+        Pattern::HalfSwap => half_swap(step, slot, total),
+        Pattern::Edges => edges(step, slot, total),
+        Pattern::PulseOut => pulse_radial(step, slot, total, false),
+        Pattern::PulseIn => pulse_radial(step, slot, total, true),
+        Pattern::Accordion => accordion(step, slot, total),
+        Pattern::Bowtie => bowtie(step, slot, total),
+        Pattern::DualChase => dual_chase(step, slot, total),
+        Pattern::SymmetricBounce => symmetric_bounce(step, slot, total),
     }
 }
 
@@ -172,6 +184,236 @@ fn symmetric(step: u64, slot: usize, total: usize) -> SlotState {
     }
     let half = total.div_ceil(2);
     let pos = (step % half as u64) as usize;
+    if slot == pos || slot == total - 1 - pos {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Mirror of `center_out`: lit area shrinks from the edges inward,
+/// then resets. step 0 lights every slot, each subsequent step
+/// drops the outermost lit ring, until only the centre is lit; one
+/// final all-off "reset" closes the cycle for visual punctuation.
+fn outside_in(step: u64, slot: usize, total: usize) -> SlotState {
+    if total <= 1 {
+        return all_together(step);
+    }
+    let half = total.div_ceil(2);
+    let cycle = (half as u64) + 1;
+    let pos = step % cycle;
+    if pos == half as u64 {
+        return SlotState::Off;
+    }
+    let centre = (total as f32 - 1.0) / 2.0;
+    let dist = (slot as f32 - centre).abs();
+    // Light if the slot is within the *current* lit-radius envelope.
+    // pos=0 → max radius (everything lit); pos grows → envelope
+    // shrinks → only the centre slots survive.
+    // The +0.5 fudge mirrors CenterOut: even totals (centre at .5
+    // between two slots) still resolve cleanly.
+    let lit_radius = (half as f32) - 0.5 - pos as f32;
+    if dist <= lit_radius {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// "Shadow chase": all slots lit except one, which marches forward.
+/// Reads as a dark spot moving across a fully-lit strip — useful
+/// when you want presence on every fixture but a moving accent.
+fn inverted_chase(step: u64, slot: usize, total: usize) -> SlotState {
+    if total == 0 {
+        return SlotState::Off;
+    }
+    let dark = (step % total as u64) as usize;
+    if slot == dark {
+        SlotState::Off
+    } else {
+        SlotState::On
+    }
+}
+
+/// Slots grouped into blocks of `n` adjacent units that march
+/// together. e.g. `n=2` over 8 slots: step 0 lights 0,1 → step 1
+/// lights 2,3 → … → step 3 lights 6,7 → cycle. Last group may be
+/// short for non-divisible totals; we still cycle through all
+/// groups.
+fn groups_of_n(step: u64, slot: usize, total: usize, n: usize) -> SlotState {
+    if total == 0 || n == 0 {
+        return SlotState::Off;
+    }
+    let groups = total.div_ceil(n);
+    let active_group = (step % groups as u64) as usize;
+    let slot_group = slot / n;
+    if slot_group == active_group {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Left half lit at even steps, right half lit at odd steps.
+/// For odd totals the centre slot belongs to the left half.
+fn half_swap(step: u64, slot: usize, total: usize) -> SlotState {
+    if total == 0 {
+        return SlotState::Off;
+    }
+    let half = total.div_ceil(2);
+    let in_left = slot < half;
+    let left_on = step % 2 == 0;
+    if (in_left && left_on) || (!in_left && !left_on) {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Only the first and last slots blink in unison; the inner slots
+/// stay off. Degenerates to `all_together` when total == 1 (single
+/// slot is both edges) or 2.
+fn edges(step: u64, slot: usize, total: usize) -> SlotState {
+    if total == 0 {
+        return SlotState::Off;
+    }
+    if total <= 2 {
+        return all_together(step);
+    }
+    let on_step = step % 2 == 0;
+    let is_edge = slot == 0 || slot == total - 1;
+    if is_edge && on_step {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Single expanding (or contracting) ring: only slots at the current
+/// radius from centre are lit. Different from CenterOut/OutsideIn
+/// which are cumulative — this one reads as a single travelling
+/// pulse, like a sonar ping. `inward=true` reverses the direction.
+fn pulse_radial(step: u64, slot: usize, total: usize, inward: bool) -> SlotState {
+    if total <= 1 {
+        return all_together(step);
+    }
+    let half = total.div_ceil(2);
+    let cycle = (half as u64) + 1;
+    let pos = (step % cycle) as usize;
+    if pos == half {
+        return SlotState::Off;
+    }
+    let radius = if inward { half - 1 - pos } else { pos };
+    let centre = (total as f32 - 1.0) / 2.0;
+    let dist = (slot as f32 - centre).abs();
+    // Even totals have centre at .5 between two slots; the radius
+    // ring there sits at dist 0.5 / 1.5 / 2.5 — match those with a
+    // 0.5 fudge band, same trick CenterOut uses.
+    let lo = (radius as f32) - 0.5;
+    let hi = (radius as f32) + 0.5;
+    if dist >= lo && dist <= hi {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Continuous breathing — single radial ring rides centre→edges→
+/// centre over a 2·half − 1 cycle, no reset frame. Reads as a
+/// sustained "in/out" pulse perfect for ambient pads.
+fn accordion(step: u64, slot: usize, total: usize) -> SlotState {
+    if total <= 1 {
+        return all_together(step);
+    }
+    let half = total.div_ceil(2);
+    // Cycle = 2·half − 1 produces positions 0,1,…,half−1,half−2,…,1
+    // before wrapping. Even totals: 5 slots → cycle 5 (0,1,2,1,0,…).
+    let cycle = (2 * half as u64).saturating_sub(1).max(1);
+    let pos_in_cycle = step % cycle;
+    let radius_idx = if pos_in_cycle < half as u64 {
+        pos_in_cycle as usize
+    } else {
+        // Mirror back from the far end of the cycle. For cycle C =
+        // 2H − 1 the reflection around H−1 lands at C − 1 − pos.
+        // pos H → H−2, pos H+1 → H−3, …, pos C−1 → 0.
+        (cycle - 1 - pos_in_cycle) as usize
+    };
+    let centre = (total as f32 - 1.0) / 2.0;
+    let dist = (slot as f32 - centre).abs();
+    let lo = (radius_idx as f32) - 0.5;
+    let hi = (radius_idx as f32) + 0.5;
+    if dist >= lo && dist <= hi {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Cumulative symmetric build from the edges inward. Both ends grow
+/// toward the centre simultaneously; the final frame in the cycle is
+/// "all off" so the eye registers a clean restart.
+fn bowtie(step: u64, slot: usize, total: usize) -> SlotState {
+    if total <= 1 {
+        return all_together(step);
+    }
+    let half = total.div_ceil(2);
+    let cycle = (half as u64) + 1;
+    let pos = (step % cycle) as usize;
+    if pos == half {
+        return SlotState::Off;
+    }
+    // Slot is lit if it sits within `pos` of EITHER edge — i.e. the
+    // distance to the *nearest* edge is <= pos.
+    let dist_to_edge = slot.min(total - 1 - slot);
+    if dist_to_edge <= pos {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Two heads marching forward in lockstep, half a strip apart. For
+/// even totals this is a perfect mirror; odd totals get an off-by-one
+/// pair that wraps cleanly through the modulo.
+fn dual_chase(step: u64, slot: usize, total: usize) -> SlotState {
+    if total <= 1 {
+        return all_together(step);
+    }
+    let half = total / 2;
+    let head_a = (step % total as u64) as usize;
+    let head_b = (head_a + half) % total;
+    if slot == head_a || slot == head_b {
+        SlotState::On
+    } else {
+        SlotState::Off
+    }
+}
+
+/// Symmetric pair walks edges→centre→edges→centre… Same shape as
+/// Symmetric but with PingPong-style direction reversal at the centre
+/// crease. Cycle = 2·half − 2; centre slot (odd totals) lights alone
+/// at the crease, pair at all other positions.
+fn symmetric_bounce(step: u64, slot: usize, total: usize) -> SlotState {
+    if total <= 1 {
+        return all_together(step);
+    }
+    let half = total.div_ceil(2);
+    if half <= 1 {
+        // total == 2 → no real bounce; degenerate to alternating
+        // each end being lit, which still reads symmetrically.
+        return if slot as u64 == step % 2 {
+            SlotState::On
+        } else {
+            SlotState::Off
+        };
+    }
+    let cycle = 2 * half as u64 - 2;
+    let pos_in_cycle = step % cycle;
+    let pos = if pos_in_cycle < half as u64 {
+        pos_in_cycle as usize
+    } else {
+        (cycle - pos_in_cycle) as usize
+    };
     if slot == pos || slot == total - 1 - pos {
         SlotState::On
     } else {
@@ -500,6 +742,260 @@ mod tests {
         let states = snapshot(&Pattern::Symmetric, 2, total);
         assert_eq!(count_on(&states), 1);
         assert_eq!(on_index(&states), Some(2));
+    }
+
+    // ----- Random ---------------------------------------------------------
+
+    // ----- OutsideIn ------------------------------------------------------
+
+    #[test]
+    fn outside_in_total_5_shrinks_to_centre_then_resets() {
+        // Mirror of CenterOut. half=3, cycle=4.
+        // step 0: all lit
+        // step 1: edges off, slots 1..=3 lit
+        // step 2: only centre slot 2 lit
+        // step 3: reset (all off)
+        let total = 5;
+        let expected: &[&[bool]] = &[
+            &[true, true, true, true, true],
+            &[false, true, true, true, false],
+            &[false, false, true, false, false],
+            &[false, false, false, false, false],
+        ];
+        for (step, want) in expected.iter().enumerate() {
+            let states = snapshot(&Pattern::OutsideIn, step as u64, total);
+            for (slot, &on_want) in want.iter().enumerate() {
+                let actual = matches!(states[slot], SlotState::On);
+                assert_eq!(actual, on_want, "step {step} slot {slot}");
+            }
+        }
+    }
+
+    // ----- InvertedChase --------------------------------------------------
+
+    #[test]
+    fn inverted_chase_dark_slot_marches_forward() {
+        let total = 4;
+        for step in 0..16 {
+            let states = snapshot(&Pattern::InvertedChase, step, total);
+            // Exactly one slot off, the rest on.
+            assert_eq!(count_on(&states), total - 1, "step {step}");
+            let dark_idx = (step as usize) % total;
+            assert_eq!(states[dark_idx], SlotState::Off, "step {step}");
+        }
+    }
+
+    // ----- GroupsOfN ------------------------------------------------------
+
+    #[test]
+    fn groups_of_two_lights_pairs() {
+        // total=8, n=2 → 4 groups. step 0 lights 0,1; step 1 lights 2,3; etc.
+        let total = 8;
+        let expected: &[&[bool]] = &[
+            &[true, true, false, false, false, false, false, false],
+            &[false, false, true, true, false, false, false, false],
+            &[false, false, false, false, true, true, false, false],
+            &[false, false, false, false, false, false, true, true],
+            &[true, true, false, false, false, false, false, false], // cycle
+        ];
+        for (step, want) in expected.iter().enumerate() {
+            let states = snapshot(&Pattern::GroupsOfTwo, step as u64, total);
+            for (slot, &on_want) in want.iter().enumerate() {
+                let actual = matches!(states[slot], SlotState::On);
+                assert_eq!(actual, on_want, "step {step} slot {slot}");
+            }
+        }
+    }
+
+    #[test]
+    fn groups_of_three_lights_triplets() {
+        // total=6, n=3 → 2 groups. step 0: 0,1,2 → step 1: 3,4,5 → cycle.
+        let total = 6;
+        let states = snapshot(&Pattern::GroupsOfThree, 0, total);
+        assert_eq!(count_on(&states), 3);
+        for slot in 0..3 {
+            assert_eq!(states[slot], SlotState::On);
+        }
+        let states = snapshot(&Pattern::GroupsOfThree, 1, total);
+        for slot in 3..6 {
+            assert_eq!(states[slot], SlotState::On);
+        }
+    }
+
+    // ----- HalfSwap -------------------------------------------------------
+
+    #[test]
+    fn half_swap_alternates_halves() {
+        // total=6 → halves of size 3.
+        let total = 6;
+        let states = snapshot(&Pattern::HalfSwap, 0, total);
+        assert_eq!(states[0], SlotState::On);
+        assert_eq!(states[1], SlotState::On);
+        assert_eq!(states[2], SlotState::On);
+        assert_eq!(states[3], SlotState::Off);
+        assert_eq!(states[4], SlotState::Off);
+        assert_eq!(states[5], SlotState::Off);
+        let states = snapshot(&Pattern::HalfSwap, 1, total);
+        assert_eq!(states[0], SlotState::Off);
+        assert_eq!(states[3], SlotState::On);
+    }
+
+    // ----- Edges ----------------------------------------------------------
+
+    #[test]
+    fn edges_blinks_only_first_and_last() {
+        let total = 5;
+        let states = snapshot(&Pattern::Edges, 0, total);
+        assert_eq!(states[0], SlotState::On);
+        assert_eq!(states[total - 1], SlotState::On);
+        assert_eq!(count_on(&states), 2);
+        let states = snapshot(&Pattern::Edges, 1, total);
+        assert_eq!(count_on(&states), 0);
+    }
+
+    #[test]
+    fn edges_total_2_or_less_acts_as_all_together() {
+        for total in 1..=2 {
+            for step in 0..4 {
+                let states = snapshot(&Pattern::Edges, step, total);
+                let n = count_on(&states);
+                assert!(n == 0 || n == total, "total {total} step {step}: {n}");
+            }
+        }
+    }
+
+    // ----- PulseOut / PulseIn ---------------------------------------------
+
+    #[test]
+    fn pulse_out_total_5_single_ring_walks_outward() {
+        // total=5, half=3, cycle=4. Centre slot 2.
+        // step 0: radius 0 → slot 2
+        // step 1: radius 1 → slots 1, 3
+        // step 2: radius 2 → slots 0, 4
+        // step 3: reset
+        let total = 5;
+        let expected: &[&[bool]] = &[
+            &[false, false, true, false, false],
+            &[false, true, false, true, false],
+            &[true, false, false, false, true],
+            &[false, false, false, false, false],
+        ];
+        for (step, want) in expected.iter().enumerate() {
+            let states = snapshot(&Pattern::PulseOut, step as u64, total);
+            for (slot, &on_want) in want.iter().enumerate() {
+                let actual = matches!(states[slot], SlotState::On);
+                assert_eq!(actual, on_want, "step {step} slot {slot}");
+            }
+        }
+    }
+
+    #[test]
+    fn pulse_in_walks_edges_to_centre() {
+        let total = 5;
+        let expected: &[&[bool]] = &[
+            &[true, false, false, false, true],
+            &[false, true, false, true, false],
+            &[false, false, true, false, false],
+            &[false, false, false, false, false],
+        ];
+        for (step, want) in expected.iter().enumerate() {
+            let states = snapshot(&Pattern::PulseIn, step as u64, total);
+            for (slot, &on_want) in want.iter().enumerate() {
+                let actual = matches!(states[slot], SlotState::On);
+                assert_eq!(actual, on_want, "step {step} slot {slot}");
+            }
+        }
+    }
+
+    #[test]
+    fn pulse_out_even_total_lights_centre_pair() {
+        // total=4 → centre at 1.5. Step 0 should light slots 1 and 2.
+        let states = snapshot(&Pattern::PulseOut, 0, 4);
+        assert_eq!(states[0], SlotState::Off);
+        assert_eq!(states[1], SlotState::On);
+        assert_eq!(states[2], SlotState::On);
+        assert_eq!(states[3], SlotState::Off);
+    }
+
+    // ----- Accordion ------------------------------------------------------
+
+    #[test]
+    fn accordion_breathes_without_reset_frame() {
+        // total=5, half=3, cycle = 5. Sequence: centre / r1 / r2 / r1 / centre.
+        let total = 5;
+        let expected: &[&[bool]] = &[
+            &[false, false, true, false, false],
+            &[false, true, false, true, false],
+            &[true, false, false, false, true],
+            &[false, true, false, true, false],
+            &[false, false, true, false, false],
+            &[false, false, true, false, false], // cycle wraps cleanly
+        ];
+        for (step, want) in expected.iter().enumerate() {
+            let states = snapshot(&Pattern::Accordion, step as u64, total);
+            for (slot, &on_want) in want.iter().enumerate() {
+                let actual = matches!(states[slot], SlotState::On);
+                assert_eq!(actual, on_want, "step {step} slot {slot}");
+            }
+        }
+    }
+
+    // ----- Bowtie ---------------------------------------------------------
+
+    #[test]
+    fn bowtie_grows_from_both_edges() {
+        // total=5, half=3, cycle=4.
+        // step 0: only edges (slots 0, 4)
+        // step 1: edges + their neighbours (0, 1, 3, 4)
+        // step 2: everything (centre included)
+        // step 3: reset
+        let total = 5;
+        let expected: &[&[bool]] = &[
+            &[true, false, false, false, true],
+            &[true, true, false, true, true],
+            &[true, true, true, true, true],
+            &[false, false, false, false, false],
+        ];
+        for (step, want) in expected.iter().enumerate() {
+            let states = snapshot(&Pattern::Bowtie, step as u64, total);
+            for (slot, &on_want) in want.iter().enumerate() {
+                let actual = matches!(states[slot], SlotState::On);
+                assert_eq!(actual, on_want, "step {step} slot {slot}");
+            }
+        }
+    }
+
+    // ----- DualChase ------------------------------------------------------
+
+    #[test]
+    fn dual_chase_lights_pairs_half_apart() {
+        // total=8, half=4. step 0: slots 0,4; step 1: 1,5; step 2: 2,6;
+        // step 3: 3,7; step 4: cycles back to 0,4 (since (4+4)%8=0).
+        let total = 8;
+        for step in 0..16 {
+            let states = snapshot(&Pattern::DualChase, step, total);
+            assert_eq!(count_on(&states), 2, "step {step}");
+            let head = (step as usize) % total;
+            let mate = (head + total / 2) % total;
+            assert_eq!(states[head], SlotState::On, "step {step}");
+            assert_eq!(states[mate], SlotState::On, "step {step}");
+        }
+    }
+
+    // ----- SymmetricBounce ------------------------------------------------
+
+    #[test]
+    fn symmetric_bounce_pair_pingpongs_through_strip() {
+        // total=6, half=3, cycle=4. Pos sequence: 0,1,2,1,0,1,2,1,…
+        // Pairs: (0,5), (1,4), (2,3), (1,4), (0,5)…
+        let total = 6;
+        let expected_pos: &[usize] = &[0, 1, 2, 1, 0, 1, 2, 1];
+        for (step, &pos) in expected_pos.iter().enumerate() {
+            let states = snapshot(&Pattern::SymmetricBounce, step as u64, total);
+            assert_eq!(states[pos], SlotState::On, "step {step}");
+            assert_eq!(states[total - 1 - pos], SlotState::On, "step {step}");
+            assert_eq!(count_on(&states), 2, "step {step}");
+        }
     }
 
     // ----- Random ---------------------------------------------------------

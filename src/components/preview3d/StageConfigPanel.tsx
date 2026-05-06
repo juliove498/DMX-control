@@ -82,6 +82,15 @@ export function StageConfigPanel({
           value={config.floor.gridColor}
           onChange={(v) => updateFloor({ gridColor: v })}
         />
+        <ColorRow
+          label="Color piso"
+          value={config.floor.color}
+          onChange={(v) => updateFloor({ color: v })}
+        />
+        <p className="hint">
+          Pisos oscuros se tragan el bounce de los pares RGB. Subí a un gris medio para que la
+          luz se vea sobre el piso.
+        </p>
       </section>
 
       <section className="p3d-section">
@@ -95,14 +104,21 @@ export function StageConfigPanel({
           Habilitada
         </label>
         {config.backWall.enabled ? (
-          <NumberRow
-            label="Altura (m)"
-            value={config.backWall.height}
-            step={0.5}
-            min={1}
-            max={20}
-            onChange={(v) => updateBackWall({ height: v })}
-          />
+          <>
+            <NumberRow
+              label="Altura (m)"
+              value={config.backWall.height}
+              step={0.5}
+              min={1}
+              max={20}
+              onChange={(v) => updateBackWall({ height: v })}
+            />
+            <ColorRow
+              label="Color pared"
+              value={config.backWall.color}
+              onChange={(v) => updateBackWall({ color: v })}
+            />
+          </>
         ) : null}
       </section>
 
@@ -227,6 +243,13 @@ export function StageConfigPanel({
               max={2.5}
               onChange={(v) =>
                 onChange({ ...config, audience: { ...config.audience, averageHeight: v } })
+              }
+            />
+            <ColorRow
+              label="Color silueta"
+              value={config.audience.color}
+              onChange={(v) =>
+                onChange({ ...config, audience: { ...config.audience, color: v } })
               }
             />
           </>

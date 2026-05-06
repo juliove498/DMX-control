@@ -74,6 +74,44 @@ pub enum Pattern {
     CenterOut,
     /// Symmetric chase: one slot lit at each end converging to the middle.
     Symmetric,
+    /// Lit area shrinks from the edges to the centre, then resets.
+    /// Mirror of CenterOut. Cycle = ceil(total/2) + 1.
+    OutsideIn,
+    /// "Shadow chase": every slot lit *except* one, which marches
+    /// forward through the strip. Reads as a moving dark spot.
+    InvertedChase,
+    /// Pairs of adjacent slots march together (slots 0+1 → 2+3 → 4+5 → …).
+    GroupsOfTwo,
+    /// Triplets of adjacent slots march together (slots 0+1+2 → 3+4+5 → …).
+    GroupsOfThree,
+    /// Left half on then right half on, swapping each step.
+    HalfSwap,
+    /// Only the first and last slots blink in unison; everything in
+    /// between stays off. Useful as a downbeat accent layer.
+    Edges,
+    /// Single ring expanding from the centre outwards: only the slots
+    /// at the current radius are lit (not cumulative like CenterOut).
+    /// Reads as a sonar ping spreading.
+    PulseOut,
+    /// Mirror of PulseOut — single ring contracting from the edges
+    /// toward the centre. Reads as a "closing in" effect.
+    PulseIn,
+    /// Continuous breathing: pulse rides centre→edges→centre with no
+    /// off-step. Cycle = 2·ceil(total/2) − 1, no reset frame, so the
+    /// motion never stalls. Great for sustained ambient pads.
+    Accordion,
+    /// Cumulative symmetric build from the edges inward — both ends
+    /// fill toward the centre simultaneously, then a reset frame.
+    /// Like a bowtie tying itself.
+    Bowtie,
+    /// Two synchronised heads on opposite halves of the strip,
+    /// marching forward together (slot k and slot k+half). For odd
+    /// totals the offset wraps around.
+    DualChase,
+    /// Symmetric pair traverses edges→centre→edges→centre…, in a
+    /// ping-pong rather than the unidirectional Symmetric. Cycle =
+    /// 2·ceil(total/2) − 2 with a centre crease for even totals.
+    SymmetricBounce,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]

@@ -36,16 +36,39 @@ export interface FixturePlacement {
   /// the band).
   aimYaw: number;
   aimPitch: number;
-  /// Optional override of the beam half-angle range (degrees).
-  /// `null` falls back to kind-based defaults: spots 2-8°, washes
-  /// 25-55°. The zoom DMX channel lerps between min and max as
-  /// 0..1. Operators tune this to match their actual fixture
-  /// (a Sharpy-class beam is 2-3°, a Mac Aura wash is 8-25°).
+  /// Legacy: beam-angle / prism used to be set per-instance, but
+  /// these belong to the fixture type, not the unit on stage. Moved
+  /// to [DefinitionRenderOverrides] keyed by definition id (read
+  /// via `config.definitionOverrides[f.definition_id]`). The fields
+  /// stay on the type so old saved configs still parse — the render
+  /// path stopped reading them.
+  beamAngle?: { minDeg: number; maxDeg: number } | null;
+  prism?: { threshold: number; facets: number; splayDeg: number } | null;
+}
+
+/// Per-fixture-DEFINITION render tunables for the 3D preview. These
+/// describe the physical characteristics of a fixture model (a
+/// Sharpy beam vs. a Mac Aura wash), so they're shared by every
+/// instance of the same definition. Stored per show because the
+/// brightness multiplier depends on the operator's current monitor
+/// (a dim screen wants higher; a bright laptop screen wants lower).
+export interface DefinitionRenderOverrides {
+  /// Multiplier applied to the rendered intensity (beam + spotlight
+  /// + lens halo together). Default 1.0. Useful range is roughly
+  /// 0.2 (very dim) to 1.8 (boost). Per-fixture-TYPE because all
+  /// instances of the same model should glow with the same scale.
+  brightness: number;
+  /// Beam half-angle range in degrees. `null` = kind-based defaults
+  /// (spots 2-8°, washes 25-55°). The zoom DMX channel lerps min↔
+  /// max as 0..1.
   beamAngle: { minDeg: number; maxDeg: number } | null;
-  /// Optional override of the prism behaviour. `null` = defaults
-  /// (threshold 8 / facets 7 / splay 6°). Operators with 3-facet
-  /// linear prisms or wider splay rigs override here.
+  /// Prism behaviour. `null` = defaults (threshold 8 / facets 7 /
+  /// splay 6°).
   prism: { threshold: number; facets: number; splayDeg: number } | null;
+}
+
+export function defaultDefinitionRenderOverrides(): DefinitionRenderOverrides {
+  return { brightness: 1, beamAngle: null, prism: null };
 }
 
 export function defaultFixturePlacement(): FixturePlacement {
@@ -55,8 +78,6 @@ export function defaultFixturePlacement(): FixturePlacement {
     truss: { trussId: null, t: 0.5 },
     aimYaw: 0,
     aimPitch: 0,
-    beamAngle: null,
-    prism: null,
   };
 }
 
@@ -87,14 +108,23 @@ export interface StageConfig {
     /// Grid cell size in meters. 1m is the universal default but
     /// some operators think in 0.5m or feet.
     cellSize: number;
-    /// Hex colour for the grid lines. Floor itself is dark.
+    /// Hex colour for the grid lines.
     gridColor: string;
+    /// Hex colour for the floor surface itself. Default near-black
+    /// reads dramatic but bounces almost nothing — bump it (greys,
+    /// warm browns) to actually see RGB par output land on the
+    /// floor. Bigger albedo = more visible wash.
+    color: string;
   };
   /// Optional back wall (cyc, scrim) — just a flat plane standing
   /// upstage, for fixtures pointing back to render against.
   backWall: {
     enabled: boolean;
     height: number;
+    /// Hex colour for the wall surface. Same bouncing logic as the
+    /// floor: a darker wall eats wash output, a lighter wall reads
+    /// the colour the rig is throwing at it.
+    color: string;
   };
   trusses: TrussSegment[];
   /// Default rig height for fixtures that don't have a per-fixture
@@ -118,6 +148,12 @@ export interface StageConfig {
   /// entries fall back to the 2D-canvas-derived position +
   /// rigHeight + (0,0) aim.
   fixturePlacements: Record<string, FixturePlacement>;
+  /// Per-fixture-DEFINITION render tunables keyed by definition id
+  /// (the library entry, e.g. "chauvet-maverick-mk2"). Brightness +
+  /// beam angle + prism live here because they describe the fixture
+  /// model, not the individual unit on stage. Missing entries fall
+  /// back to the kind-based defaults inside Fixture3D.
+  definitionOverrides: Record<string, DefinitionRenderOverrides>;
   /// Optional crowd silhouettes filling the dance floor. Off by
   /// default (clean floor reads better when first opening the
   /// preview); operator can flip on for the venue feel.
@@ -140,6 +176,12 @@ export interface AudienceConfig {
   /// Approximate height of the average person (metres). Used for
   /// the body capsule + head sphere proportions.
   averageHeight: number;
+  /// Hex colour for the silhouette body + head material. Default
+  /// near-black reads as silhouette against the floor; bumping it
+  /// to a mid grey makes the rig's colour wash actually visible
+  /// on the crowd (which is the main reason the audience exists
+  /// in the preview).
+  color: string;
 }
 
 const STORAGE_PREFIX = "preview3d.config.";
@@ -151,10 +193,12 @@ export function defaultStageConfig(): StageConfig {
       depth: 8,
       cellSize: 1,
       gridColor: "#3a4a5a",
+      color: "#0c1218",
     },
     backWall: {
       enabled: true,
       height: 5,
+      color: "#0a0d12",
     },
     trusses: [
       // Front truss across stage width at FOH height — typical small
@@ -185,11 +229,13 @@ export function defaultStageConfig(): StageConfig {
     ambientLevel: 0.1,
     pixelsPerMeter: 100,
     fixturePlacements: {},
+    definitionOverrides: {},
     audience: {
       enabled: false,
       zone: { x1: -4, z1: -2.5, x2: 4, z2: 2.5 },
       density: 0.3,
       averageHeight: 1.7,
+      color: "#0d1014",
     },
   };
 }
@@ -203,6 +249,13 @@ export function loadStageConfig(showPath: string | null): StageConfig {
     // Shallow merge with defaults so older saved configs gain new
     // fields without crashing the UI.
     const def = defaultStageConfig();
+    // Migrate legacy per-instance beamAngle/prism into the new
+    // per-definition map, best-effort. Old saved configs keep their
+    // tuning even though the UI moved one level up.
+    const migratedDefOverrides: Record<string, DefinitionRenderOverrides> = {
+      ...def.definitionOverrides,
+      ...(parsed.definitionOverrides ?? {}),
+    };
     return {
       ...def,
       ...parsed,
@@ -210,6 +263,7 @@ export function loadStageConfig(showPath: string | null): StageConfig {
       backWall: { ...def.backWall, ...(parsed.backWall ?? {}) },
       trusses: parsed.trusses ?? def.trusses,
       fixturePlacements: parsed.fixturePlacements ?? def.fixturePlacements,
+      definitionOverrides: migratedDefOverrides,
       audience: { ...def.audience, ...(parsed.audience ?? {}) },
     };
   } catch {

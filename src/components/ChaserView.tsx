@@ -63,7 +63,19 @@ const PATTERNS: Array<{ value: Pattern["type"]; labelKey: keyof Translation }> =
   { value: "build", labelKey: "chaser.patternLabel.build" },
   { value: "build_reverse", labelKey: "chaser.patternLabel.buildReverse" },
   { value: "center_out", labelKey: "chaser.patternLabel.centerOut" },
+  { value: "outside_in", labelKey: "chaser.patternLabel.outsideIn" },
+  { value: "pulse_out", labelKey: "chaser.patternLabel.pulseOut" },
+  { value: "pulse_in", labelKey: "chaser.patternLabel.pulseIn" },
+  { value: "accordion", labelKey: "chaser.patternLabel.accordion" },
+  { value: "bowtie", labelKey: "chaser.patternLabel.bowtie" },
   { value: "symmetric", labelKey: "chaser.patternLabel.symmetric" },
+  { value: "symmetric_bounce", labelKey: "chaser.patternLabel.symmetricBounce" },
+  { value: "dual_chase", labelKey: "chaser.patternLabel.dualChase" },
+  { value: "inverted_chase", labelKey: "chaser.patternLabel.invertedChase" },
+  { value: "groups_of_two", labelKey: "chaser.patternLabel.groupsOfTwo" },
+  { value: "groups_of_three", labelKey: "chaser.patternLabel.groupsOfThree" },
+  { value: "half_swap", labelKey: "chaser.patternLabel.halfSwap" },
+  { value: "edges", labelKey: "chaser.patternLabel.edges" },
   { value: "random", labelKey: "chaser.patternLabel.random" },
 ];
 
@@ -164,6 +176,86 @@ function evaluatePattern(pattern: Pattern, step: number, slot: number, total: nu
       if (total === 1) return step % 2 === 0;
       const half = Math.ceil(total / 2);
       const pos = step % half;
+      return slot === pos || slot === total - 1 - pos;
+    }
+    case "outside_in": {
+      if (total <= 1) return step % 2 === 0;
+      const half = Math.ceil(total / 2);
+      const cycle = half + 1;
+      const pos = step % cycle;
+      if (pos === half) return false;
+      const centre = (total - 1) / 2;
+      const litRadius = half - 0.5 - pos;
+      return Math.abs(slot - centre) <= litRadius;
+    }
+    case "inverted_chase": {
+      const dark = step % total;
+      return slot !== dark;
+    }
+    case "groups_of_two":
+    case "groups_of_three": {
+      const n = pattern.type === "groups_of_two" ? 2 : 3;
+      const groups = Math.ceil(total / n);
+      const activeGroup = step % groups;
+      return Math.floor(slot / n) === activeGroup;
+    }
+    case "half_swap": {
+      const half = Math.ceil(total / 2);
+      const inLeft = slot < half;
+      const leftOn = step % 2 === 0;
+      return (inLeft && leftOn) || (!inLeft && !leftOn);
+    }
+    case "edges": {
+      if (total <= 2) return step % 2 === 0;
+      const onStep = step % 2 === 0;
+      const isEdge = slot === 0 || slot === total - 1;
+      return isEdge && onStep;
+    }
+    case "pulse_out":
+    case "pulse_in": {
+      if (total <= 1) return step % 2 === 0;
+      const half = Math.ceil(total / 2);
+      const cycle = half + 1;
+      const pos = step % cycle;
+      if (pos === half) return false;
+      const radius = pattern.type === "pulse_in" ? half - 1 - pos : pos;
+      const centre = (total - 1) / 2;
+      const dist = Math.abs(slot - centre);
+      return dist >= radius - 0.5 && dist <= radius + 0.5;
+    }
+    case "accordion": {
+      if (total <= 1) return step % 2 === 0;
+      const half = Math.ceil(total / 2);
+      const cycle = Math.max(1, 2 * half - 1);
+      const posInCycle = step % cycle;
+      const radius = posInCycle < half ? posInCycle : cycle - 1 - posInCycle;
+      const centre = (total - 1) / 2;
+      const dist = Math.abs(slot - centre);
+      return dist >= radius - 0.5 && dist <= radius + 0.5;
+    }
+    case "bowtie": {
+      if (total <= 1) return step % 2 === 0;
+      const half = Math.ceil(total / 2);
+      const cycle = half + 1;
+      const pos = step % cycle;
+      if (pos === half) return false;
+      const distToEdge = Math.min(slot, total - 1 - slot);
+      return distToEdge <= pos;
+    }
+    case "dual_chase": {
+      if (total <= 1) return step % 2 === 0;
+      const half = Math.floor(total / 2);
+      const headA = step % total;
+      const headB = (headA + half) % total;
+      return slot === headA || slot === headB;
+    }
+    case "symmetric_bounce": {
+      if (total <= 1) return step % 2 === 0;
+      const half = Math.ceil(total / 2);
+      if (half <= 1) return slot === step % 2;
+      const cycle = 2 * half - 2;
+      const posInCycle = step % cycle;
+      const pos = posInCycle < half ? posInCycle : cycle - posInCycle;
       return slot === pos || slot === total - 1 - pos;
     }
   }
@@ -712,19 +804,21 @@ function ChaserCard({
             <div className="chaser-tab-body">
               <div className="chaser-section">
                 <h5>{t("chaser.section.pattern")}</h5>
-                <div className="chaser-pattern-list">
+                {/* The pattern list grew past a comfortable radio
+                    grid (18 entries), so we use a <select>. The
+                    options stay sorted in PATTERNS to keep related
+                    looks adjacent (chase / chase_reverse, build /
+                    build_reverse, center_out / outside_in). */}
+                <select
+                  value={chaser.pattern.type}
+                  onChange={(e) => setPattern(e.currentTarget.value as Pattern["type"])}
+                >
                   {PATTERNS.map((p) => (
-                    <label key={p.value}>
-                      <input
-                        type="radio"
-                        name={`pattern-${chaser.id}`}
-                        checked={chaser.pattern.type === p.value}
-                        onChange={() => setPattern(p.value)}
-                      />
+                    <option key={p.value} value={p.value}>
                       {t(p.labelKey)}
-                    </label>
+                    </option>
                   ))}
-                </div>
+                </select>
               </div>
               <div className="chaser-section">
                 <h5>{t("chaser.section.colorMode")}</h5>

@@ -3,15 +3,23 @@ import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import type { FixtureKind, FixtureLightState } from "./useFixtureLightStates";
 
-/// Per-fixture overrides delivered from the StageConfigPanel. Each
-/// is `null` when the operator hasn't set one, in which case the
-/// renderer falls back to the kind-based defaults.
+/// Per-fixture-definition render overrides delivered from the
+/// StageConfigPanel. `beamAngle`/`prism` are `null` when the operator
+/// hasn't tuned the model, in which case the renderer falls back to
+/// kind-based defaults. `brightness` is always present (default 1.0)
+/// and multiplies the rendered intensity — operators dial down on
+/// bright laptop screens, up on dim monitors.
 export interface FixtureRenderOverrides {
+  brightness: number;
   beamAngle: { minDeg: number; maxDeg: number } | null;
   prism: { threshold: number; facets: number; splayDeg: number } | null;
 }
 
-const DEFAULT_OVERRIDES: FixtureRenderOverrides = { beamAngle: null, prism: null };
+const DEFAULT_OVERRIDES: FixtureRenderOverrides = {
+  brightness: 1,
+  beamAngle: null,
+  prism: null,
+};
 
 /// Module-level cache of loaded gobo textures, keyed by URL. Many
 /// fixtures of the same model share the same gobo wheel, so caching
@@ -543,7 +551,11 @@ export function Fixture3D({
       s.strobe > 0.02
         ? 0.5 + 0.5 * Math.sin(performance.now() * 0.001 * (4 + s.strobe * 50))
         : 1;
-    const lit = s.intensity * strobeFactor;
+    // Per-fixture-definition brightness multiplier. Folded into `lit`
+    // so beam haze, spotlight, and lens halo all scale together —
+    // dialing this down dims the whole representation uniformly.
+    const brightnessMul = Math.max(0, overrides.brightness ?? 1);
+    const lit = s.intensity * strobeFactor * brightnessMul;
 
     // Beam shader uniforms — one main cone + optional prism cones,
     // both sharing the per-fixture color / opacity / gobo state.

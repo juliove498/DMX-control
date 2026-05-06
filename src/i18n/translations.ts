@@ -446,6 +446,18 @@ export type Translation = {
   "chaser.patternLabel.centerOut": string;
   "chaser.patternLabel.symmetric": string;
   "chaser.patternLabel.random": string;
+  "chaser.patternLabel.outsideIn": string;
+  "chaser.patternLabel.invertedChase": string;
+  "chaser.patternLabel.groupsOfTwo": string;
+  "chaser.patternLabel.groupsOfThree": string;
+  "chaser.patternLabel.halfSwap": string;
+  "chaser.patternLabel.edges": string;
+  "chaser.patternLabel.pulseOut": string;
+  "chaser.patternLabel.pulseIn": string;
+  "chaser.patternLabel.accordion": string;
+  "chaser.patternLabel.bowtie": string;
+  "chaser.patternLabel.dualChase": string;
+  "chaser.patternLabel.symmetricBounce": string;
   "chaser.cadenceLabel.everyStep": string;
   "chaser.cadenceLabel.everyN": string;
   "chaser.cadenceLabel.perSlot": string;
@@ -660,6 +672,26 @@ export type Translation = {
   "aiGen.replacing": string;
   "aiGen.applyNew": string;
   "aiGen.applying": string;
+
+  // ---- Preview 3D fixtures panel ---------------------------------------
+  "p3d.types.title": string;
+  "p3d.types.intro": string;
+  "p3d.types.metaPrefix": string;
+  "p3d.types.brightness": string;
+  "p3d.types.brightnessHint": string;
+  "p3d.types.beamOverride": string;
+  "p3d.types.beamMin": string;
+  "p3d.types.beamMax": string;
+  "p3d.types.beamMinHint": string;
+  "p3d.types.beamMaxHint": string;
+  "p3d.types.prismOverride": string;
+  "p3d.types.prismThreshold": string;
+  "p3d.types.prismFacets": string;
+  "p3d.types.prismSplay": string;
+  "p3d.types.prismThresholdHint": string;
+  "p3d.types.prismFacetsHint": string;
+  "p3d.types.prismSplayHint": string;
+  "p3d.types.reset": string;
 };
 
 export const en: Translation = {
@@ -1110,6 +1142,18 @@ export const en: Translation = {
   "chaser.patternLabel.centerOut": "Center out",
   "chaser.patternLabel.symmetric": "Symmetric",
   "chaser.patternLabel.random": "Random",
+  "chaser.patternLabel.outsideIn": "Outside in",
+  "chaser.patternLabel.invertedChase": "Inverted chase (shadow)",
+  "chaser.patternLabel.groupsOfTwo": "Groups of two",
+  "chaser.patternLabel.groupsOfThree": "Groups of three",
+  "chaser.patternLabel.halfSwap": "Half swap",
+  "chaser.patternLabel.edges": "Edges only",
+  "chaser.patternLabel.pulseOut": "Pulse outward (sonar)",
+  "chaser.patternLabel.pulseIn": "Pulse inward",
+  "chaser.patternLabel.accordion": "Accordion (breathing)",
+  "chaser.patternLabel.bowtie": "Bowtie (build from edges)",
+  "chaser.patternLabel.dualChase": "Dual chase (paired heads)",
+  "chaser.patternLabel.symmetricBounce": "Symmetric bounce",
   "chaser.cadenceLabel.everyStep": "Every step (A B A B…)",
   "chaser.cadenceLabel.everyN": "Every N steps (AAAA BBBB)",
   "chaser.cadenceLabel.perSlot": "Per slot (half A, half B)",
@@ -1330,6 +1374,27 @@ export const en: Translation = {
   "aiGen.replacing": "Replacing…",
   "aiGen.applyNew": "Apply as new scene",
   "aiGen.applying": "Applying…",
+
+  "p3d.types.title": "Per fixture type ({count})",
+  "p3d.types.intro":
+    "Brightness, beam angle and prism are configured per fixture model — every instance of the same type shares these values.",
+  "p3d.types.metaPrefix": "{count}× · brightness {brightness}",
+  "p3d.types.brightness": "Brightness",
+  "p3d.types.brightnessHint":
+    "Multiplies the rendered intensity (beam + spotlight + halo). Default 1.0.",
+  "p3d.types.beamOverride": "Beam angle override",
+  "p3d.types.beamMin": "Min °",
+  "p3d.types.beamMax": "Max °",
+  "p3d.types.beamMinHint": "Half-angle of the beam at closed zoom",
+  "p3d.types.beamMaxHint": "Half-angle of the beam at open zoom",
+  "p3d.types.prismOverride": "Prism override",
+  "p3d.types.prismThreshold": "Threshold",
+  "p3d.types.prismFacets": "Facets",
+  "p3d.types.prismSplay": "Splay °",
+  "p3d.types.prismThresholdHint": "DMX value above which the prism activates",
+  "p3d.types.prismFacetsHint": "Total number of beams (including the central one)",
+  "p3d.types.prismSplayHint": "Angular spacing between beams",
+  "p3d.types.reset": "Remove overrides (back to defaults)",
 };
 
 export const es: Translation = {
@@ -1782,6 +1847,18 @@ export const es: Translation = {
   "chaser.patternLabel.centerOut": "Centro hacia afuera",
   "chaser.patternLabel.symmetric": "Simétrico",
   "chaser.patternLabel.random": "Random",
+  "chaser.patternLabel.outsideIn": "Hacia adentro",
+  "chaser.patternLabel.invertedChase": "Chase invertido (sombra)",
+  "chaser.patternLabel.groupsOfTwo": "Grupos de dos",
+  "chaser.patternLabel.groupsOfThree": "Grupos de tres",
+  "chaser.patternLabel.halfSwap": "Intercambio de mitades",
+  "chaser.patternLabel.edges": "Sólo bordes",
+  "chaser.patternLabel.pulseOut": "Pulso hacia afuera (sonar)",
+  "chaser.patternLabel.pulseIn": "Pulso hacia adentro",
+  "chaser.patternLabel.accordion": "Acordeón (respiración)",
+  "chaser.patternLabel.bowtie": "Moño (build desde bordes)",
+  "chaser.patternLabel.dualChase": "Chase doble (heads paralelos)",
+  "chaser.patternLabel.symmetricBounce": "Vaivén simétrico",
   "chaser.cadenceLabel.everyStep": "Cada step (A B A B…)",
   "chaser.cadenceLabel.everyN": "Cada N steps (AAAA BBBB)",
   "chaser.cadenceLabel.perSlot": "Por slot (mitad A, mitad B)",
@@ -2003,6 +2080,27 @@ export const es: Translation = {
   "aiGen.replacing": "Reemplazando…",
   "aiGen.applyNew": "Aplicar como escena nueva",
   "aiGen.applying": "Aplicando…",
+
+  "p3d.types.title": "Por tipo de fixture ({count})",
+  "p3d.types.intro":
+    "Brillo, ángulo de haz y prisma se configuran por modelo de fixture — todas las instancias del mismo tipo comparten estos valores.",
+  "p3d.types.metaPrefix": "{count}× · brillo {brightness}",
+  "p3d.types.brightness": "Brillo",
+  "p3d.types.brightnessHint":
+    "Multiplica la intensidad renderizada (haz + spotlight + halo). Default 1.0.",
+  "p3d.types.beamOverride": "Override de ángulo de haz",
+  "p3d.types.beamMin": "Mín °",
+  "p3d.types.beamMax": "Máx °",
+  "p3d.types.beamMinHint": "Half-angle del beam con zoom cerrado",
+  "p3d.types.beamMaxHint": "Half-angle del beam con zoom abierto",
+  "p3d.types.prismOverride": "Override de prisma",
+  "p3d.types.prismThreshold": "Threshold",
+  "p3d.types.prismFacets": "Facetas",
+  "p3d.types.prismSplay": "Splay °",
+  "p3d.types.prismThresholdHint": "DMX value a partir del cual el prisma se activa",
+  "p3d.types.prismFacetsHint": "Cantidad total de haces (incluyendo el central)",
+  "p3d.types.prismSplayHint": "Apertura entre haces",
+  "p3d.types.reset": "Quitar overrides (volver a defaults)",
 };
 
 export type LanguageCode = "en" | "es";

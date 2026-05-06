@@ -149,6 +149,11 @@ export function Preview3D() {
         const z = (py - 300) / config.pixelsPerMeter;
         position = [x, config.rigHeight, z];
       }
+      // Render tunables (brightness / beam angle / prism) are
+      // per-fixture-DEFINITION, not per instance. Pull from the
+      // definition-keyed map; missing entries get the safe defaults
+      // (brightness 1, beamAngle/prism null = kind-based defaults).
+      const defOverride = config.definitionOverrides[f.definition_id];
       return {
         id: f.id,
         position,
@@ -164,8 +169,9 @@ export function Preview3D() {
         hasGobo: fixtureHasGoboWheel(f, library),
         isSpot: fixtureIsSpotKind(f, library),
         overrides: {
-          beamAngle: override?.beamAngle ?? null,
-          prism: override?.prism ?? null,
+          brightness: defOverride?.brightness ?? 1,
+          beamAngle: defOverride?.beamAngle ?? null,
+          prism: defOverride?.prism ?? null,
         },
       };
     });
@@ -176,6 +182,7 @@ export function Preview3D() {
     config.rigHeight,
     config.trusses,
     config.fixturePlacements,
+    config.definitionOverrides,
   ]);
 
   return (

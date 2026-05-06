@@ -35,6 +35,8 @@ pub const ALLOWED_METHODS: &[&str] = &[
     "set_master",
     "set_blackout",
     "set_blind",
+    "set_chaser_enabled",
+    "set_chaser_master",
     "get_show",
     "programmer_status",
     "get_engine_stats",
@@ -193,6 +195,46 @@ pub fn dispatch(ctx: &Arc<RpcContext>, req: RpcRequest) -> RpcResponse {
             ctx.globals.lock().set_blind(pressed);
             let _ = tauri::Emitter::emit(&ctx.app, BLIND_EVENT, BlindChange { pressed });
             RpcResponse::ok(req.id, json!(true))
+        }
+        "set_chaser_enabled" => {
+            let id = match req.params.get("id").and_then(Value::as_str) {
+                Some(s) => s.to_string(),
+                None => return RpcResponse::err(req.id, -32602, "missing param 'id'"),
+            };
+            let enabled = match req.params.get("enabled").and_then(Value::as_bool) {
+                Some(b) => b,
+                None => return RpcResponse::err(req.id, -32602, "param 'enabled' must be bool"),
+            };
+            match crate::commands::toggle_chaser_impl(
+                &ctx.app,
+                &ctx.show,
+                &ctx.chasers,
+                &id,
+                enabled,
+            ) {
+                Ok(()) => RpcResponse::ok(req.id, json!(true)),
+                Err(e) => RpcResponse::err(req.id, -32000, e.to_string()),
+            }
+        }
+        "set_chaser_master" => {
+            let id = match req.params.get("id").and_then(Value::as_str) {
+                Some(s) => s.to_string(),
+                None => return RpcResponse::err(req.id, -32602, "missing param 'id'"),
+            };
+            let value = match req.params.get("value").and_then(Value::as_f64) {
+                Some(v) => v as f32,
+                None => return RpcResponse::err(req.id, -32602, "param 'value' must be a number"),
+            };
+            match crate::commands::set_chaser_master_impl(
+                &ctx.app,
+                &ctx.show,
+                &ctx.chasers,
+                &id,
+                value,
+            ) {
+                Ok(()) => RpcResponse::ok(req.id, json!(true)),
+                Err(e) => RpcResponse::err(req.id, -32000, e.to_string()),
+            }
         }
         "get_show" => {
             let show = ctx.show.read().show.clone();

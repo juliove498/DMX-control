@@ -133,4 +133,35 @@ pub struct GlobalsConfig {
     pub blackout: BlackoutConfig,
     #[serde(default)]
     pub blind: BlindConfig,
+    /// Which fixture channels the master fader scales. Default behaviour
+    /// (`MasterConfig::default()` with `fixtures` empty) is "auto":
+    /// scale only the intensity-or-RGB channel of every patched fixture,
+    /// leaving pan/tilt/zoom/colour-wheel/etc. untouched. The per-
+    /// fixture override lets the operator extend or narrow that set.
+    #[serde(default)]
+    pub master: MasterConfig,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct MasterConfig {
+    /// Fixtures with custom master scaling. Empty = "auto mode" applies
+    /// to every patched fixture. Auto mode means: scale intensity (or
+    /// RGB if there's no intensity channel). Strobe is intentionally
+    /// *not* included in auto — operators expect the master to dim the
+    /// look, not slow strobes.
+    #[serde(default)]
+    pub fixtures: Vec<MasterFixture>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct MasterFixture {
+    pub fixture_id: String,
+    /// Role labels the master should scale on this fixture. Empty list
+    /// = "use the auto channel set for THIS fixture" (intensity-or-RGB).
+    /// Operators tick e.g. `["intensity", "white"]` to also dim the
+    /// extra LED chips on an RGBWAP par.
+    #[serde(default)]
+    pub channels_to_scale: Vec<String>,
 }

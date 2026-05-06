@@ -1287,6 +1287,37 @@ pub fn toggle_chaser_impl(
     Ok(())
 }
 
+/// Set just the `master` multiplier on a chaser without touching the rest
+/// of its config. Surfaces that only need a "level" knob (the mobile
+/// remote, the Launchpad's CC pots) call this instead of `update_chaser`
+/// so they can't accidentally clobber the slot list / pattern / tempo.
+/// Clamped to 0.0..=1.0 to keep the engine's `intensity * master`
+/// multiplication well-defined.
+pub fn set_chaser_master_impl(
+    app: &AppHandle,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    id: &str,
+    value: f32,
+) -> Result<(), CommandError> {
+    let value = value.clamp(0.0, 1.0);
+    {
+        let mut s = show.write();
+        let entry = s
+            .show
+            .chasers
+            .iter_mut()
+            .find(|c| c.id == id)
+            .ok_or_else(|| CommandError::Other(format!("chaser {id} not found")))?;
+        entry.master = value;
+        s.dirty = true;
+    }
+    sync_chasers(show, chasers);
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
 // ---- Globals (Blackout + Blind) -----------------------------------------
 
 /// Push the show's fixture/library context plus the persisted globals

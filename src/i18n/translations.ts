@@ -253,8 +253,15 @@ export type Translation = {
   // ---- Buttons (blackout & blind) --------------------------------------
   "buttons.title": string;
   "buttons.subhead": string;
+  "buttons.section.master": string;
   "buttons.section.blackout": string;
   "buttons.section.blind": string;
+  "buttons.masterIntro": string;
+  "buttons.assignedMaster": string;
+  "buttons.assignedMasterAuto": string;
+  "buttons.emptyMaster": string;
+  "buttons.masterHintAuto": string;
+  "buttons.masterHintCustom": string;
   "buttons.blackoutIntro": string;
   "buttons.blindIntro": string;
   "buttons.fadeIn": string;
@@ -737,8 +744,9 @@ export const en: Translation = {
   "config.tabs.outputsHint": "DMX universes and drivers",
   "config.tabs.patch": "Patch",
   "config.tabs.patchHint": "Assign fixtures to DMX addresses",
-  "config.tabs.blackoutBlind": "Blackout & Blind",
-  "config.tabs.blackoutBlindHint": "Fades and fixtures affected by the global buttons",
+  "config.tabs.blackoutBlind": "Globals",
+  "config.tabs.blackoutBlindHint":
+    "Master scaling, blackout fades, blind halogen — per-fixture channel sets",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Control surface (Launchpad, etc.)",
   "config.tabs.ai": "AI",
@@ -944,8 +952,17 @@ export const en: Translation = {
 
   "buttons.title": "Global buttons",
   "buttons.subhead": "Fades in milliseconds · independent in/out",
+  "buttons.section.master": "Master",
   "buttons.section.blackout": "Blackout",
   "buttons.section.blind": "Blind (halogen)",
+  "buttons.masterIntro":
+    "Channels the master fader scales. With no fixtures assigned = auto: every patched fixture gets its intensity (or RGB if no dimmer) scaled by the master, and pan/tilt/colour-wheel/etc. pass through untouched. Assign fixtures below to override the channel set per fixture (e.g. include W/A on RGBWAP pars).",
+  "buttons.assignedMaster": "Fixtures assigned to Master ({count})",
+  "buttons.assignedMasterAuto": "Fixtures assigned to Master (auto · {count})",
+  "buttons.emptyMaster": "Patch fixtures first to assign them to master.",
+  "buttons.masterHintAuto":
+    "Auto: intensity (or R/G/B if no dimmer) is scaled. Other channels untouched.",
+  "buttons.masterHintCustom": "Only these channels are scaled by the master fader.",
   "buttons.blackoutIntro":
     "Cross-fades to off the channels you pick on each fixture. With no fixtures assigned = auto mode: every patched fixture kills intensity (or RGB if no dimmer) + strobe; pan/tilt/zoom stay put so heads don't slam to the floor. To target something specific (kill only intensity, or also a custom macro channel) add the fixtures below and tick the channels that should go to 0.",
   "buttons.blindIntro":
@@ -1450,8 +1467,9 @@ export const es: Translation = {
   "config.tabs.outputsHint": "Universos y drivers DMX",
   "config.tabs.patch": "Patch",
   "config.tabs.patchHint": "Asignar fixtures a direcciones DMX",
-  "config.tabs.blackoutBlind": "Blackout & Blind",
-  "config.tabs.blackoutBlindHint": "Fades y fixtures afectados por los botones globales",
+  "config.tabs.blackoutBlind": "Globales",
+  "config.tabs.blackoutBlindHint":
+    "Master, blackout y blind — canales afectados por cada uno por fixture",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Superficie de control (Launchpad, etc.)",
   "config.tabs.ai": "IA",
@@ -1658,8 +1676,17 @@ export const es: Translation = {
 
   "buttons.title": "Botones omnipresentes",
   "buttons.subhead": "Fades en milisegundos · in/out independientes",
+  "buttons.section.master": "Master",
   "buttons.section.blackout": "Blackout",
   "buttons.section.blind": "Blind (halógeno)",
+  "buttons.masterIntro":
+    "Canales que el master fader escala. Sin fixtures asignados = automático: cada fixture patcheado escala su intensidad (o RGB si no tiene dimmer); pan/tilt/colour-wheel/etc. quedan intactos. Asigná fixtures abajo si querés override del set de canales por fixture (ej. incluir W/A en pares RGBWAP).",
+  "buttons.assignedMaster": "Fixtures asignados al Master ({count})",
+  "buttons.assignedMasterAuto": "Fixtures asignados al Master (auto · {count})",
+  "buttons.emptyMaster": "Patcheá fixtures primero para poder asignarlos al master.",
+  "buttons.masterHintAuto":
+    "Auto: se escala intensidad (o R/G/B si no hay dimmer). Otros canales no se tocan.",
+  "buttons.masterHintCustom": "Sólo estos canales son escalados por el master fader.",
   "buttons.blackoutIntro":
     "Apaga (con cross-fade) los canales que elijas de cada fixture. Sin fixtures asignados = modo automático: todos los fixtures patcheados apagan intensidad (o RGB si no tienen dimmer) + strobe; pan/tilt/zoom no se tocan para que los cabezales no salten al piso. Si querés algo específico (matar solo intensity, o también un canal de macro custom), agregá los fixtures abajo y tildá los canales que tienen que ir a 0.",
   "buttons.blindIntro":

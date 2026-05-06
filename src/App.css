@@ -125,32 +125,51 @@ code,
 }
 
 .tab-group {
+  position: relative;
   display: inline-flex;
   align-items: center;
   border-radius: 4px;
 }
-.tab-group.active {
-  background: #2c2c2c;
-}
-.tab-group .tab {
-  padding-right: 4px;
-}
+/* No `.tab-group.active` background: the active highlight lives on
+ * the .tab itself (dark fill + accent underline). Painting the
+ * wrapper would extend the dark block into the popout-button's
+ * reserved space, leaving a trailing dark stripe to the right of
+ * the tab text — visible as an "empty cushion" next to the active
+ * tab even though nothing is rendered there. */
+/* Popout button floats absolute on the right edge of its tab.
+ * Removed from layout flow so it doesn't reserve "empty cushion"
+ * space when invisible — without that change, every tab carried a
+ * permanent ~14 px margin on its right side, making the active
+ * highlight look off-centred and the inter-tab spacing wider than
+ * it needed to be. */
 .tab-popout-btn {
+  position: absolute;
+  z-index: 99;
+  right: -6px;
+  top: 10%;
+  transform: translateY(-50%);
   background: transparent;
   border: none;
   color: #6c6c6c;
-  font-size: 12px;
+  font-size: 8px;
   line-height: 1;
-  padding: 4px 6px;
-  margin-right: 2px;
-  border-radius: 3px;
+  padding: 0;
+  border-radius: 2px;
+  width: 10px;
+  height: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   opacity: 0;
+  pointer-events: none;
   transition: opacity 0.1s ease, color 0.1s ease, background 0.1s ease;
+  padding: 7px !important;
 }
 .tab-group:hover .tab-popout-btn,
 .tab-popout-btn:focus-visible {
   opacity: 1;
+  pointer-events: auto;
 }
 .tab-popout-btn:hover {
   color: #f5d896;
@@ -1473,6 +1492,45 @@ label {
   height: 0;
   margin: 0;
   padding: 0;
+}
+
+/* Each fixture is wrapped in a <details>/<summary> so the heavy
+ * channel-chip grid only renders + scrolls into view when the
+ * operator opens it. Without these overrides the browser's default
+ * disclosure triangle would crowd the assignment checkbox and the
+ * summary's box-model would inherit `display: list-item`, breaking
+ * our flex layout. */
+.blind-fixture-list details {
+  margin: 0;
+}
+.blind-fixture-list details > summary {
+  /* Drop the native disclosure triangle. The whole row is the
+   * affordance; clicking anywhere except the assignment checkbox
+   * toggles the open/closed state. */
+  list-style: none;
+}
+.blind-fixture-list details > summary::-webkit-details-marker {
+  display: none;
+}
+.blind-fixture-list details > summary::marker {
+  content: "";
+}
+/* Compact "auto" / "Nch" status chip in the summary — visible at a
+ * glance so operators can tell at-a-list-scan which fixtures have
+ * custom channel sets without expanding each one. */
+.blind-fixture-badge {
+  background: #2a2a2a;
+  color: #b6b6b6;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.blind-fixture-list li.assigned .blind-fixture-badge {
+  background: #3a3526;
+  color: #f5d896;
 }
 
 /* === MIDI Config === */

@@ -10,10 +10,10 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
-use crate::engine::{empty_overlay, ChannelOverlay, DMX_CHANNELS};
+use crate::engine::{empty_mask, empty_overlay, ChannelMask, ChannelOverlay, DMX_CHANNELS};
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance};
 
-use super::{BlackoutConfig, BlindConfig, GlobalsConfig};
+use super::{BlackoutConfig, BlindConfig, GlobalsConfig, MasterConfig};
 
 /// Halogen "cold" tip — what blinders look like just as they wake.
 const HALOGEN_AMBER: (f32, f32, f32) = (255.0, 80.0, 0.0);
@@ -118,7 +118,17 @@ impl GlobalsRuntime {
         } else {
             build_blackout_overlay(&self.config.blackout, &self.fixtures, &self.library)
         };
-        GlobalsTickOutput { blind, blackout }
+        // Master mask is rebuilt unconditionally — even when the master
+        // fader is at 255 (engine skips the multiply anyway), we want
+        // the mask to be ready the moment the user starts pulling so
+        // the first frame off-full already respects the channel
+        // restrictions.
+        let master = build_master_mask(&self.config.master, &self.fixtures, &self.library);
+        GlobalsTickOutput {
+            blind,
+            blackout,
+            master,
+        }
     }
 }
 
@@ -129,6 +139,10 @@ impl GlobalsRuntime {
 pub struct GlobalsTickOutput {
     pub blind: HashMap<u16, ChannelOverlay>,
     pub blackout: HashMap<u16, ChannelOverlay>,
+    /// Bitmask of channels the master fader is allowed to scale, per
+    /// universe. Built every tick from `MasterConfig` + the patched
+    /// fixtures. The engine reads this in `snapshot_universe`.
+    pub master: HashMap<u16, ChannelMask>,
 }
 
 /// Advance `current` toward `target` by `delta_ms`. Picks `fade_in_ms`
@@ -268,6 +282,113 @@ fn build_blackout_overlay(
         }
     }
     overlay
+}
+
+/// Build the per-universe master scaling mask. Channels marked `true`
+/// will be multiplied by `master / 255` in the engine snapshot;
+/// unmasked channels pass the master stage untouched (pan/tilt
+/// continue parking, colour-wheel positions hold, etc).
+///
+/// Mode resolution mirrors blackout:
+/// - `cfg.fixtures` empty → AUTO across every patched fixture: the
+///   intensity channel, or the R/G/B channels if no dedicated
+///   intensity exists. Same channel set the operator already gets
+///   under "auto blackout"; consistency between the two globals
+///   means they don't have to relearn the rules per button.
+/// - `cfg.fixtures` non-empty → user mode: only the listed fixtures.
+///   Each fixture's `channels_to_scale` empty falls back to the auto
+///   set for THAT fixture; non-empty drives the named roles.
+fn build_master_mask(
+    cfg: &MasterConfig,
+    fixtures: &[FixtureInstance],
+    library: &HashMap<String, FixtureDefinition>,
+) -> HashMap<u16, ChannelMask> {
+    let mut mask: HashMap<u16, ChannelMask> = HashMap::new();
+    if cfg.fixtures.is_empty() {
+        for fixture in fixtures {
+            let Some(def) = library.get(&fixture.definition_id) else {
+                continue;
+            };
+            let Some(mode) = def.modes.get(fixture.mode_index as usize) else {
+                continue;
+            };
+            let base = (fixture.address as usize).saturating_sub(1);
+            mask_master_auto(&mut mask, fixture, mode, base);
+        }
+    } else {
+        for entry in &cfg.fixtures {
+            let Some(fixture) = fixtures.iter().find(|f| f.id == entry.fixture_id) else {
+                continue;
+            };
+            let Some(def) = library.get(&fixture.definition_id) else {
+                continue;
+            };
+            let Some(mode) = def.modes.get(fixture.mode_index as usize) else {
+                continue;
+            };
+            let base = (fixture.address as usize).saturating_sub(1);
+            if entry.channels_to_scale.is_empty() {
+                mask_master_auto(&mut mask, fixture, mode, base);
+            } else {
+                mask_master_listed(&mut mask, fixture, mode, base, &entry.channels_to_scale);
+            }
+        }
+    }
+    // The engine's `master_mask.get(universe)` returns `None` to mean
+    // "no mask configured at all → fall back to global scaling".
+    // Universes that have at least one fixture must always have an
+    // entry in the map even if no channels ended up flagged, so the
+    // engine does NOT regress to the global-master fallback when the
+    // operator deliberately removes every channel from a fixture.
+    // Insert empty masks for every universe represented in the patch.
+    for fixture in fixtures {
+        mask.entry(fixture.universe).or_insert_with(empty_mask);
+    }
+    mask
+}
+
+fn mask_master_auto(
+    mask: &mut HashMap<u16, ChannelMask>,
+    fixture: &FixtureInstance,
+    mode: &crate::show::fixture::FixtureMode,
+    base: usize,
+) {
+    let intensity_off = role_offset(
+        mode.channels.iter().map(|c| &c.role),
+        &ChannelRole::Intensity,
+    );
+    if let Some(off) = intensity_off {
+        set_mask(mask, fixture.universe, base + off);
+    } else {
+        for role in [ChannelRole::Red, ChannelRole::Green, ChannelRole::Blue] {
+            if let Some(off) = role_offset(mode.channels.iter().map(|c| &c.role), &role) {
+                set_mask(mask, fixture.universe, base + off);
+            }
+        }
+    }
+}
+
+fn mask_master_listed(
+    mask: &mut HashMap<u16, ChannelMask>,
+    fixture: &FixtureInstance,
+    mode: &crate::show::fixture::FixtureMode,
+    base: usize,
+    channels: &[String],
+) {
+    for role_name in channels {
+        for (i, ch) in mode.channels.iter().enumerate() {
+            if ch.role.label() == role_name.as_str() {
+                set_mask(mask, fixture.universe, base + i);
+            }
+        }
+    }
+}
+
+fn set_mask(mask: &mut HashMap<u16, ChannelMask>, universe: u16, channel: usize) {
+    if channel >= DMX_CHANNELS {
+        return;
+    }
+    mask.entry(universe).or_insert_with(empty_mask)[channel] = true;
 }
 
 /// Auto blackout for one fixture: kill intensity (or R/G/B if there's

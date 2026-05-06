@@ -44,6 +44,17 @@ pub fn empty_overlay() -> ChannelOverlay {
     [None; DMX_CHANNELS]
 }
 
+/// Bitmask flagging which channels of a universe the master fader is
+/// allowed to scale. Constructed once per frame from the user's
+/// MasterConfig (via `globals::runtime`). `true` → channel goes
+/// through the master multiplication; `false` → passes the master
+/// stage untouched (pan/tilt/colour-wheel/etc. survive the dim).
+pub type ChannelMask = [bool; DMX_CHANNELS];
+
+pub fn empty_mask() -> ChannelMask {
+    [false; DMX_CHANNELS]
+}
+
 #[derive(Clone, Debug)]
 pub struct Universe {
     pub id: u16,
@@ -92,6 +103,15 @@ pub struct EngineInner {
     /// the older "multiply every channel by `1 - factor`" path which
     /// also dragged movers' positions to 0.
     pub blackout_overlay: HashMap<u16, ChannelOverlay>,
+    /// Per-universe bitmask of channels the master fader is allowed to
+    /// scale. `globals::runtime` rebuilds this each frame from the
+    /// user's MasterConfig — by default it covers intensity-or-RGB on
+    /// every patched fixture and leaves pan/tilt/wheel channels alone.
+    /// An empty map (no entries for the universe) is treated as the
+    /// pre-feature behaviour: master scales every channel. That keeps
+    /// engine-only contexts (tests, mid-startup) from suddenly losing
+    /// their master before the runtime has populated the mask.
+    pub master_mask: HashMap<u16, ChannelMask>,
 }
 
 impl EngineInner {
@@ -105,6 +125,7 @@ impl EngineInner {
             blind_overlay: HashMap::new(),
             blind_factor: 0.0,
             blackout_overlay: HashMap::new(),
+            master_mask: HashMap::new(),
         }
     }
 
@@ -120,6 +141,7 @@ impl EngineInner {
             blind_overlay: HashMap::new(),
             blind_factor: 0.0,
             blackout_overlay: HashMap::new(),
+            master_mask: HashMap::new(),
         }
     }
 
@@ -198,11 +220,32 @@ impl EngineInner {
                 }
             }
         }
-        // 3. Master fader: scales every channel before blackout.
+        // 3. Master fader: scales channels by `self.master / 255`. The
+        //    set of channels affected is the per-universe `master_mask`
+        //    built each frame by `globals::runtime` from the user's
+        //    MasterConfig — by default it covers intensity-or-RGB on
+        //    every patched fixture and lets pan/tilt/colour-wheel
+        //    survive intact (a half-master shouldn't drag mover
+        //    positions toward channel 127). When the runtime hasn't
+        //    populated a mask for this universe yet (e.g. boot, tests)
+        //    we fall back to scaling every channel — preserves the
+        //    pre-mask behaviour so the engine is never silently
+        //    "muted" before the globals tick has landed once.
         if self.master != 255 {
             let m = self.master as u16;
-            for v in out.iter_mut() {
-                *v = ((*v as u16 * m) / 255) as u8;
+            match self.master_mask.get(&universe) {
+                Some(mask) => {
+                    for (i, v) in out.iter_mut().enumerate() {
+                        if mask[i] {
+                            *v = ((*v as u16 * m) / 255) as u8;
+                        }
+                    }
+                }
+                None => {
+                    for v in out.iter_mut() {
+                        *v = ((*v as u16 * m) / 255) as u8;
+                    }
+                }
             }
         }
         // 4. Blackout layer: lerp the configured channels toward 0 by
@@ -240,6 +283,10 @@ impl EngineInner {
 
     pub fn replace_blackout_overlay(&mut self, next: HashMap<u16, ChannelOverlay>) {
         self.blackout_overlay = next;
+    }
+
+    pub fn replace_master_mask(&mut self, next: HashMap<u16, ChannelMask>) {
+        self.master_mask = next;
     }
 }
 

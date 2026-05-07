@@ -10,6 +10,7 @@ import { MidiConfigView } from "./MidiConfigView";
 import { OutputsView } from "./OutputsView";
 import { PatchView } from "./PatchView";
 import { RemoteBridgeView } from "./RemoteBridgeView";
+import { StreamDeckConfigView } from "./StreamDeckConfigView";
 import { SyncView } from "./SyncView";
 
 type ConfigTab =
@@ -18,6 +19,7 @@ type ConfigTab =
   | "patch"
   | "blackout-blind"
   | "midi"
+  | "streamdeck"
   | "ai"
   | "remote"
   | "sync"
@@ -48,6 +50,11 @@ const GROUPS: Array<{ id: string; items: TabMeta[] }> = [
         hintKey: "config.tabs.blackoutBlindHint",
       },
       { id: "midi", labelKey: "config.tabs.midi", hintKey: "config.tabs.midiHint" },
+      {
+        id: "streamdeck",
+        labelKey: "config.tabs.streamdeck",
+        hintKey: "config.tabs.streamdeckHint",
+      },
       { id: "ai", labelKey: "config.tabs.ai", hintKey: "config.tabs.aiHint" },
       { id: "remote", labelKey: "config.tabs.remote", hintKey: "config.tabs.remoteHint" },
       { id: "sync", labelKey: "config.tabs.sync", hintKey: "config.tabs.syncHint" },
@@ -95,6 +102,7 @@ export function ConfigView() {
         {sub === "patch" && <PatchView />}
         {sub === "blackout-blind" && <ButtonsConfigView />}
         {sub === "midi" && <MidiConfigView />}
+        {sub === "streamdeck" && <StreamDeckConfigView />}
         {sub === "ai" && <AiConfigView />}
         {sub === "remote" && <RemoteBridgeView />}
         {sub === "sync" && <SyncView />}

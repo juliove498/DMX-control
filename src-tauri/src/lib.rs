@@ -9,6 +9,7 @@ pub mod movement;
 pub mod output;
 pub mod programmer;
 pub mod show;
+pub mod streamdeck;
 pub mod sync;
 
 use std::path::PathBuf;
@@ -22,6 +23,7 @@ use crate::engine::scene_playback::{shared_scene_playback, SharedScenePlayback};
 use crate::engine::EngineState;
 use crate::midi::hub::{shared_midi, SharedMidi};
 use crate::midi::launchpad::{shared_launchpad, SharedLaunchpad};
+use crate::streamdeck::controller::{shared_streamdeck, SharedStreamDeck};
 use crate::programmer::shared_programmer;
 use crate::show::library::{ensure_seeded, library_dir, load_all};
 use crate::show::session::{
@@ -217,6 +219,7 @@ pub fn run() {
     let globals_handle = shared_globals();
     let midi_handle = shared_midi();
     let launchpad_handle = shared_launchpad();
+    let streamdeck_handle = shared_streamdeck();
     let scene_playback_handle = shared_scene_playback();
     let programmer_handle = shared_programmer();
     let bridge_state = crate::bridge::BridgeState::new();
@@ -231,6 +234,7 @@ pub fn run() {
         .manage(globals_handle.clone())
         .manage(midi_handle.clone())
         .manage(launchpad_handle.clone())
+        .manage(streamdeck_handle.clone())
         .manage(scene_playback_handle.clone())
         .manage(programmer_handle.clone())
         .manage(bridge_state.clone())
@@ -324,6 +328,32 @@ pub fn run() {
                 }
             }
 
+            // Same auto-connect logic for the Stream Deck. Independent of
+            // MIDI: an operator may have just an SD, or both surfaces
+            // running side by side.
+            let sd_st: tauri::State<'_, SharedStreamDeck> = app.state();
+            let sd_devices = streamdeck::controller::list_streamdeck_devices();
+            if let Some(first) = sd_devices.into_iter().next() {
+                match streamdeck::controller::start(
+                    app_handle.clone(),
+                    Some(&first.serial),
+                    chasers_st.inner().clone(),
+                    movement_st.inner().clone(),
+                    globals_st.inner().clone(),
+                    scenes_st.inner().clone(),
+                    engine_state.inner().clone(),
+                    show_state_st.inner().clone(),
+                ) {
+                    Ok(controller) => {
+                        *sd_st.lock() = Some(controller);
+                        tracing::info!(serial = %first.serial, kind = %first.kind, "auto-connected streamdeck surface at launch");
+                    }
+                    Err(err) => tracing::warn!(serial = %first.serial, %err, "streamdeck auto-connect failed"),
+                }
+            } else {
+                tracing::debug!("no streamdeck devices found at launch");
+            }
+
             // Background snapshot thread: every ~1.5 s we dump the live
             // engine state (universes + master) to disk. The output thread
             // can't do this itself without risking I/O latency in the DMX
@@ -399,6 +429,10 @@ pub fn run() {
                 //      first would leave its `OutputDriver` open while
                 //      the LP teardown is still trying to send SysEx,
                 //      which is fine but makes the logs noisy.
+                if let Some(sd) = window.state::<SharedStreamDeck>().lock().take() {
+                    tracing::info!("window close: shutting down streamdeck controller");
+                    sd.shutdown();
+                }
                 if let Some(lp) = window.state::<SharedLaunchpad>().lock().take() {
                     tracing::info!("window close: shutting down launchpad controller");
                     lp.shutdown();
@@ -494,6 +528,11 @@ pub fn run() {
             commands::disconnect_midi,
             commands::get_midi_status,
             commands::send_midi_raw,
+            // Stream Deck
+            commands::list_streamdeck_devices,
+            commands::connect_streamdeck_device,
+            commands::disconnect_streamdeck,
+            commands::get_streamdeck_status,
             // Mobile remote bridge
             bridge::bridge_start,
             bridge::bridge_stop,

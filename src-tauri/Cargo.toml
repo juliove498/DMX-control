@@ -40,6 +40,29 @@ thread-priority = "1"
 # MIDI input/output for control surfaces (Launchpad MK2, etc.). Cross-
 # platform USB-class compliant; no separate driver needed.
 midir = "0.10"
+# Elgato Stream Deck control surface — talks USB-HID directly, no
+# Stream Deck app required. Mirrors the Launchpad MK2 layout in
+# `streamdeck::layout` (5×3 grid for the MK.2). Bundles its own hidapi
+# but we depend on `hidapi` directly so we can hold the HidApi handle
+# in a global `OnceLock` (see `streamdeck::controller::shared_hidapi`).
+# The hidapi C library is a process-wide singleton — dropping the
+# `HidApi` value while open `HidDevice`s exist tears down the global
+# state and leaves the surviving devices in undefined territory, which
+# is what was hanging the app on the second `new_hidapi()` call.
+elgato-streamdeck = "0.12"
+hidapi = "2"
+# Image rendering for Stream Deck LCD keys (72×72 PNG generated per
+# state). `image` is already a transitive dep of elgato-streamdeck, but
+# we depend on it directly so we can build DynamicImages with primitive
+# drawing + text. `ab_glyph` is the font rasteriser used by imageproc.
+# Default features pull in jpeg + png + bmp encoders. We need at least
+# jpeg because the Stream Deck OriginalV2 / Mk2 firmware expects JPEG
+# tile uploads — disabling default features here was previously
+# starving `set_button_image` of its encoder and may have been
+# producing blocked / failing USB writes.
+image = "0.25"
+imageproc = { version = "0.25", default-features = false }
+ab_glyph = "0.2"
 # Used to inline fixture preview images as data URLs inside their JSON
 # definitions. Keeps each fixture self-contained for portability — copy
 # one .json file across machines and the picture goes with it.

@@ -48,6 +48,8 @@ export type Translation = {
   "config.tabs.blackoutBlindHint": string;
   "config.tabs.midi": string;
   "config.tabs.midiHint": string;
+  "config.tabs.streamdeck": string;
+  "config.tabs.streamdeckHint": string;
   "config.tabs.ai": string;
   "config.tabs.aiHint": string;
   "config.tabs.remote": string;
@@ -302,6 +304,21 @@ export type Translation = {
   "midi.testPads": string;
   "midi.statusSection": string;
   "midi.connectedToFmt": string;
+
+  // ---- Stream Deck -----------------------------------------------------
+  "streamdeck.title": string;
+  "streamdeck.intro": string;
+  "streamdeck.refresh": string;
+  "streamdeck.connect": string;
+  "streamdeck.disconnect": string;
+  "streamdeck.empty": string;
+  "streamdeck.detectedDevices": string;
+  "streamdeck.deviceMeta": string;
+  "streamdeck.statusSection": string;
+  "streamdeck.connectedToFmt": string;
+  "streamdeck.errListing": string;
+  "streamdeck.errConnect": string;
+  "streamdeck.errDisconnect": string;
 
   // ---- AI Config -------------------------------------------------------
   "ai.title": string;
@@ -749,6 +766,8 @@ export const en: Translation = {
     "Master scaling, blackout fades, blind halogen — per-fixture channel sets",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Control surface (Launchpad, etc.)",
+  "config.tabs.streamdeck": "Stream Deck",
+  "config.tabs.streamdeckHint": "Elgato Stream Deck control surface",
   "config.tabs.ai": "AI",
   "config.tabs.aiHint": "Provider, model and API key for LLM scene generation",
   "config.tabs.remote": "Remote",
@@ -1007,6 +1026,21 @@ export const en: Translation = {
   "midi.testPads": "Test pads (Launchpad MK2)",
   "midi.statusSection": "Status",
   "midi.connectedToFmt": "Connected to {name} ({io}){surface}",
+
+  "streamdeck.title": "Stream Deck",
+  "streamdeck.intro":
+    "Plug in an Elgato Stream Deck and the surface controller takes over the keys: chasers on row 1, movements on row 2, scenes on row 3 plus blind (momentary) and blackout (toggle). Layout is fixed for now — first 5 chasers/movements and first 3 scenes.",
+  "streamdeck.refresh": "Refresh",
+  "streamdeck.connect": "Connect",
+  "streamdeck.disconnect": "Disconnect",
+  "streamdeck.empty": "No Stream Decks found.",
+  "streamdeck.detectedDevices": "Detected devices ({count})",
+  "streamdeck.deviceMeta": "{keys} keys · {serial}",
+  "streamdeck.statusSection": "Status",
+  "streamdeck.connectedToFmt": "Connected to {kind} ({keys} keys) · surface active",
+  "streamdeck.errListing": "Could not list Stream Decks: {err}",
+  "streamdeck.errConnect": "Could not connect to {name}: {err}",
+  "streamdeck.errDisconnect": "Could not disconnect: {err}",
 
   "ai.title": "AI",
   "ai.intro":
@@ -1472,6 +1506,8 @@ export const es: Translation = {
     "Master, blackout y blind — canales afectados por cada uno por fixture",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Superficie de control (Launchpad, etc.)",
+  "config.tabs.streamdeck": "Stream Deck",
+  "config.tabs.streamdeckHint": "Elgato Stream Deck como superficie de control",
   "config.tabs.ai": "IA",
   "config.tabs.aiHint": "Provider, modelo y API key para generación de escenas con LLM",
   "config.tabs.remote": "Remote",
@@ -1731,6 +1767,21 @@ export const es: Translation = {
   "midi.testPads": "Test pads (Launchpad MK2)",
   "midi.statusSection": "Estado",
   "midi.connectedToFmt": "Conectado a {name} ({io}){surface}",
+
+  "streamdeck.title": "Stream Deck",
+  "streamdeck.intro":
+    "Conectá un Elgato Stream Deck y el surface controller toma las teclas: chasers en fila 1, movimientos en fila 2, escenas en fila 3 más blind (momentáneo) y blackout (toggle). Layout fijo por ahora — primeros 5 chasers/movimientos y primeras 3 escenas.",
+  "streamdeck.refresh": "Refrescar",
+  "streamdeck.connect": "Conectar",
+  "streamdeck.disconnect": "Desconectar",
+  "streamdeck.empty": "No se encontraron Stream Decks.",
+  "streamdeck.detectedDevices": "Dispositivos detectados ({count})",
+  "streamdeck.deviceMeta": "{keys} teclas · {serial}",
+  "streamdeck.statusSection": "Estado",
+  "streamdeck.connectedToFmt": "Conectado a {kind} ({keys} teclas) · surface activo",
+  "streamdeck.errListing": "No se pudieron listar los Stream Decks: {err}",
+  "streamdeck.errConnect": "No se pudo conectar a {name}: {err}",
+  "streamdeck.errDisconnect": "No se pudo desconectar: {err}",
 
   "ai.title": "IA",
   "ai.intro":

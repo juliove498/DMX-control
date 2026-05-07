@@ -2270,6 +2270,79 @@ pub fn send_midi_raw(midi: State<'_, SharedMidi>, bytes: Vec<u8>) -> Result<(), 
     midi.lock().send_raw(&bytes).map_err(CommandError::Other)
 }
 
+// ---- Stream Deck ---------------------------------------------------------
+
+#[tauri::command]
+pub fn list_streamdeck_devices() -> Vec<crate::streamdeck::StreamDeckDeviceInfo> {
+    tracing::debug!("cmd: list_streamdeck_devices");
+    crate::streamdeck::controller::list_streamdeck_devices()
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn connect_streamdeck_device(
+    app: AppHandle,
+    streamdeck_state: State<'_, crate::streamdeck::controller::SharedStreamDeck>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes: State<'_, SharedScenePlayback>,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    serial: Option<String>,
+) -> Result<(), CommandError> {
+    // Tear down any previous controller — same reasoning as the MIDI
+    // path: never reuse a stale worker thread across reconnects.
+    if let Some(prev) = streamdeck_state.lock().take() {
+        prev.shutdown();
+    }
+    let controller = crate::streamdeck::controller::start(
+        app,
+        serial.as_deref(),
+        chasers.inner().clone(),
+        movement.inner().clone(),
+        globals.inner().clone(),
+        scenes.inner().clone(),
+        engine.inner().clone(),
+        show.inner().clone(),
+    )
+    .map_err(CommandError::Other)?;
+    *streamdeck_state.lock() = Some(controller);
+    Ok(())
+}
+
+#[tauri::command]
+pub fn disconnect_streamdeck(
+    streamdeck_state: State<'_, crate::streamdeck::controller::SharedStreamDeck>,
+) {
+    if let Some(prev) = streamdeck_state.lock().take() {
+        prev.shutdown();
+    }
+}
+
+#[tauri::command]
+pub fn get_streamdeck_status(
+    streamdeck_state: State<'_, crate::streamdeck::controller::SharedStreamDeck>,
+) -> crate::streamdeck::StreamDeckStatus {
+    tracing::debug!("cmd: get_streamdeck_status");
+    let guard = streamdeck_state.lock();
+    match guard.as_ref() {
+        Some(ctrl) => {
+            let info = ctrl.info();
+            crate::streamdeck::StreamDeckStatus {
+                connected: Some(info.serial),
+                kind: Some(info.kind),
+                key_count: Some(info.key_count),
+            }
+        }
+        None => crate::streamdeck::StreamDeckStatus {
+            connected: None,
+            kind: None,
+            key_count: None,
+        },
+    }
+}
+
 // ---- helpers + error type ------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]

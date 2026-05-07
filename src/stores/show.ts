@@ -106,6 +106,12 @@ interface ShowStoreState {
   disconnectMidi: () => Promise<void>;
   sendMidiRaw: (bytes: number[]) => Promise<void>;
 
+  listStreamDeckDevices: () => Promise<
+    { serial: string; kind: string; key_count: number }[]
+  >;
+  connectStreamDeckDevice: (serial?: string) => Promise<void>;
+  disconnectStreamDeck: () => Promise<void>;
+
   // AI scene generation (POC) — keys live off the show file in the OS
   // app-config dir, so these don't touch show state.
   getAiConfig: () => Promise<AiConfig>;
@@ -432,6 +438,20 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
 
   async sendMidiRaw(bytes) {
     await invoke("send_midi_raw", { bytes });
+  },
+
+  async listStreamDeckDevices() {
+    return invoke<{ serial: string; kind: string; key_count: number }[]>(
+      "list_streamdeck_devices",
+    );
+  },
+
+  async connectStreamDeckDevice(serial) {
+    await invoke("connect_streamdeck_device", { serial: serial ?? null });
+  },
+
+  async disconnectStreamDeck() {
+    await invoke("disconnect_streamdeck");
   },
 
   async getAiConfig() {

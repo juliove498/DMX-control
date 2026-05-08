@@ -110,14 +110,19 @@ impl ChaserEngine {
 
     /// Run one frame: advance step counters as needed, evaluate the pattern
     /// for every enabled chaser, and produce the merged overlay map keyed by
-    /// universe.
-    pub fn tick(&mut self, now: Instant) -> HashMap<u16, ChannelOverlay> {
+    /// universe. `overall_bpm`, when `Some`, replaces every chaser's
+    /// `tempo` for the duration of this tick — see `advance_step`.
+    pub fn tick(
+        &mut self,
+        now: Instant,
+        overall_bpm: Option<f32>,
+    ) -> HashMap<u16, ChannelOverlay> {
         let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
         for entry in &mut self.entries {
             if !entry.config.enabled {
                 continue;
             }
-            advance_step(&mut entry.runtime, &entry.config, now);
+            advance_step(&mut entry.runtime, &entry.config, now, overall_bpm);
             apply_chaser(entry, &mut overlay, now);
         }
         overlay
@@ -130,10 +135,18 @@ impl ChaserEngine {
 /// doesn't leave the chaser drifting. When the step changes we snapshot
 /// `last_emitted` into `fade_from` so the fade-in interpolates from the
 /// actual previous output rather than from a recomputed ideal.
-fn advance_step(runtime: &mut ChaserRuntime, config: &AmbientChaser, now: Instant) {
-    let bpm = match config.tempo {
+fn advance_step(
+    runtime: &mut ChaserRuntime,
+    config: &AmbientChaser,
+    now: Instant,
+    overall_bpm: Option<f32>,
+) {
+    // Overall BPM, when active, wins over the chaser's own configured
+    // tempo. The *configuration* isn't mutated — disabling the override
+    // restores the chaser's previous tempo with no setup needed.
+    let bpm = overall_bpm.unwrap_or_else(|| match config.tempo {
         TempoSource::Fixed { bpm } => bpm,
-    };
+    });
     let step_ms = step_duration_ms(bpm, config.subdivision).max(1.0);
     let step_dur = std::time::Duration::from_secs_f32(step_ms / 1000.0);
     match runtime.last_step_at {
@@ -460,18 +473,18 @@ mod tests {
 
         let t0 = Instant::now();
         // Step 0 → On (255)
-        let ov0 = engine.tick(t0);
+        let ov0 = engine.tick(t0, None);
         let u0 = ov0.get(&0).unwrap();
         assert_eq!(u0[0], Some(255));
 
         // 120 BPM, subdivision One = 500 ms per step. Tick a tick later than
         // half a second → step 1 → Off.
-        let ov1 = engine.tick(t0 + Duration::from_millis(510));
+        let ov1 = engine.tick(t0 + Duration::from_millis(510), None);
         let u1 = ov1.get(&0).unwrap();
         assert_eq!(u1[0], Some(0));
 
         // Another half-second → step 2 → On.
-        let ov2 = engine.tick(t0 + Duration::from_millis(1010));
+        let ov2 = engine.tick(t0 + Duration::from_millis(1010), None);
         assert_eq!(ov2.get(&0).unwrap()[0], Some(255));
     }
 
@@ -487,7 +500,7 @@ mod tests {
         c.enabled = false;
         engine.replace_chasers(vec![c]);
 
-        let ov = engine.tick(Instant::now());
+        let ov = engine.tick(Instant::now(), None);
         assert!(ov.is_empty());
     }
 
@@ -514,11 +527,11 @@ mod tests {
         engine.replace_chasers(vec![c]);
 
         let t0 = Instant::now();
-        let on = engine.tick(t0);
+        let on = engine.tick(t0, None);
         // Step 0 → on → full red.
         assert_eq!(on.get(&0).unwrap()[0], Some(255));
         // Step 1 → off, but background 64 → dim red.
-        let off = engine.tick(t0 + Duration::from_millis(510));
+        let off = engine.tick(t0 + Duration::from_millis(510), None);
         let u = off.get(&0).unwrap();
         assert!(
             u[0] == Some(64) || u[0] == Some(63),
@@ -549,7 +562,7 @@ mod tests {
         c.slots[0].use_intensity = false;
         engine.replace_chasers(vec![c]);
 
-        let ov = engine.tick(Instant::now());
+        let ov = engine.tick(Instant::now(), None);
         let u = ov.get(&0).unwrap();
         assert_eq!(u[0], Some(255));
         assert_eq!(u[1], Some(0));
@@ -563,7 +576,7 @@ mod tests {
         let mut engine = ChaserEngine::new();
         engine.update_show_context(fixtures, lib);
         engine.replace_chasers(vec![chaser("c", vec!["nonexistent"])]);
-        let ov = engine.tick(Instant::now());
+        let ov = engine.tick(Instant::now(), None);
         assert!(ov.is_empty());
     }
 
@@ -588,9 +601,9 @@ mod tests {
         engine.replace_chasers(vec![c]);
 
         let t0 = Instant::now();
-        engine.tick(t0); // step 0 → 255 cached as last_emitted
+        engine.tick(t0, None); // step 0 → 255 cached as last_emitted
                          // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
-        let ov_at_transition = engine.tick(t0 + Duration::from_millis(510));
+        let ov_at_transition = engine.tick(t0 + Duration::from_millis(510), None);
         // At t=510 we are 0 ms into the fade → still ~255 (linear curve, t=0).
         assert!(
             ov_at_transition.get(&0).unwrap()[0].unwrap() > 200,
@@ -598,11 +611,11 @@ mod tests {
             ov_at_transition.get(&0).unwrap()[0]
         );
         // Halfway through the 250 ms fade → ~127.
-        let ov_mid = engine.tick(t0 + Duration::from_millis(510 + 125));
+        let ov_mid = engine.tick(t0 + Duration::from_millis(510 + 125), None);
         let v = ov_mid.get(&0).unwrap()[0].unwrap();
         assert!((90..=160).contains(&(v as i32)), "expected ~127, got {v}");
         // Past the fade end → 0.
-        let ov_done = engine.tick(t0 + Duration::from_millis(510 + 260));
+        let ov_done = engine.tick(t0 + Duration::from_millis(510 + 260), None);
         assert_eq!(ov_done.get(&0).unwrap()[0], Some(0));
     }
 
@@ -618,9 +631,9 @@ mod tests {
         engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
 
         let t0 = Instant::now();
-        engine.tick(t0);
+        engine.tick(t0, None);
         // 1 ms into step 1 should already be the new value (Off = 0).
-        let ov = engine.tick(t0 + Duration::from_millis(501));
+        let ov = engine.tick(t0 + Duration::from_millis(501), None);
         assert_eq!(ov.get(&0).unwrap()[0], Some(0));
     }
 
@@ -637,9 +650,9 @@ mod tests {
         engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
 
         let t0 = Instant::now();
-        engine.tick(t0); // step 0
+        engine.tick(t0, None); // step 0
                          // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
-        let ov = engine.tick(t0 + Duration::from_millis(5_001));
+        let ov = engine.tick(t0 + Duration::from_millis(5_001), None);
         assert_eq!(ov.get(&0).unwrap()[0], Some(255));
     }
 }

@@ -72,8 +72,14 @@ pub const BPM_MAX: f32 = 300.0;
 /// Scene button column note numbers we use:
 ///   - `BLACKOUT_NOTE` (19): bottom-right scene → toggles blackout.
 ///   - `BLIND_NOTE` (29): scene above → momentary blind.
+///   - `TAP_NOTE` (39): one above blind → register a TAP press to
+///     compute the global Overall BPM.
+///   - `BPM_TOGGLE_NOTE` (49): one above TAP → toggle the Overall BPM
+///     override on/off.
 pub const BLACKOUT_NOTE: u8 = 19;
 pub const BLIND_NOTE: u8 = 29;
+pub const TAP_NOTE: u8 = 39;
+pub const BPM_TOGGLE_NOTE: u8 = 49;
 
 /// (dim, bright) palette pairs for chaser pads. Off pads sit at `dim`,
 /// active pads flash between `dim` and `bright`.
@@ -118,6 +124,12 @@ const SCENE_PAD_PALETTE: [(u8, u8); 8] = [
 
 const BLACKOUT_PALETTE: (u8, u8) = (7, 5); // dim red / bright red
 const BLIND_PALETTE: (u8, u8) = (1, 3); // dim white / bright white
+/// TAP: cool teal palette — distinct from the strobe/alarm-coloured
+/// blind+blackout pads above it, signalling "info / metronome" rather
+/// than "emergency".
+const TAP_PALETTE: (u8, u8) = (37, 33); // dim teal / bright cyan
+/// Overall-BPM toggle: magenta palette. Dim when override is off, flashing bright when on.
+const BPM_TOGGLE_PALETTE: (u8, u8) = (54, 53); // dim magenta / bright magenta
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PadState {
@@ -154,6 +166,8 @@ struct LedTargets {
     top_row: [TopRowRgb; 8],
     blackout: PadState,
     blind: PadState,
+    tap: PadState,
+    bpm_toggle: PadState,
 }
 
 impl LedTargets {
@@ -165,6 +179,8 @@ impl LedTargets {
             top_row: [TopRowRgb::default(); 8],
             blackout: PadState::Empty,
             blind: PadState::Empty,
+            tap: PadState::Empty,
+            bpm_toggle: PadState::Empty,
         }
     }
 }
@@ -335,6 +351,32 @@ fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
         return;
     }
 
+    if note == TAP_NOTE {
+        match crate::commands::tap_overall_bpm_impl(
+            &handles.app,
+            &handles.show,
+            &handles.globals,
+        ) {
+            Ok(Some(bpm)) => tracing::info!(bpm, "launchpad tap → bpm"),
+            Ok(None) => tracing::info!("launchpad tap → first of window"),
+            Err(err) => tracing::warn!(?err, "launchpad tap dispatch failed"),
+        }
+        return;
+    }
+
+    if note == BPM_TOGGLE_NOTE {
+        let next = !handles.show.read().show.globals.overall_bpm_enabled;
+        if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
+            &handles.app,
+            &handles.show,
+            &handles.globals,
+            next,
+        ) {
+            tracing::warn!(?err, "launchpad bpm toggle dispatch failed");
+        }
+        return;
+    }
+
     if let Some(pad_idx) = CHASER_PAD_NOTES.iter().position(|&n| n == note) {
         handle_chaser_press(pad_idx, handles);
         return;
@@ -471,6 +513,25 @@ fn compute_targets(handles: &LpHandles) -> LedTargets {
         PadState::OffDim(bl_dim)
     };
 
+    // TAP (always lit dim teal — it's a momentary trigger, no state) ------
+    let (t_dim, _t_bright) = TAP_PALETTE;
+    out.tap = PadState::OffDim(t_dim);
+
+    // BPM toggle (flashes when the override is on, dim when off) ----------
+    let (bpm_dim, bpm_bright) = BPM_TOGGLE_PALETTE;
+    let bpm_enabled = {
+        let s = handles.show.read();
+        s.show.globals.overall_bpm_enabled
+    };
+    out.bpm_toggle = if bpm_enabled {
+        PadState::OnFlash {
+            dim: bpm_dim,
+            bright: bpm_bright,
+        }
+    } else {
+        PadState::OffDim(bpm_dim)
+    };
+
     out
 }
 
@@ -494,6 +555,12 @@ fn diff_and_push(midi: &SharedMidi, last: &LedTargets, target: &LedTargets) {
     }
     if target.blind != last.blind {
         push_pad(midi, BLIND_NOTE, target.blind);
+    }
+    if target.tap != last.tap {
+        push_pad(midi, TAP_NOTE, target.tap);
+    }
+    if target.bpm_toggle != last.bpm_toggle {
+        push_pad(midi, BPM_TOGGLE_NOTE, target.bpm_toggle);
     }
 }
 
@@ -550,6 +617,8 @@ fn push_all(midi: &SharedMidi, target: &LedTargets) {
     }
     push_pad(midi, BLACKOUT_NOTE, target.blackout);
     push_pad(midi, BLIND_NOTE, target.blind);
+    push_pad(midi, TAP_NOTE, target.tap);
+    push_pad(midi, BPM_TOGGLE_NOTE, target.bpm_toggle);
 }
 
 fn clear_all_pads(midi: &SharedMidi) {
@@ -568,6 +637,8 @@ fn clear_all_pads(midi: &SharedMidi) {
     }
     let _ = hub.send_raw(&[0x90, BLACKOUT_NOTE, 0]);
     let _ = hub.send_raw(&[0x90, BLIND_NOTE, 0]);
+    let _ = hub.send_raw(&[0x90, TAP_NOTE, 0]);
+    let _ = hub.send_raw(&[0x90, BPM_TOGGLE_NOTE, 0]);
 }
 
 /// Translate one chaser slot's output (intensity + RGB) into the actual

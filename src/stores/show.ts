@@ -101,6 +101,12 @@ interface ShowStoreState {
   setBlind: (pressed: boolean) => Promise<void>;
   updateGlobals: (config: GlobalsConfig) => Promise<void>;
 
+  setOverallBpm: (bpm: number) => Promise<void>;
+  setOverallBpmEnabled: (enabled: boolean) => Promise<void>;
+  /// Resolves to the freshly-computed BPM (when 2+ taps in the rolling
+  /// window) or `null` (first tap of a fresh window).
+  tapOverallBpm: () => Promise<number | null>;
+
   listMidiDevices: () => Promise<{ name: string; has_input: boolean; has_output: boolean }[]>;
   connectMidiDevice: (name: string) => Promise<void>;
   disconnectMidi: () => Promise<void>;
@@ -422,6 +428,22 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   async updateGlobals(config) {
     await invoke("update_globals", { config });
     await get().refresh();
+  },
+
+  async setOverallBpm(bpm) {
+    await invoke("set_overall_bpm", { bpm });
+    await get().refresh();
+  },
+
+  async setOverallBpmEnabled(enabled) {
+    await invoke("set_overall_bpm_enabled", { enabled });
+    await get().refresh();
+  },
+
+  async tapOverallBpm() {
+    const result = await invoke<number | null>("tap_overall_bpm");
+    await get().refresh();
+    return result;
   },
 
   async listMidiDevices() {

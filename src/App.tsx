@@ -5,6 +5,7 @@ import "./App.css";
 import { ChaserView } from "./components/ChaserView";
 import { ConfigView } from "./components/ConfigView";
 import { MovementView } from "./components/MovementView";
+import { OverallBpmControl } from "./components/OverallBpmControl";
 import { Preview3D } from "./components/Preview3D";
 import { ScenesView } from "./components/ScenesView";
 import { StageView } from "./components/StageView";
@@ -207,6 +208,7 @@ function App() {
             })}
         </div>
         <div className="tabs-globals">
+          <OverallBpmControl />
           <button
             type="button"
             className={`global-btn blackout-btn${blackoutActive ? " active" : ""}`}

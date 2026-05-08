@@ -181,6 +181,109 @@ pub fn update_globals(
     Ok(())
 }
 
+// ---- Overall BPM override -------------------------------------------------
+//
+// One global tempo that, when enabled, replaces every chaser/movement's
+// own configured `tempo`. Lets the operator drive a whole rig from the
+// header (or from a TAP button on the MIDI / Stream Deck surface)
+// instead of editing each effect separately.
+//
+// Persistence: every change goes through the show file so the override
+// state survives restarts. The TAP button writes through too, but the
+// stored value is just the most-recent computed BPM — `tap_history` is
+// in-memory only and resets across sessions, which is what an operator
+// expects (a tempo measured during last week's set has no value now).
+
+/// Free-function variant of [`set_overall_bpm_enabled`]. Used by the
+/// Launchpad and Stream Deck surface controllers, which dispatch
+/// without going through Tauri IPC.
+pub fn set_overall_bpm_enabled_impl(
+    app: &AppHandle,
+    show: &ShowState,
+    globals: &SharedGlobals,
+    enabled: bool,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        s.show.globals.overall_bpm_enabled = enabled;
+        s.dirty = true;
+    }
+    globals.lock().set_overall_bpm_enabled(enabled);
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_overall_bpm_enabled(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    globals: State<'_, SharedGlobals>,
+    enabled: bool,
+) -> Result<(), CommandError> {
+    set_overall_bpm_enabled_impl(&app, &show, &globals, enabled)
+}
+
+pub fn set_overall_bpm_impl(
+    app: &AppHandle,
+    show: &ShowState,
+    globals: &SharedGlobals,
+    bpm: f32,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        // Mirror the runtime's clamp so the persisted value never drifts
+        // outside the physical range.
+        s.show.globals.overall_bpm = bpm.clamp(20.0, 300.0);
+        s.dirty = true;
+    }
+    globals.lock().set_overall_bpm(bpm);
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn set_overall_bpm(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    globals: State<'_, SharedGlobals>,
+    bpm: f32,
+) -> Result<(), CommandError> {
+    set_overall_bpm_impl(&app, &show, &globals, bpm)
+}
+
+pub fn tap_overall_bpm_impl(
+    app: &AppHandle,
+    show: &ShowState,
+    globals: &SharedGlobals,
+) -> Result<Option<f32>, CommandError> {
+    let new_bpm = globals.lock().tap_overall_bpm(std::time::Instant::now());
+    // First tap of a fresh window only enables the override — no BPM
+    // computed yet. Mirror that into the show state so the UI's toggle
+    // flips on immediately.
+    {
+        let mut s = show.write();
+        s.show.globals.overall_bpm_enabled = true;
+        if let Some(bpm) = new_bpm {
+            s.show.globals.overall_bpm = bpm;
+        }
+        s.dirty = true;
+    }
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(new_bpm)
+}
+
+#[tauri::command]
+pub fn tap_overall_bpm(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    globals: State<'_, SharedGlobals>,
+) -> Result<Option<f32>, CommandError> {
+    tap_overall_bpm_impl(&app, &show, &globals)
+}
+
 #[tauri::command]
 pub fn clear_universe(engine: State<'_, EngineState>, universe: u16) -> Result<(), EngineError> {
     let mut g = engine.write();

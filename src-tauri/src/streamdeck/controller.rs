@@ -25,8 +25,9 @@ use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::EngineState;
 use crate::show::ShowState;
 use crate::streamdeck::layout::{
-    BLACKOUT_COLORS, BLACKOUT_KEY, BLIND_COLORS, BLIND_KEY, CHASER_KEYS, CHASER_PALETTE,
-    MOVEMENT_KEYS, MOVEMENT_PALETTE, SCENE_KEYS, SCENE_PALETTE,
+    BLACKOUT_COLORS, BLACKOUT_KEY, BLIND_COLORS, BLIND_KEY, BPM_TOGGLE_COLORS, BPM_TOGGLE_KEY,
+    CHASER_KEYS, CHASER_PALETTE, MOVEMENT_KEYS, MOVEMENT_PALETTE, SCENE_KEYS, SCENE_PALETTE,
+    TAP_COLORS, TAP_KEY,
 };
 use crate::streamdeck::render::{KeyVisual, RenderCache, TileKind};
 use crate::streamdeck::StreamDeckDeviceInfo;
@@ -356,6 +357,32 @@ fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
         return;
     }
 
+    if key == TAP_KEY {
+        match crate::commands::tap_overall_bpm_impl(
+            &handles.app,
+            &handles.show,
+            &handles.globals,
+        ) {
+            Ok(Some(bpm)) => tracing::info!(bpm, "streamdeck tap → bpm"),
+            Ok(None) => tracing::info!("streamdeck tap → first of window"),
+            Err(err) => tracing::warn!(?err, "streamdeck tap dispatch failed"),
+        }
+        return;
+    }
+
+    if key == BPM_TOGGLE_KEY {
+        let next = !handles.show.read().show.globals.overall_bpm_enabled;
+        if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
+            &handles.app,
+            &handles.show,
+            &handles.globals,
+            next,
+        ) {
+            tracing::warn!(?err, "streamdeck bpm toggle dispatch failed");
+        }
+        return;
+    }
+
     if let Some(idx) = CHASER_KEYS.iter().position(|&k| k == key) {
         handle_chaser_press(idx, handles);
         return;
@@ -550,6 +577,36 @@ fn compute_targets(
         palette: BLACKOUT_COLORS,
         active: blackout_active,
         phase: phase_for(blackout_active),
+        slots: None,
+    };
+
+    // Overall-BPM controls. Read once, share across both keys.
+    let bpm_enabled = handles.show.read().show.globals.overall_bpm_enabled;
+    let current_bpm = handles.show.read().show.globals.overall_bpm;
+
+    // TAP: always rendered "active" so the operator can see it living
+    // on the surface and so the ring animation pulses while idle. The
+    // ripple cadence is a fixed visual (decoupled from real BPM) — the
+    // BpmToggle key is the one that mirrors the actual tempo.
+    out[TAP_KEY as usize] = KeyVisual::Tile {
+        kind: TileKind::Tap,
+        label: "TAP".to_string(),
+        palette: TAP_COLORS,
+        active: true,
+        phase: animation_phase,
+        slots: None,
+    };
+
+    // BPM toggle: label always shows the current BPM number so the
+    // operator can read the global tempo at a glance even when the
+    // override is off (it's the value the toggle WILL apply when
+    // pressed). Active when override is on — the metronome arm swings.
+    out[BPM_TOGGLE_KEY as usize] = KeyVisual::Tile {
+        kind: TileKind::BpmToggle,
+        label: format!("{}", current_bpm.round() as u32),
+        palette: BPM_TOGGLE_COLORS,
+        active: bpm_enabled,
+        phase: phase_for(bpm_enabled),
         slots: None,
     };
 

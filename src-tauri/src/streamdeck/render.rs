@@ -60,6 +60,14 @@ pub enum TileKind {
     Blind,
     /// Toggleable blackout. Strobes red-on-black when active.
     Blackout,
+    /// TAP button — registers a tap timestamp, derives the overall BPM
+    /// from the rolling window. Idle: hand-tap glyph. Active (just
+    /// pressed) flashes briefly so the operator gets visual feedback
+    /// of the press registering.
+    Tap,
+    /// Overall-BPM toggle — flips the global override on/off. Idle:
+    /// dim metronome glyph. Active: bright pulsing metronome.
+    BpmToggle,
 }
 
 /// One key's desired visual. Cached when `state == Idle`; re-rendered
@@ -251,6 +259,8 @@ fn draw_tile(
         TileKind::Scene => draw_scene_glyph(img, icon_cy, fg),
         TileKind::Blind => draw_eye_glyph(img, icon_cy, fg, active, phase),
         TileKind::Blackout => draw_bolt_glyph(img, icon_cy, fg),
+        TileKind::Tap => draw_tap_glyph(img, icon_cy, fg, active, phase),
+        TileKind::BpmToggle => draw_metronome_glyph(img, icon_cy, fg, active, phase),
     }
 
     // -- chaser live RGB strip ------------------------------------------
@@ -355,6 +365,79 @@ fn draw_eye_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, phase:
         // "Blink": the eye closes — just a horizontal bar.
         draw_filled_rect_mut(img, Rect::at(cx - 12, cy - 1).of_size(24, 3), Rgb(bg));
     }
+}
+
+fn draw_tap_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, phase: u32) {
+    // Concentric "ripple" rings — like a finger has just tapped a
+    // surface. When active, the rings expand-and-fade with `phase` to
+    // suggest the next beat is incoming. We draw at most three rings;
+    // the ones that have "expanded" past the key edge are clipped by
+    // the image bounds.
+    let cx = KEY_IMAGE_SIZE as i32 / 2;
+    // Animation cycle: 8 frames at 10fps = 0.8s per ripple sequence,
+    // close enough to the standard 1-2 Hz tap motion.
+    let cycle = 8_u32;
+    let t = (phase % cycle) as f32 / cycle as f32;
+    // Three concentric rings, each offset by 1/3 of the cycle.
+    for i in 0..3 {
+        let local_t = (t + i as f32 / 3.0) % 1.0;
+        let radius = (4.0 + local_t * 18.0) as i32;
+        // Approximate stroke by drawing a filled outer disc and a
+        // "punched-out" inner disc the same colour as the background.
+        if active {
+            draw_filled_circle_mut(img, (cx, cy), radius, fg);
+            let bg = img.get_pixel(0, 0).0;
+            draw_filled_circle_mut(img, (cx, cy), (radius - 2).max(0), Rgb(bg));
+        }
+    }
+    // Static centre dot — always visible so the key reads as TAP-ish
+    // even when the rings are expanded off-screen.
+    draw_filled_circle_mut(img, (cx, cy), 4, fg);
+}
+
+fn draw_metronome_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, phase: u32) {
+    // Trapezoid body (the metronome housing) with a swinging arm. Arm
+    // angle driven by `phase` when active; static at centre when idle.
+    let cx = KEY_IMAGE_SIZE as i32 / 2;
+    // Body — a flat-topped trapezoid drawn as a polygon.
+    let body = [
+        imageproc::point::Point::new(cx - 10, cy + 12),
+        imageproc::point::Point::new(cx + 10, cy + 12),
+        imageproc::point::Point::new(cx + 6, cy - 12),
+        imageproc::point::Point::new(cx - 6, cy - 12),
+    ];
+    imageproc::drawing::draw_polygon_mut(img, &body, fg);
+    // Hollow inside so it doesn't look like a solid block.
+    let bg = img.get_pixel(0, 0).0;
+    let inner = [
+        imageproc::point::Point::new(cx - 8, cy + 10),
+        imageproc::point::Point::new(cx + 8, cy + 10),
+        imageproc::point::Point::new(cx + 4, cy - 10),
+        imageproc::point::Point::new(cx - 4, cy - 10),
+    ];
+    imageproc::drawing::draw_polygon_mut(img, &inner, Rgb(bg));
+    // Arm: pivot at body bottom-centre, swings ±25° at metronome rate.
+    let cycle = 10_u32; // 1.0 s/cycle at 10 fps ≈ 60 BPM swing — close enough
+    let pivot = (cx, cy + 11);
+    let angle = if active {
+        let t = pulse(phase, cycle);  // 0..1 sine
+        (t - 0.5) * 2.0 * std::f32::consts::FRAC_PI_4 // ±π/4
+    } else {
+        0.0 // idle: arm dead-centre
+    };
+    let arm_len = 22_f32;
+    let tip = (
+        pivot.0 + (arm_len * angle.sin()) as i32,
+        pivot.1 - (arm_len * angle.cos()) as i32,
+    );
+    draw_line_segment_mut(
+        img,
+        (pivot.0 as f32, pivot.1 as f32),
+        (tip.0 as f32, tip.1 as f32),
+        fg,
+    );
+    // Counterweight bead near the tip.
+    draw_filled_circle_mut(img, tip, 3, fg);
 }
 
 fn draw_bolt_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>) {

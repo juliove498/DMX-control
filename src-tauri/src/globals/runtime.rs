@@ -8,12 +8,27 @@
 //! resulting state so the engine can compose it into the snapshot.
 
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use crate::engine::{empty_mask, empty_overlay, ChannelMask, ChannelOverlay, DMX_CHANNELS};
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance};
 
 use super::{BlackoutConfig, BlindConfig, GlobalsConfig, MasterConfig};
+
+/// If two TAP presses are spaced wider than this, the operator is
+/// almost certainly starting a new measurement — drop the previous
+/// taps so a stale tempo doesn't drag the average.
+const TAP_RESET_GAP: Duration = Duration::from_secs(2);
+
+/// Bound the rolling tap window so very-old presses can't drift the
+/// average even if they're spaced just under `TAP_RESET_GAP`.
+const TAP_HISTORY_MAX: usize = 8;
+
+/// Reasonable BPM ceiling/floor — anything outside is almost certainly
+/// a misclick or a phantom button release. Matches the Launchpad's BPM
+/// nudge clamp ([20, 300]).
+const TAP_BPM_MIN: f32 = 20.0;
+const TAP_BPM_MAX: f32 = 300.0;
 
 /// Halogen "cold" tip — what blinders look like just as they wake.
 const HALOGEN_AMBER: (f32, f32, f32) = (255.0, 80.0, 0.0);
@@ -31,6 +46,10 @@ pub struct GlobalsRuntime {
     /// Snapshot of fixtures + library used to resolve blind slot writes.
     fixtures: Vec<FixtureInstance>,
     library: HashMap<String, FixtureDefinition>,
+    /// In-memory rolling buffer of TAP button presses. Not persisted —
+    /// a tempo measured at the start of a song is meaningless across
+    /// app restarts. Each entry is a wall-clock `Instant` of one tap.
+    tap_history: Vec<Instant>,
 }
 
 impl Default for GlobalsRuntime {
@@ -44,6 +63,7 @@ impl Default for GlobalsRuntime {
             last_update: None,
             fixtures: Vec::new(),
             library: HashMap::new(),
+            tap_history: Vec::new(),
         }
     }
 }
@@ -75,6 +95,81 @@ impl GlobalsRuntime {
 
     pub fn set_blind(&mut self, pressed: bool) {
         self.blind_target = if pressed { 1.0 } else { 0.0 };
+    }
+
+    /// Toggle the override on/off without touching the stored BPM
+    /// value. Disabling clears the tap window so the next enable starts
+    /// fresh rather than averaging in stale taps from a previous song.
+    pub fn set_overall_bpm_enabled(&mut self, enabled: bool) {
+        self.config.overall_bpm_enabled = enabled;
+        if !enabled {
+            self.tap_history.clear();
+        }
+    }
+
+    /// Set the BPM value directly (e.g. typing into the header input).
+    /// Doesn't change the enabled flag — the operator might want to
+    /// pre-set the value before turning the override on.
+    pub fn set_overall_bpm(&mut self, bpm: f32) {
+        self.config.overall_bpm = bpm.clamp(TAP_BPM_MIN, TAP_BPM_MAX);
+    }
+
+    /// Register a TAP press. Returns the freshly-computed BPM if at
+    /// least two recent taps are available, or `None` if this was the
+    /// first tap of a fresh window. The override is also turned on
+    /// implicitly — operators expect TAP-then-watch behaviour without
+    /// a separate "enable" click.
+    pub fn tap_overall_bpm(&mut self, now: Instant) -> Option<f32> {
+        // Reset on long gaps so a paused performance doesn't poison
+        // the next measurement. Compares to the *last* tap so a slow
+        // four-tap (e.g. 50 BPM = 1.2 s/beat) survives within the
+        // 2 s threshold.
+        if let Some(last) = self.tap_history.last() {
+            if now.saturating_duration_since(*last) > TAP_RESET_GAP {
+                self.tap_history.clear();
+            }
+        }
+        self.tap_history.push(now);
+        if self.tap_history.len() > TAP_HISTORY_MAX {
+            let drop = self.tap_history.len() - TAP_HISTORY_MAX;
+            self.tap_history.drain(0..drop);
+        }
+        if self.tap_history.len() < 2 {
+            // First tap: enable so the next press lands on a hot
+            // override. Don't touch the bpm value yet.
+            self.config.overall_bpm_enabled = true;
+            return None;
+        }
+        // Mean of inter-tap intervals, in seconds. Mean (vs median)
+        // because four-tap measurements are short and a median would
+        // throw away half the data; if the operator drifts they can
+        // simply tap a few more times.
+        let intervals_secs: Vec<f64> = self
+            .tap_history
+            .windows(2)
+            .map(|w| w[1].saturating_duration_since(w[0]).as_secs_f64())
+            .collect();
+        let avg = intervals_secs.iter().sum::<f64>() / intervals_secs.len() as f64;
+        if avg < 0.05 {
+            // <50 ms between taps means a ghost click or stuck button.
+            // Bail out without polluting the stored value.
+            return None;
+        }
+        let bpm = ((60.0 / avg) as f32).clamp(TAP_BPM_MIN, TAP_BPM_MAX);
+        self.config.overall_bpm = bpm;
+        self.config.overall_bpm_enabled = true;
+        Some(bpm)
+    }
+
+    /// The BPM that should override every chaser/movement on this
+    /// frame, or `None` if the operator hasn't enabled the override.
+    /// Read every tick by the engine — keep cheap.
+    pub fn current_overall_bpm(&self) -> Option<f32> {
+        if self.config.overall_bpm_enabled {
+            Some(self.config.overall_bpm)
+        } else {
+            None
+        }
     }
 
     /// Per-frame update. Returns the blind + blackout overlays so the

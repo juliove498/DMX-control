@@ -121,13 +121,17 @@ impl MovementEngine {
     /// at the toggle command, so in practice at most one entry contributes
     /// per tick — but if two were briefly enabled the later iteration
     /// would simply overwrite the earlier one's pan/tilt cells.
-    pub fn tick(&mut self, now: Instant) -> HashMap<u16, ChannelOverlay> {
+    pub fn tick(
+        &mut self,
+        now: Instant,
+        overall_bpm: Option<f32>,
+    ) -> HashMap<u16, ChannelOverlay> {
         let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
         for entry in &mut self.entries {
             if !entry.config.enabled || entry.resolved.is_empty() {
                 continue;
             }
-            advance_phase(&mut entry.runtime, &entry.config, now);
+            advance_phase(&mut entry.runtime, &entry.config, now, overall_bpm);
             for r in &entry.resolved {
                 let (x, y) = evaluate_slot(
                     entry.runtime.global_phase,
@@ -182,10 +186,18 @@ fn resolve_slots(
 /// the boundaries so the same shape traces out and back without ever
 /// jumping — vital for a moving head where a phase wrap means a fast
 /// snap across the rig.
-fn advance_phase(runtime: &mut MovementRuntime, cfg: &MovementGenerator, now: Instant) {
-    let bpm = match cfg.tempo {
+fn advance_phase(
+    runtime: &mut MovementRuntime,
+    cfg: &MovementGenerator,
+    now: Instant,
+    overall_bpm: Option<f32>,
+) {
+    // Same override semantics as the chaser side — keep both effects
+    // locked to one tempo when the operator is driving the rig from
+    // the header's overall BPM.
+    let bpm = overall_bpm.unwrap_or_else(|| match cfg.tempo {
         TempoSource::Fixed { bpm } => bpm,
-    };
+    });
     let beats_per_loop = beats_per_loop(cfg.subdivision);
     let beats_per_sec = (bpm.max(1.0) as f64) / 60.0;
     let cycles_per_sec = beats_per_sec / beats_per_loop;
@@ -367,7 +379,7 @@ mod tests {
         let mut g = MovementGenerator::default_disabled();
         g.fixtures = vec![slot("m1")];
         e.replace_generators(vec![g]);
-        let ov = e.tick(Instant::now());
+        let ov = e.tick(Instant::now(), None);
         assert!(ov.is_empty(), "disabled generator should not write");
     }
 
@@ -379,7 +391,7 @@ mod tests {
         g.enabled = true;
         g.fixtures = vec![slot("m1")];
         e.replace_generators(vec![g]);
-        let ov = e.tick(Instant::now());
+        let ov = e.tick(Instant::now(), None);
         let u = ov.get(&0).expect("universe 0 written");
         // Phase 0: circle at (1, 0). Pan = +1 → DMX 0xFFFF. Tilt = 0 →
         // midpoint 0x8000 (high byte 0x80, low 0x00).
@@ -408,8 +420,8 @@ mod tests {
         e.replace_generators(vec![g]);
 
         let t0 = Instant::now();
-        e.tick(t0); // initialises last_update; phase still 0
-        e.tick(t0 + Duration::from_millis(250));
+        e.tick(t0, None); // initialises last_update; phase still 0
+        e.tick(t0 + Duration::from_millis(250), None);
         let phase = e
             .entries
             .first()
@@ -427,7 +439,7 @@ mod tests {
         g.enabled = true;
         g.fixtures = vec![slot("nope")];
         e.replace_generators(vec![g]);
-        let ov = e.tick(Instant::now());
+        let ov = e.tick(Instant::now(), None);
         assert!(ov.is_empty());
     }
 
@@ -445,7 +457,7 @@ mod tests {
         g.enabled = true;
         g.fixtures = vec![slot("m1")];
         e.replace_generators(vec![g]);
-        let ov = e.tick(Instant::now());
+        let ov = e.tick(Instant::now(), None);
         assert!(ov.is_empty());
     }
 }

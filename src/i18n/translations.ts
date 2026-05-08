@@ -27,6 +27,13 @@ export type Translation = {
   "app.global.blackoutTitle": string;
   "app.global.blind": string;
   "app.global.blindTitle": string;
+  "app.global.bpm.label": string;
+  "app.global.bpm.tap": string;
+  "app.global.bpm.tapHint": string;
+  "app.global.bpm.on": string;
+  "app.global.bpm.off": string;
+  "app.global.bpm.toggleHint": string;
+  "app.global.bpm.editHint": string;
   "app.show.untitled": string;
   "app.show.unsaved": string;
   "app.show.renameHint": string;
@@ -745,6 +752,15 @@ export const en: Translation = {
   "app.global.blackoutTitle": "Blackout (toggle, configurable fades)",
   "app.global.blind": "BLIND",
   "app.global.blindTitle": "Blind / blinder (hold, halogen with fade in/out)",
+  "app.global.bpm.label": "BPM",
+  "app.global.bpm.tap": "TAP",
+  "app.global.bpm.tapHint":
+    "Tap repeatedly to set the overall BPM from your timing. After two taps the value updates and the override turns on.",
+  "app.global.bpm.on": "ON",
+  "app.global.bpm.off": "OFF",
+  "app.global.bpm.toggleHint":
+    "When ON, every chaser and movement runs at this BPM instead of its own configured tempo.",
+  "app.global.bpm.editHint": "Type a BPM (20–300) and press Enter to set it.",
   "app.show.untitled": "Untitled",
   "app.show.unsaved": "(unsaved) · click to rename",
   "app.show.renameHint": "{path} · click to rename",
@@ -1484,6 +1500,15 @@ export const es: Translation = {
   "app.global.blackoutTitle": "Blackout (toggle, fades configurables)",
   "app.global.blind": "BLIND",
   "app.global.blindTitle": "Blind / blinder (mantené presionado, halógeno con fade in/out)",
+  "app.global.bpm.label": "BPM",
+  "app.global.bpm.tap": "TAP",
+  "app.global.bpm.tapHint":
+    "Tocá varias veces para fijar el BPM global a tu ritmo. Después de dos taps el valor se actualiza y el override se activa.",
+  "app.global.bpm.on": "ON",
+  "app.global.bpm.off": "OFF",
+  "app.global.bpm.toggleHint":
+    "Cuando está en ON, todos los chasers y movimientos corren a este BPM en vez de al tempo propio que tengan configurado.",
+  "app.global.bpm.editHint": "Escribí un BPM (20–300) y presioná Enter para fijarlo.",
   "app.show.untitled": "Sin título",
   "app.show.unsaved": "(sin guardar) · click para renombrar",
   "app.show.renameHint": "{path} · click para renombrar",

@@ -126,7 +126,7 @@ impl Default for BlindConfig {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
 #[ts(export, export_to = "../bindings/")]
 pub struct GlobalsConfig {
     #[serde(default)]
@@ -140,6 +140,32 @@ pub struct GlobalsConfig {
     /// fixture override lets the operator extend or narrow that set.
     #[serde(default)]
     pub master: MasterConfig,
+    /// When `true`, every chaser and movement generator ignores its own
+    /// configured `tempo` and runs at `overall_bpm` instead. Lets the
+    /// operator drive the entire rig from one TAP button on the header
+    /// without fiddling with each effect's BPM individually. The bpm
+    /// value is preserved across toggles so disabling and re-enabling
+    /// snaps back to the same tempo.
+    #[serde(default)]
+    pub overall_bpm_enabled: bool,
+    #[serde(default = "default_overall_bpm")]
+    pub overall_bpm: f32,
+}
+
+impl Default for GlobalsConfig {
+    fn default() -> Self {
+        Self {
+            blackout: BlackoutConfig::default(),
+            blind: BlindConfig::default(),
+            master: MasterConfig::default(),
+            overall_bpm_enabled: false,
+            overall_bpm: default_overall_bpm(),
+        }
+    }
+}
+
+fn default_overall_bpm() -> f32 {
+    120.0
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS, PartialEq, Eq)]

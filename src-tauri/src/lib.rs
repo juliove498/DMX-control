@@ -522,6 +522,9 @@ pub fn run() {
             commands::update_globals,
             commands::set_blackout,
             commands::set_blind,
+            commands::set_overall_bpm,
+            commands::set_overall_bpm_enabled,
+            commands::tap_overall_bpm,
             // MIDI
             commands::list_midi_devices,
             commands::connect_midi_device,

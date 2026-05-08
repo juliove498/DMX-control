@@ -14,6 +14,8 @@ const DEFAULT_GLOBALS: GlobalsConfig = {
   blackout: { active: false, fade_in_ms: 200, fade_out_ms: 800, fixtures: [] },
   blind: { fade_in_ms: 80, fade_out_ms: 1500, fixtures: [] },
   master: { fixtures: [] },
+  overall_bpm_enabled: false,
+  overall_bpm: 120,
 };
 
 /// Mirror of `ChannelRole::label()` — returns the snake-case role name,

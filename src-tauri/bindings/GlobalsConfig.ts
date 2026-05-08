@@ -11,4 +11,13 @@ export type GlobalsConfig = { blackout: BlackoutConfig, blind: BlindConfig,
  * leaving pan/tilt/zoom/colour-wheel/etc. untouched. The per-
  * fixture override lets the operator extend or narrow that set.
  */
-master: MasterConfig, };
+master: MasterConfig, 
+/**
+ * When `true`, every chaser and movement generator ignores its own
+ * configured `tempo` and runs at `overall_bpm` instead. Lets the
+ * operator drive the entire rig from one TAP button on the header
+ * without fiddling with each effect's BPM individually. The bpm
+ * value is preserved across toggles so disabling and re-enabling
+ * snaps back to the same tempo.
+ */
+overall_bpm_enabled: boolean, overall_bpm: number, };

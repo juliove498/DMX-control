@@ -1,0 +1,89 @@
+---
+title: Chasers
+description: Generadores ambientales — patrones de color y luz que respiran al BPM, sin pisar lo que hacés en vivo.
+---
+
+import { Image } from "astro:assets";
+import chasersOverview from "../../assets/captures/chasers-overview.png";
+import chasersCardAnatomy from "../../assets/captures/chasers-card-anatomy.png";
+
+Un **chaser** es un generador ambiental que escribe ciclos de color e
+intensidad sobre los fixtures, en sincronía con el BPM master. Está
+pensado para ser el telón de fondo del show: vos seguís disparando
+escenas y editando looks; el chaser sigue corriendo abajo sin
+interferir, porque sus escrituras tienen prioridad baja — cualquier
+canal que toques desde el Stage o desde una escena lo pisa.
+
+## La vista a vuelo de pájaro
+
+<Image src={chasersOverview} alt="Vista general de Chasers con dos cards (uno encendido, uno apagado) y los botones de creación" />
+
+1. **Acciones del header.** _+ Example chasers_ siembra un par de
+   chasers de ejemplo en el show (útil para tener algo corriendo en
+   minutos); _+ New chaser_ crea uno vacío y abre su editor.
+2. **Card de chaser encendido.** Cuando un chaser está en ON, la card
+   gana un borde lateral del color del pad asignado (el mismo color
+   con el que aparece en Launchpad / Stream Deck). Es la pista visual
+   más rápida para saber qué está corriendo.
+3. **Toggle ON / OFF.** Apaga o prende el chaser. El cambio es
+   inmediato; el fade interno entre pasos sigue respetándose, así
+   que prender un chaser no produce un salto duro.
+
+:::tip[¿Cuándo usar Example chasers?]
+La primera vez que abrís la app con un show vacío. Te deja un par de
+chasers ya configurados que podés activar y empezar a escuchar para
+entender cómo se mezclan con el resto del rig.
+:::
+
+## Anatomía de un chaser expandido
+
+Apretar **Edit** abre el editor en línea con tres tabs. _Hide_
+contrae la tarjeta y deja sólo la fila resumen.
+
+<Image src={chasersCardAnatomy} alt="Card de chaser expandido mostrando los tabs Pattern & Color, Timing & Fade y Slots" />
+
+1. **Fila resumen.** Toggle ON/OFF, nombre editable, resumen
+   (`120 BPM · 6 slots · fade`), botones _Edit_ / _Hide_ y _Del_. El
+   nombre se edita inline — clic dentro y empezás a tipear.
+2. **Tabs del editor.** Tres pestañas independientes:
+   - **Pattern & Color.** Qué patrón de movimiento corre (Chase, Wave,
+     Ping-pong, Pulse, etc.) y cómo se colorea (un color, dos en
+     cadencia, paleta o arcoíris).
+   - **Timing & Fade.** A qué tempo (BPM fijo o atado al master),
+     subdivisión rítmica (`1/16`, `1/8`, `1/4`, …) y la curva de fade
+     entre pasos (lineal, ease, exponencial, log).
+   - **Slots.** Qué fixtures participan del chaser y, por cada uno,
+     si el chaser puede tocar su intensidad, su color o ambos.
+3. **Cuerpo del tab.** Lo que cambia según la pestaña activa. En la
+   captura está abierto _Pattern & Color_ con el chaser arcoíris:
+   patrón _Wave →_, modo de color _Rainbow_, controles de _Speed_ y
+   _Spread_.
+
+## Cómo se mezcla con escenas
+
+Los chasers escriben con prioridad baja, así que **una escena
+recalleada gana** sobre los canales que el chaser toque en común.
+Pero las escenas también pueden _llevar consigo_ el estado de los
+chasers: al recallar una escena, el chaser asociado se prende, se
+apaga o queda como estaba (`Inherit`).
+
+Eso significa que podés tener una escena _tema A_ que prende el
+chaser de cadencia rojo/azul y otra _tema B_ que lo apaga, todo en
+el mismo botón.
+
+:::note[Prioridad de escritura]
+Los chasers usan _low-priority writes_ contra la mezcla DMX final.
+El orden efectivo es: chaser → movement → escena → edición manual
+desde el Stage. El de más arriba es el que termina llegando al
+fixture.
+:::
+
+## Atajos relacionados
+
+- **BPM master.** Todos los chasers que tengan tempo _master_
+  siguen el BPM global; cambiarlo arriba a la derecha del header los
+  acelera o frena en sincronía. Ver el capítulo de Controles
+  globales.
+- **Stream Deck / Launchpad.** El toggle ON/OFF se puede asignar a
+  un pad físico desde **Config**. El color del pad coincide con el
+  borde lateral de la card.

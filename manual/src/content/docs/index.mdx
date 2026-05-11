@@ -1,0 +1,37 @@
+---
+title: DMX Control
+description: Manual del operador para el sistema de control DMX en vivo.
+template: splash
+hero:
+  tagline: Manual del operador
+  actions:
+    - text: Empezar por el Stage
+      link: /stage/
+      icon: right-arrow
+      variant: primary
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+Bienvenido al manual de **DMX Control**. Este documento es para el operador
+en cabina: cómo armar el rig, recallar escenas, programar chasers y
+gobernar todo desde el Stream Deck o el control remoto.
+
+<CardGrid>
+  <Card title="Stage" icon="seti:smarty">
+    La vista por defecto. Aquí ves todos los fixtures patcheados y
+    seleccionás cuáles editar antes de tocar las perillas.
+  </Card>
+  <Card title="Escenas" icon="seti:powershell">
+    Snapshots de un look completo que se recallan con un fade. La memoria
+    operativa del show.
+  </Card>
+  <Card title="Chasers + Movement" icon="rocket">
+    Generadores ambientales: chases de color y patrones de pan/tilt que
+    corren en el fondo sin pisar tus escenas.
+  </Card>
+  <Card title="Stream Deck + MIDI" icon="setting">
+    Cualquier botón del Stream Deck o tecla MIDI puede dispararse contra
+    una escena. Todo en la pestaña Config.
+  </Card>
+</CardGrid>

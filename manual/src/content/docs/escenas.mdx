@@ -1,0 +1,77 @@
+---
+title: Escenas
+description: Snapshots de un look completo. La memoria operativa del show — recall con un fade y olvidate.
+---
+
+import { Image } from "astro:assets";
+import scenesOverview from "../../assets/captures/scenes-overview.png";
+import scenesRecallActive from "../../assets/captures/scenes-recall-active.png";
+import scenesEditorDetail from "../../assets/captures/scenes-editor-detail.png";
+
+Una **escena** es un snapshot del rig completo: cada fixture, cada
+canal, el estado de los chasers y el de los movimientos. Cuando la
+recallás, el sistema interpola del look actual al look guardado con
+el fade que vos le hayas configurado.
+
+## La vista a vuelo de pájaro
+
+<Image src={scenesOverview} alt="Vista general de Escenas con anotaciones sobre la lista, el editor y los botones GO y New" />
+
+1. **Lista de escenas.** Todas las escenas del show, con su contador
+   de pasos. La selección (click sobre el nombre) abre la escena en
+   el editor de la derecha; el GO (`▶`) la dispara sin tocar la
+   selección.
+2. **Editor de escena.** Donde editás la escena seleccionada: nombre,
+   pasos (steps), tiempos de fade y hold, qué chasers/movements la
+   acompañan.
+3. **+ New scene.** Crea una escena nueva tomando el look actual del
+   rig como primer paso. Después podés tunear todo desde el editor.
+4. **GO de cada fila.** Recall instantáneo de esa escena con su fade
+   configurado. Es el botón que más vas a apretar durante el show.
+
+## Una escena en vivo
+
+<Image src={scenesRecallActive} alt="La escena Azul ambient está activa en el paso 2; el footer inferior muestra el estado y el botón Release" />
+
+Cuando recallás una escena, el sistema marca dos cosas:
+
+1. **La fila se ilumina** en la lista — sabés a primer vistazo cuál
+   está jugando.
+2. **El footer inferior** aparece con el nombre, el paso actual (en
+   escenas multi-step se actualiza solo) y el botón **RELEASE**, que
+   corta la escena y vuelve a los defaults del rig.
+
+:::note
+El "paso actual" sólo aparece en escenas con más de un step. Las
+escenas de un solo step no tienen ciclo, así que no hay paso que
+mostrar.
+:::
+
+## Anatomía del editor
+
+<Image src={scenesEditorDetail} alt="Editor de la escena Azul ambient con sus tres pasos y el formulario para agregar otro" />
+
+1. **Cabecera.** GO de la escena, nombre editable (doble clic →
+   Enter confirma, Escape cancela), total cycle (suma de fade + hold
+   de cada paso), botones AI y Delete.
+2. **Lista de pasos (steps).** Cada step tiene su propio fade-in,
+   hold, opciones de chaser/movement y un botón rojo para
+   eliminarlo. El step que está jugando tiene un halo dorado.
+3. **+ Add step.** Toma el look actual del rig y lo convierte en un
+   nuevo paso al final. _Touched only_ limita la captura a los
+   fixtures que tocaste explícitamente desde el último clear.
+
+:::tip[¿Multi-step o single-step?]
+Si el look es estático, una escena de un solo step alcanza. Multi-step
+sirve cuando querés que la escena "respire" sola — entrada lenta,
+pico, bajada — sin tener que pisar otro botón.
+:::
+
+## Atajos relacionados
+
+- **Stream Deck / MIDI.** Cualquier botón externo se puede asignar a
+  un GO de escena desde **Config**. Ver el capítulo de Stream Deck
+  cuando esté listo.
+- **AI.** El botón _Improve with AI_ del editor toma la escena
+  actual como semilla y te deja iterarla con un prompt de texto. La
+  cubrimos en el capítulo de IA.

@@ -1,0 +1,87 @@
+---
+title: Stream Deck
+description: Convertir un Elgato Stream Deck en superficie de control. Plug-and-play con layout fijo — chasers, movements, escenas y los globales en filas dedicadas.
+---
+
+import { Image } from "astro:assets";
+import streamdeckOverview from "../../assets/captures/streamdeck-overview.png";
+
+Un **Stream Deck** es una grilla de teclas con LCD detrás de cada
+una; conectarlo a la app lo convierte en una superficie de control
+para disparar chasers, movimientos, escenas y los toggles globales
+sin tocar el mouse. La integración es _plug-and-play_: enchufás,
+apretás _Refrescar_, _Conectar_, y la grilla queda mapeada con un
+layout fijo.
+
+## La vista de Config
+
+<Image src={streamdeckOverview} alt="Sub-tab Stream Deck dentro de Config con un device XL conectado" />
+
+Vive en **Config → Stream Deck**.
+
+1. **Texto introductorio.** Resume el layout fijo: fila 1 chasers,
+   fila 2 movimientos, fila 3 escenas + blind + blackout. Se lee de
+   un golpe — si querés saber qué tecla hace qué, está acá.
+2. **Dispositivos detectados.** Lista los Stream Decks que el sistema
+   reconoce ahora mismo. Cada item muestra el modelo (XL, Mk.2, etc.),
+   la cantidad de teclas y el serial. _Refrescar_ vuelve a escanear el
+   bus USB; _Conectar_ toma posesión del device. Sólo uno conectado
+   a la vez.
+3. **Estado.** Sólo aparece cuando hay un device conectado. Repite el
+   modelo y las teclas para confirmar que el _surface_ está activo —
+   "surface activo" significa que la app ya está empujando colores e
+   íconos a las teclas y escuchando los presses.
+
+:::tip[Si no aparece ningún device]
+Asegurate de cerrar el _Stream Deck Software_ oficial de Elgato.
+HID-compatible: dos procesos no pueden tener el mismo dispositivo
+abierto simultáneamente, así que si el daemon de Elgato lo agarró
+primero, vas a ver _No se encontraron Stream Decks_ acá.
+:::
+
+## El layout fijo
+
+Hoy el mapeo es estático — no hay configuración por tecla, todavía.
+Así se distribuye sobre el device XL (32 teclas en 4×8); en Mk.2 la
+fila Globales queda más justa porque hay 5 columnas en vez de 8.
+
+```text
+Fila 1  →  Chaser 1   Chaser 2   Chaser 3   Chaser 4   Chaser 5    · · ·
+Fila 2  →  Mov 1      Mov 2      Mov 3      Mov 4      Mov 5       · · ·
+Fila 3  →  Escena 1   Escena 2   Escena 3   Blind*     Blackout
+Fila 4  →  · · ·  (libre)
+```
+
+\* _Blind_ es **momentáneo**: sólo dispara mientras tenés la tecla
+apretada. _Blackout_ es **toggle**: una pulsación lo prende, otra lo
+apaga.
+
+### Cómo se ve en el LCD
+
+- **Chasers / Movimientos.** El color del pad del chaser/movement —
+  el mismo que aparece como borde en su card — se renderiza de fondo;
+  el nombre va escrito arriba. ON/OFF se muestra con saturación
+  (apagado = atenuado).
+- **Escenas.** Color genérico salvo cuando una escena está activa,
+  ahí el LCD se enciende. Recallar es instantáneo (respeta el fade
+  configurado en la escena).
+- **Blind / Blackout.** Íconos dedicados. Blackout pulsa cuando está
+  activo para que se vea desde lejos en cabina.
+
+:::note[Capacidad y prioridad]
+El layout asume que tu show tiene los chasers/movements/escenas que
+querés disparar en las primeras posiciones. Si tenés 12 chasers y
+sólo querés que los pads disparen 5, reordenalos en sus listas — los
+primeros 5 son los que aparecen.
+:::
+
+## Reconexión y persistencia
+
+- **El device queda asociado al show.** Si guardás el show con el
+  Stream Deck conectado, al reabrirlo se reconecta automáticamente
+  cuando la app encuentra el mismo serial.
+- **Hot-plug.** Desenchufar y volver a enchufar funciona — la app lo
+  re-detecta sin reiniciar; puede que tengas que apretar _Refrescar_
+  para que aparezca en la lista.
+- **Si cambia el modelo**, el layout se ajusta solo a la cantidad de
+  teclas disponibles; teclas que no entran simplemente no se mapean.

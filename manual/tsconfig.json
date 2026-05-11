@@ -1,0 +1,11 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "paths": {
+      "@bindings/*": ["../src-tauri/bindings/*"]
+    }
+  },
+  "include": [".astro/types.d.ts", "**/*.ts", "**/*.tsx", "**/*.astro", "**/*.mdx"],
+  "exclude": ["dist", "node_modules", "output"]
+}

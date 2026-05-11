@@ -1,0 +1,53 @@
+---
+title: El Stage
+description: La vista principal del operador — fixtures patcheados, controles globales y la barra de navegación.
+---
+
+import { Image } from "astro:assets";
+import stageOverview from "../../assets/captures/stage-overview.png";
+import stageFixtureAnatomy from "../../assets/captures/stage-fixture-anatomy.png";
+
+El **Stage** es la pantalla con la que vas a pasar el 90% del show.
+Combina tres bloques en una sola vista: la barra de navegación, los
+controles globales y el lienzo donde viven los fixtures.
+
+<Image src={stageOverview} alt="Vista general del Stage con anotaciones sobre las cuatro zonas principales" />
+
+## Las cuatro zonas
+
+1. **Barra de navegación.** Cada pestaña abre una vista distinta —
+   Stage (esta), Escenas, Chaser, Movement, Preview 3D y Config. La
+   flecha `↗` al lado de cada nombre abre esa vista en una ventana
+   independiente, útil cuando tenés un segundo monitor en cabina.
+2. **Controles globales.** Vivien en la esquina superior derecha y
+   están disponibles desde cualquier pestaña: el _BPM master_ (con
+   tap), el botón _BLACKOUT_ (toggle) y el botón _BLIND_
+   (momentáneo, mientras lo tenés apretado).
+3. **El lienzo del Stage.** Es donde vas a hacer el grueso del trabajo
+   de programación: seleccionar fixtures, editar sus canales, recordar
+   recalls.
+4. **Blackout.** Tip: para emergencias o cambios bruscos de tema, el
+   blackout corta toda la salida con el fade configurado en
+   _Config → Globales_.
+
+## Anatomía de un fixture
+
+Cada tarjeta del lienzo representa un fixture patcheado. El click la
+selecciona y abre sus encoders en el panel lateral derecho.
+
+<Image src={stageFixtureAnatomy} alt="Una tarjeta de fixture circulada, con flecha hacia el panel de encoders" />
+
+1. **Selección.** El fixture seleccionado queda resaltado con un borde.
+   `⌘-click` (Mac) o `Ctrl-click` agrega o quita de la selección
+   múltiple, así podés editar varios a la vez.
+2. **Apertura de encoders.** Una vez seleccionado, los controles de
+   canal aparecen en el panel lateral derecho.
+3. **Caption del fixture.** El label superior es el nombre del fixture
+   (editable); abajo está la firma DMX (`U1 · 5` = universo 1,
+   dirección 5).
+
+:::tip[Atajo]
+Mantené presionado y arrastrá sobre el lienzo para hacer una
+selección con marco — todos los fixtures que toque el rectángulo
+quedan seleccionados.
+:::

@@ -1,0 +1,26 @@
+{
+  "name": "dmx-control-manual",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Documentation pipeline + static site for DMX Control. The capture pipeline (captures/) drives the running app with Playwright and writes annotated screenshots into src/assets/captures/. Astro Starlight (src/content/) renders the manual.",
+  "scripts": {
+    "capture": "tsx captures/run.ts",
+    "capture:scene": "tsx captures/run.ts --scene",
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.4",
+    "@astrojs/starlight": "^0.30.6",
+    "astro": "^5.1.6",
+    "sharp": "^0.33.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "playwright": "^1.49.1",
+    "tsx": "^4.19.2",
+    "typescript": "~5.8.3"
+  }
+}

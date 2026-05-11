@@ -1,0 +1,7 @@
+node_modules
+.astro
+dist
+# Generated screenshots — regenerable from `npm run capture`, kept out of
+# git so PRs aren't dominated by binary churn every time the UI shifts a
+# pixel. Re-running the pipeline rebuilds the same set deterministically.
+src/assets/captures/

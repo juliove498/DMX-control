@@ -1,0 +1,86 @@
+---
+title: Patch
+description: Decir qué fixtures físicos hay en el rig y en qué dirección DMX viven. La base sobre la que se construye todo lo demás.
+---
+
+import { Image } from "astro:assets";
+import patchOverview from "../../assets/captures/patch-overview.png";
+import patchConflict from "../../assets/captures/patch-conflict.png";
+
+**Patchear** es decirle al software qué fixtures hay en tu rig y a
+qué dirección DMX está cada uno conectado. Vive en
+**Config → Patch**. Sin patch no hay nada que controlar — el resto
+del manual asume que ya pasaste por acá.
+
+Cada fila de la tabla representa un _fixture instance_: una
+referencia a un fixture de la biblioteca (la _definition_), un modo
+DMX (`4ch`, `12ch`, etc.), un universo y una dirección de inicio.
+
+## La vista a vuelo de pájaro
+
+<Image src={patchOverview} alt="Vista de Patch dentro de Config con seis fixtures patcheados y el formulario para agregar más" />
+
+1. **Formulario de Add.** Los seis controles de izquierda a derecha:
+   - **Fixture** — qué definición de la biblioteca usar.
+   - **Modo** — qué modo DMX (cantidad de canales) abrir.
+   - **Qty** — cuántas instancias agregar de una sola vez. Si pedís
+     3 con un fixture de 4 canales, ocupa 12 direcciones consecutivas.
+   - **U** (universo) y **Addr** (dirección de inicio). _Addr_ se
+     auto-completa con el primer hueco libre del universo elegido,
+     pero cualquier edición manual gana.
+   - **Label** opcional. Vacío significa "usar el nombre del fixture".
+2. **Estado del patch.** El badge superior derecho dice _patch
+   clean_ cuando todo está bien o _N conflicts · M problems_ cuando
+   detecta solapamientos o errores de configuración. Es la primera
+   cosa que mirás antes de empezar un show.
+3. **Tabla de fixtures patcheados.** Una fila por instance, con
+   columnas editables in-place: cambiar la _Addr_ acá ahorra borrar
+   y volver a agregar. _Range_ muestra el rango ocupado
+   (`addr…addr+canales-1`) — útil para entender visualmente cuánto
+   espacio te queda en el universo.
+
+:::tip[Cuántas direcciones por universo]
+DMX-512 da 512 canales por universo. Si tu rig necesita más, mover
+fixtures pesados (cabezas móviles con 30+ canales) a un universo
+aparte es lo más limpio.
+:::
+
+## Cuando algo se solapa
+
+<Image src={patchConflict} alt="Patch con un fixture mal direccionado; el badge muestra 2 conflicts y abajo aparece el panel de issues" />
+
+Agregar un fixture en una dirección que ya está ocupada no se
+bloquea — el software te deja hacerlo, pero te lo marca:
+
+1. **El badge cambia a warn** — `2 conflicts · 0 problems` en este
+   ejemplo. _Conflicts_ son dos fixtures pisándose el mismo rango
+   en el mismo universo; _problems_ son errores estructurales (modo
+   inexistente, dirección fuera de 1..512, etc.).
+2. **El panel de issues** aparece debajo de la tabla, listando cada
+   conflicto con la pareja de fixtures, el universo y los canales
+   exactos del solapamiento. Las filas afectadas se tiñen rojas en
+   la tabla.
+
+Para resolverlo: editás la _Addr_ de uno de los dos fixtures en la
+columna correspondiente y el badge vuelve a _patch clean_ en cuanto
+el solapamiento desaparece.
+
+:::note[¿Y si dejo el conflicto?]
+La salida DMX se sigue calculando, pero los canales solapados
+reciben los valores del último fixture procesado — en general no es
+lo que querés. Tratá _conflicts_ como bloqueante antes de empezar a
+programar escenas.
+:::
+
+## Cómo se conecta con el resto
+
+- **Library.** Las opciones del dropdown de _Fixture_ vienen de
+  **Config → Library**. Si tu cabeza no aparece, primero la agregás
+  ahí.
+- **Outputs.** _Patch_ asigna un universo lógico al fixture; **Config
+  → Outputs** es donde decís por qué cable físico (sACN, Open DMX,
+  Enttec) sale ese universo. Ver el capítulo de Salidas DMX.
+- **Stage.** Cada fixture patcheado aparece como una tarjeta en el
+  Stage en la `position` que se le asigna automáticamente al
+  agregarlo. Después arrastrás libremente desde el Stage para
+  reordenar el layout visual.

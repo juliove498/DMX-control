@@ -1,0 +1,85 @@
+---
+title: Movements
+description: Pan / tilt patrones para cabezas móviles. La pareja temática del Chaser, pero para mover luz por el espacio en vez de pintarla con color.
+---
+
+import { Image } from "astro:assets";
+import movementsOverview from "../../assets/captures/movements-overview.png";
+import movementsShape from "../../assets/captures/movements-shape.png";
+
+Un **movement** es un generador que escribe pan y tilt sobre un grupo
+de cabezas móviles, en sincronía con el BPM. Es a las cabezas lo que
+el chaser es al color: corre solo, respeta la prioridad baja contra
+escenas y edición manual, y se prende o apaga con un toggle.
+
+A diferencia de los chasers, los movements **sólo aceptan fixtures
+con canales `pan` o `tilt`**. La aplicación filtra el dropdown _Add
+fixture_ para no ofrecerte un PAR estático: si lo elegís, el motor
+descarta el slot silenciosamente y nada se mueve.
+
+## La vista a vuelo de pájaro
+
+<Image src={movementsOverview} alt="Vista del Movement view: lista a la izquierda con un movement encendido, parámetros al centro, preview SVG a la derecha" />
+
+1. **Lista de movements.** Un movement por fila, con el conteo de
+   slots (cuántas cabezas tiene asignadas). El borde izquierdo se
+   ilumina cuando el movement está en ON, igual que con los chasers.
+   La selección abre el editor a la derecha; sólo hay un movement
+   editable a la vez.
+2. **Columna de parámetros.** Los cinco bloques que definen la forma:
+   _Fixtures_, _Shape_, _Canon_ (cómo se distribuyen las cabezas en
+   la trayectoria), _Timing_ y _Transform_ (size, center, rotation).
+   Scroll vertical cuando no entran todos en el viewport.
+3. **Preview en vivo.** SVG en tiempo real que dibuja la trayectoria,
+   el bounding box, el handle de rotación y un dot por fixture
+   recorriendo la curva. Es interactivo: las esquinas redimensionan,
+   el centro mueve el bounding box, el handle exterior rota.
+
+:::tip[¿Cómo se elige el primer fixture?]
+Patcheá las cabezas (Config → Patch) con un fixture cuyo modo
+declare `pan` y `tilt` como roles. El dropdown _Add fixture_ del
+movement va a listarlas automáticamente.
+:::
+
+## Anatomía de los parámetros
+
+<Image src={movementsShape} alt="Close-up de los bloques Shape, Canon y Timing del editor de movements" />
+
+1. **Shape.** Define la trayectoria geométrica: _Circle_, _Polygon_
+   (con N lados), _Star_ (con puntas + ratio interno), _Figure 8_,
+   _Line H/V_ y _Sine combo_ (Lissajous arbitrario con dos waveforms).
+   Cambiar el shape es lo que más impacto visual tiene.
+2. **Canon.** Cómo se distribuyen las cabezas a lo largo del ciclo.
+   _None_ → todas en fase, _Even_ → equiespaciadas, _Symmetric_ →
+   reflejadas alrededor del centro, _Pairs_ → de a dos en fase, y
+   _Manual_ para tocar el offset por fixture en la lista de slots.
+3. **Timing.** _BPM_ y _Loop length_ (cuántos beats dura una vuelta:
+   `1/16`, `1/8`, _1 beat_, _2 beats_, _4 beats_). El _Direction_
+   manda Forward, Reverse o Ping-pong; éste último rebota al final
+   del ciclo en lugar de cortarlo.
+
+:::note[Loop length vs. BPM]
+Para un mismo BPM, _4 beats_ se siente más lento que _1 beat_ — la
+trayectoria ocupa más tiempo por vuelta. Es la perilla más útil para
+ajustar el feel sin pelear con el master.
+:::
+
+## Cómo se mezcla con el resto
+
+- **Prioridad de escritura.** Como los chasers, los movements
+  escriben con baja prioridad. Recallar una escena que toque pan/tilt
+  manualmente sobre los mismos fixtures gana sobre el movement.
+- **Escenas pueden prender/apagar movements.** Al recallar una
+  escena, el estado del movement asociado se aplica (`Enabled`,
+  `Disabled` o `Inherit`). La misma idea que con chasers — todo en
+  un solo botón.
+- **Stream Deck / Launchpad.** El toggle ON/OFF se mapea a un pad
+  desde **Config**. El color del pad coincide con el del borde
+  lateral en la lista.
+
+:::tip[Editar la forma con el mouse]
+Las esquinas amarillas del bounding box redimensionan, el dot
+central traslada y el círculo en el extremo derecho rota. No hace
+falta tocar los sliders de Transform si tenés el preview a mano —
+las dos vistas están sincronizadas.
+:::

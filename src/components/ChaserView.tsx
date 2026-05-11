@@ -726,12 +726,15 @@ function ChaserCard({
 
   return (
     <div
+      data-doc="chaser-card"
+      data-doc-on={chaser.enabled ? "true" : undefined}
       className={`chaser-card${chaser.enabled ? " on" : ""}`}
       style={chaser.enabled ? { borderLeft: `4px solid ${padColor}` } : undefined}
     >
-      <div className="chaser-row">
+      <div className="chaser-row" data-doc="chaser-row">
         <button
           type="button"
+          data-doc="chaser-toggle"
           className={`chaser-toggle${chaser.enabled ? " on" : ""}`}
           onClick={() => toggleChaser(chaser.id, !chaser.enabled)}
           aria-label={chaser.enabled ? t("chaser.toggle.disable") : t("chaser.toggle.enable")}
@@ -767,7 +770,7 @@ function ChaserCard({
             aria-hidden="true"
           />
         ) : null}
-        <button type="button" onClick={onToggleExpanded}>
+        <button type="button" data-doc="chaser-edit-toggle" onClick={onToggleExpanded}>
           {expanded ? t("chaser.hide") : t("chaser.edit")}
         </button>
         <button type="button" className="danger" onClick={() => deleteChaser(chaser.id)}>
@@ -778,8 +781,8 @@ function ChaserCard({
       <ChaserPreview chaser={chaser} fixtures={fixtures} />
 
       {expanded ? (
-        <div className="chaser-edit">
-          <nav className="chaser-tabs">
+        <div className="chaser-edit" data-doc="chaser-edit">
+          <nav className="chaser-tabs" data-doc="chaser-tabs">
             {(
               [
                 { id: "pattern", labelKey: "chaser.tab.pattern" as const },
@@ -1062,13 +1065,13 @@ export function ChaserView() {
 
   return (
     <main className="page chaser-view">
-      <header className="page-head">
+      <header className="page-head" data-doc="chaser-head">
         <h2>{t("chaser.title", { count: chasers.length })}</h2>
-        <div className="actions">
-          <button type="button" onClick={onAddExamples}>
+        <div className="actions" data-doc="chaser-actions">
+          <button type="button" data-doc="chaser-add-example" onClick={onAddExamples}>
             {t("chaser.addExample")}
           </button>
-          <button type="button" onClick={onNew}>
+          <button type="button" data-doc="chaser-add-new" onClick={onNew}>
             {t("chaser.addNew")}
           </button>
         </div>
@@ -1089,7 +1092,7 @@ export function ChaserView() {
       {chasers.length === 0 ? (
         <p className="empty">{t("chaser.empty")}</p>
       ) : (
-        <div className="chaser-list">
+        <div className="chaser-list" data-doc="chaser-list">
           {chasers.map((c, i) => (
             <ChaserCard
               key={c.id}

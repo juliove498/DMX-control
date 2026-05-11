@@ -20,15 +20,14 @@ use tauri::AppHandle;
 
 use crate::chaser::runtime::SlotOutput;
 use crate::chaser::Rgb;
+use crate::engine::loop_playback::SharedLoopPlayback;
 use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
 use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::EngineState;
-use crate::show::ShowState;
-use crate::streamdeck::layout::{
-    BLACKOUT_COLORS, BLACKOUT_KEY, BLIND_COLORS, BLIND_KEY, BPM_TOGGLE_COLORS, BPM_TOGGLE_KEY,
-    CHASER_KEYS, CHASER_PALETTE, MOVEMENT_KEYS, MOVEMENT_PALETTE, SCENE_KEYS, SCENE_PALETTE,
-    TAP_COLORS, TAP_KEY,
+use crate::show::button_bindings::{
+    ButtonAction, ButtonActiveMode, ButtonIcon, StreamDeckBinding,
 };
+use crate::show::ShowState;
 use crate::streamdeck::render::{KeyVisual, RenderCache, TileKind};
 use crate::streamdeck::StreamDeckDeviceInfo;
 
@@ -96,6 +95,7 @@ struct SdHandles {
     movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
+    loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
     blind_held: Arc<AtomicBool>,
@@ -167,6 +167,7 @@ pub fn start(
     movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
+    loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
 ) -> Result<StreamDeckController, String> {
@@ -217,6 +218,7 @@ pub fn start(
         movement,
         globals: globals.clone(),
         scenes,
+        loops,
         engine,
         show,
         blind_held: blind_held.clone(),
@@ -329,9 +331,89 @@ fn process_button_changes(state: &[bool], last_state: &mut Vec<bool>, handles: &
     }
 }
 
+fn resolve_bindings(handles: &SdHandles) -> Vec<StreamDeckBinding> {
+    let bindings = handles.show.read().show.button_bindings.clone();
+    if bindings.custom_enabled {
+        bindings.streamdeck
+    } else {
+        crate::show::button_bindings::default_streamdeck_bindings()
+    }
+}
+
+/// Resolve `*ByIndex` against the show's lists. Mirror of the launchpad
+/// helper — kept local so the two surfaces stay independent.
+fn resolve_indexed_action(handles: &SdHandles, action: &ButtonAction) -> Option<ButtonAction> {
+    let s = handles.show.read();
+    Some(match action {
+        ButtonAction::ToggleChaserByIndex { index } => {
+            let id = s.show.chasers.get(*index as usize)?.id.clone();
+            ButtonAction::ToggleChaser { id }
+        }
+        ButtonAction::ToggleMovementByIndex { index } => {
+            let id = s.show.movements.get(*index as usize)?.id.clone();
+            ButtonAction::ToggleMovement { id }
+        }
+        ButtonAction::RecallSceneByIndex { index } => {
+            let id = s.show.scenes.get(*index as usize)?.id.clone();
+            ButtonAction::RecallScene { id }
+        }
+        ButtonAction::StartLoopGroupByIndex { index } => {
+            let id = s.show.scene_loop_groups.get(*index as usize)?.id.clone();
+            ButtonAction::StartLoopGroup { id }
+        }
+        other => other.clone(),
+    })
+}
+
+fn is_action_active(action: &ButtonAction, handles: &SdHandles) -> bool {
+    match action {
+        ButtonAction::None => false,
+        ButtonAction::ToggleChaser { id } => handles
+            .show
+            .read()
+            .show
+            .chasers
+            .iter()
+            .any(|c| &c.id == id && c.enabled),
+        ButtonAction::ToggleMovement { id } => handles
+            .show
+            .read()
+            .show
+            .movements
+            .iter()
+            .any(|m| &m.id == id && m.enabled),
+        ButtonAction::RecallScene { id } => handles
+            .scenes
+            .lock()
+            .active_scene_id()
+            .map(|a| a == id)
+            .unwrap_or(false),
+        ButtonAction::Blackout => handles.show.read().show.globals.blackout.active,
+        ButtonAction::Blind => handles.blind_held.load(Ordering::Relaxed),
+        ButtonAction::Tap => false,
+        ButtonAction::ToggleOverallBpm => {
+            handles.show.read().show.globals.overall_bpm_enabled
+        }
+        ButtonAction::BumpActiveChaserBpm { .. } => false,
+        ButtonAction::StartLoopGroup { id } => handles
+            .loops
+            .lock()
+            .active_group_id()
+            .map(|a| a == id)
+            .unwrap_or(false),
+        ButtonAction::StopLoopGroup => false,
+        _ => false,
+    }
+}
+
 fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
-    // Blind: momentary. Both press and release dispatch.
-    if key == BLIND_KEY {
+    let bindings = resolve_bindings(handles);
+    let Some(binding) = bindings.iter().find(|b| b.key == key) else {
+        return;
+    };
+    let action = binding.action.clone();
+    // Blind is momentary — both press and release dispatch.
+    if let ButtonAction::Blind = action {
         handles.blind_held.store(pressed, Ordering::Relaxed);
         handles.globals.lock().set_blind(pressed);
         let _ = tauri::Emitter::emit(
@@ -341,140 +423,170 @@ fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
         );
         return;
     }
-
-    // All other keys latch on press, ignore release.
     if !pressed {
         return;
     }
-
-    if key == BLACKOUT_KEY {
-        let on = !handles.show.read().show.globals.blackout.active;
-        if let Err(err) =
-            crate::commands::set_blackout_impl(&handles.app, &handles.show, &handles.globals, on)
-        {
-            tracing::warn!(?err, "streamdeck blackout dispatch failed");
+    let Some(action) = resolve_indexed_action(handles, &action) else {
+        return;
+    };
+    match action {
+        ButtonAction::None => (),
+        ButtonAction::ToggleChaser { id } => {
+            let desired = !handles
+                .show
+                .read()
+                .show
+                .chasers
+                .iter()
+                .any(|c| c.id == id && c.enabled);
+            if let Err(err) = crate::commands::toggle_chaser_impl(
+                &handles.app,
+                &handles.show,
+                &handles.chasers,
+                &id,
+                desired,
+            ) {
+                tracing::warn!(?err, "streamdeck action toggle_chaser failed");
+            }
         }
-        return;
-    }
-
-    if key == TAP_KEY {
-        match crate::commands::tap_overall_bpm_impl(
-            &handles.app,
-            &handles.show,
-            &handles.globals,
-        ) {
-            Ok(Some(bpm)) => tracing::info!(bpm, "streamdeck tap → bpm"),
-            Ok(None) => tracing::info!("streamdeck tap → first of window"),
-            Err(err) => tracing::warn!(?err, "streamdeck tap dispatch failed"),
+        ButtonAction::ToggleMovement { id } => {
+            let desired = !handles
+                .show
+                .read()
+                .show
+                .movements
+                .iter()
+                .any(|m| m.id == id && m.enabled);
+            if let Err(err) = crate::commands::toggle_movement_impl(
+                &handles.app,
+                &handles.show,
+                &handles.movement,
+                &id,
+                desired,
+            ) {
+                tracing::warn!(?err, "streamdeck action toggle_movement failed");
+            }
         }
-        return;
-    }
-
-    if key == BPM_TOGGLE_KEY {
-        let next = !handles.show.read().show.globals.overall_bpm_enabled;
-        if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
-            &handles.app,
-            &handles.show,
-            &handles.globals,
-            next,
-        ) {
-            tracing::warn!(?err, "streamdeck bpm toggle dispatch failed");
+        ButtonAction::RecallScene { id } => {
+            let active_id = handles
+                .scenes
+                .lock()
+                .active_scene_id()
+                .map(|s| s.to_string());
+            if active_id.as_deref() == Some(id.as_str()) {
+                handles.scenes.lock().release(std::time::Instant::now());
+                let _ = tauri::Emitter::emit(
+                    &handles.app,
+                    crate::commands::SCENE_ACTIVE_EVENT,
+                    crate::commands::SceneActiveChange {
+                        active_scene_id: None,
+                        step_index: None,
+                    },
+                );
+                return;
+            }
+            if let Err(err) = crate::commands::recall_scene_impl(
+                &handles.app,
+                &handles.engine,
+                &handles.show,
+                &handles.chasers,
+                &handles.movement,
+                &handles.scenes,
+                &id,
+            ) {
+                tracing::warn!(?err, "streamdeck action recall_scene failed");
+            }
         }
-        return;
-    }
-
-    if let Some(idx) = CHASER_KEYS.iter().position(|&k| k == key) {
-        handle_chaser_press(idx, handles);
-        return;
-    }
-
-    if let Some(idx) = MOVEMENT_KEYS.iter().position(|&k| k == key) {
-        handle_movement_press(idx, handles);
-        return;
-    }
-
-    if let Some(idx) = SCENE_KEYS.iter().position(|&k| k == key) {
-        handle_scene_press(idx, handles);
-    }
-}
-
-fn handle_chaser_press(idx: usize, handles: &SdHandles) {
-    let target = {
-        let s = handles.show.read();
-        s.show
-            .chasers
-            .get(idx)
-            .map(|c| (c.id.clone(), !c.enabled))
-    };
-    let Some((id, desired)) = target else {
-        return;
-    };
-    if let Err(err) =
-        crate::commands::toggle_chaser_impl(&handles.app, &handles.show, &handles.chasers, &id, desired)
-    {
-        tracing::warn!(?err, "streamdeck toggle_chaser dispatch failed");
-    }
-}
-
-fn handle_movement_press(idx: usize, handles: &SdHandles) {
-    let target = {
-        let s = handles.show.read();
-        s.show
-            .movements
-            .get(idx)
-            .map(|m| (m.id.clone(), !m.enabled))
-    };
-    let Some((id, desired)) = target else {
-        return;
-    };
-    if let Err(err) = crate::commands::toggle_movement_impl(
-        &handles.app,
-        &handles.show,
-        &handles.movement,
-        &id,
-        desired,
-    ) {
-        tracing::warn!(?err, "streamdeck toggle_movement dispatch failed");
-    }
-}
-
-fn handle_scene_press(idx: usize, handles: &SdHandles) {
-    let scene_id = {
-        let s = handles.show.read();
-        s.show.scenes.get(idx).map(|c| c.id.clone())
-    };
-    let Some(scene_id) = scene_id else {
-        return;
-    };
-    let active_id = handles
-        .scenes
-        .lock()
-        .active_scene_id()
-        .map(|s| s.to_string());
-    if active_id.as_deref() == Some(scene_id.as_str()) {
-        // Pressing the active scene releases it — same convention as
-        // the Launchpad surface, see `handle_scene_press` there.
-        handles.scenes.lock().release(std::time::Instant::now());
-        let _ = tauri::Emitter::emit(
-            &handles.app,
-            crate::commands::SCENE_ACTIVE_EVENT,
-            crate::commands::SceneActiveChange {
-                active_scene_id: None,
-                step_index: None,
-            },
-        );
-        return;
-    }
-    if let Err(err) = crate::commands::recall_scene_impl(
-        &handles.app,
-        &handles.engine,
-        &handles.show,
-        &handles.chasers,
-        &handles.movement,
-        &handles.scenes,
-        &scene_id,
-    ) {
-        tracing::warn!(?err, "streamdeck recall_scene dispatch failed");
+        ButtonAction::Blackout => {
+            let on = !handles.show.read().show.globals.blackout.active;
+            if let Err(err) = crate::commands::set_blackout_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+                on,
+            ) {
+                tracing::warn!(?err, "streamdeck action blackout failed");
+            }
+        }
+        ButtonAction::Blind => (),
+        ButtonAction::Tap => {
+            match crate::commands::tap_overall_bpm_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+            ) {
+                Ok(Some(bpm)) => tracing::info!(bpm, "streamdeck action tap → bpm"),
+                Ok(None) => tracing::info!("streamdeck action tap → first of window"),
+                Err(err) => tracing::warn!(?err, "streamdeck action tap failed"),
+            }
+        }
+        ButtonAction::ToggleOverallBpm => {
+            let next = !handles.show.read().show.globals.overall_bpm_enabled;
+            if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+                next,
+            ) {
+                tracing::warn!(?err, "streamdeck action toggle overall bpm failed");
+            }
+        }
+        ButtonAction::BumpActiveChaserBpm { delta } => {
+            let active = {
+                let s = handles.show.read();
+                s.show.chasers.iter().find(|c| c.enabled).cloned()
+            };
+            let Some(mut chaser) = active else { return };
+            let crate::chaser::TempoSource::Fixed { bpm } = chaser.tempo;
+            let new_bpm = (bpm + delta).clamp(20.0, 300.0);
+            if (new_bpm - bpm).abs() < f32::EPSILON {
+                return;
+            }
+            chaser.tempo = crate::chaser::TempoSource::Fixed { bpm: new_bpm };
+            if let Err(err) = crate::commands::update_chaser_impl(
+                &handles.app,
+                &handles.show,
+                &handles.chasers,
+                chaser,
+            ) {
+                tracing::warn!(?err, "streamdeck BPM nudge failed");
+            }
+        }
+        ButtonAction::StartLoopGroup { id } => {
+            let active = handles
+                .loops
+                .lock()
+                .active_group_id()
+                .map(|s| s.to_string());
+            if active.as_deref() == Some(id.as_str()) {
+                crate::commands::stop_loop_group_impl(
+                    &handles.app,
+                    &handles.scenes,
+                    &handles.loops,
+                );
+                return;
+            }
+            if let Err(err) = crate::commands::start_loop_group_impl(
+                &handles.app,
+                &handles.engine,
+                &handles.show,
+                &handles.chasers,
+                &handles.movement,
+                &handles.scenes,
+                &handles.loops,
+                &id,
+            ) {
+                tracing::warn!(?err, "streamdeck action start loop group failed");
+            }
+        }
+        ButtonAction::StopLoopGroup => {
+            crate::commands::stop_loop_group_impl(
+                &handles.app,
+                &handles.scenes,
+                &handles.loops,
+            );
+        }
+        _ => (),
     }
 }
 
@@ -484,133 +596,94 @@ fn compute_targets(
     animation_phase: u32,
 ) -> Vec<KeyVisual> {
     let mut out = vec![KeyVisual::Empty; key_count];
-
-    let (chasers_snapshot, movements_snapshot, scenes_snapshot, blackout_active) = {
-        let s = handles.show.read();
-        (
-            s.show.chasers.clone(),
-            s.show.movements.clone(),
-            s.show.scenes.clone(),
-            s.show.globals.blackout.active,
-        )
-    };
-    let active_scene_id = handles
-        .scenes
-        .lock()
-        .active_scene_id()
-        .map(|s| s.to_string());
+    let bindings = resolve_bindings(handles);
     let active_slots = handles.chasers.lock().active_slot_outputs();
-
-    // Idle tiles get phase=0 unconditionally so the cache key is
-    // stable across animation ticks. Active tiles carry the live phase
-    // so the renderer can drive pulses / strobes / orbits.
-    let phase_for = |active: bool| if active { animation_phase } else { 0 };
-
-    // Chasers: row 1. Active chasers also carry the live RGB outputs of
-    // their slots in `slots` so the renderer can paint the strip across
-    // the bottom of the tile (mirror of the Launchpad top-row CCs).
-    for (i, &key) in CHASER_KEYS.iter().enumerate() {
-        let Some(ch) = chasers_snapshot.get(i) else {
-            continue;
-        };
-        let active = ch.enabled;
-        out[key as usize] = KeyVisual::Tile {
-            kind: TileKind::Chaser,
-            label: short_name(&ch.name, i + 1, "C"),
-            palette: CHASER_PALETTE[i],
-            active,
-            phase: phase_for(active),
-            slots: if active { Some(slots_to_rgb(active_slots.as_deref())) } else { None },
-        };
-    }
-
-    // Movements: row 2. The renderer animates an orbiting dot when
-    // active, so just pass through the phase.
-    for (i, &key) in MOVEMENT_KEYS.iter().enumerate() {
-        let Some(m) = movements_snapshot.get(i) else {
-            continue;
-        };
-        let active = m.enabled;
-        out[key as usize] = KeyVisual::Tile {
-            kind: TileKind::Movement,
-            label: short_name(&m.name, i + 1, "M"),
-            palette: MOVEMENT_PALETTE[i],
-            active,
-            phase: phase_for(active),
-            slots: None,
-        };
-    }
-
-    // Scenes: row 3 left. Active = currently-playing scene.
-    for (i, &key) in SCENE_KEYS.iter().enumerate() {
-        let Some(scene) = scenes_snapshot.get(i) else {
-            continue;
-        };
-        let active = active_scene_id.as_deref() == Some(scene.id.as_str());
-        out[key as usize] = KeyVisual::Tile {
-            kind: TileKind::Scene,
-            label: short_name(&scene.name, i + 1, "S"),
-            palette: SCENE_PALETTE[i],
-            active,
-            phase: phase_for(active),
-            slots: None,
-        };
-    }
-
-    // Blind: momentary. Held → fast strobe. The renderer treats Blind
-    // strobes specially (toggle every animation frame).
-    let blind_active = handles.blind_held.load(Ordering::Relaxed);
-    out[BLIND_KEY as usize] = KeyVisual::Tile {
-        kind: TileKind::Blind,
-        label: String::new(),
-        palette: BLIND_COLORS,
-        active: blind_active,
-        phase: phase_for(blind_active),
-        slots: None,
-    };
-
-    // Blackout: toggle. Active → red strobe (slower than blind so they
-    // read as different alarms).
-    out[BLACKOUT_KEY as usize] = KeyVisual::Tile {
-        kind: TileKind::Blackout,
-        label: String::new(),
-        palette: BLACKOUT_COLORS,
-        active: blackout_active,
-        phase: phase_for(blackout_active),
-        slots: None,
-    };
-
-    // Overall-BPM controls. Read once, share across both keys.
-    let bpm_enabled = handles.show.read().show.globals.overall_bpm_enabled;
     let current_bpm = handles.show.read().show.globals.overall_bpm;
 
-    // TAP: always rendered "active" so the operator can see it living
-    // on the surface and so the ring animation pulses while idle. The
-    // ripple cadence is a fixed visual (decoupled from real BPM) — the
-    // BpmToggle key is the one that mirrors the actual tempo.
-    out[TAP_KEY as usize] = KeyVisual::Tile {
-        kind: TileKind::Tap,
-        label: "TAP".to_string(),
-        palette: TAP_COLORS,
-        active: true,
-        phase: animation_phase,
-        slots: None,
-    };
-
-    // BPM toggle: label always shows the current BPM number so the
-    // operator can read the global tempo at a glance even when the
-    // override is off (it's the value the toggle WILL apply when
-    // pressed). Active when override is on — the metronome arm swings.
-    out[BPM_TOGGLE_KEY as usize] = KeyVisual::Tile {
-        kind: TileKind::BpmToggle,
-        label: format!("{}", current_bpm.round() as u32),
-        palette: BPM_TOGGLE_COLORS,
-        active: bpm_enabled,
-        phase: phase_for(bpm_enabled),
-        slots: None,
-    };
-
+    for b in &bindings {
+        if (b.key as usize) >= key_count {
+            continue;
+        }
+        if let ButtonAction::None = b.action {
+            out[b.key as usize] = KeyVisual::Empty;
+            continue;
+        }
+        let resolved = resolve_indexed_action(handles, &b.action);
+        let active = match b.active_mode {
+            ButtonActiveMode::AlwaysIdle => false,
+            ButtonActiveMode::AlwaysActive => true,
+            ButtonActiveMode::Auto => resolved
+                .as_ref()
+                .map(|a| is_action_active(a, handles))
+                .unwrap_or(false),
+        };
+        let phase = if active { animation_phase } else { 0 };
+        // Live RGB slot mirror: only for chaser bindings whose action
+        // resolves to a chaser that's actually enabled. Mirror of the
+        // Launchpad top-row CC behaviour, but inlined into the tile.
+        let slots = if active {
+            match &resolved {
+                Some(ButtonAction::ToggleChaser { .. }) => {
+                    Some(slots_to_rgb(active_slots.as_deref()))
+                }
+                _ => None,
+            }
+        } else {
+            None
+        };
+        // Substitute a runtime label when the binding's label is the
+        // empty default and the action has a natural number to show
+        // (current BPM for the toggle).
+        let mut label = b.label.clone();
+        if label.is_empty() {
+            if let ButtonAction::ToggleOverallBpm = b.action {
+                label = format!("{}", current_bpm.round() as u32);
+            }
+        }
+        let kind = tile_kind_for(b.icon, &b.action);
+        out[b.key as usize] = KeyVisual::Tile {
+            kind,
+            label,
+            palette: (b.color_off, b.color_on),
+            active,
+            phase,
+            slots,
+        };
+    }
     out
+}
+
+/// Pick a TileKind from the binding's icon and (as a fallback) its
+/// action. The renderer's TileKind enum still drives the glyph; this
+/// helper bridges from the user-facing ButtonIcon enum to it. When
+/// the icon is None, infer one from the action so older shows (or
+/// minimal bindings) still get a recognisable tile.
+fn tile_kind_for(icon: ButtonIcon, action: &ButtonAction) -> TileKind {
+    match icon {
+        ButtonIcon::Play => TileKind::Chaser,
+        ButtonIcon::Stage => TileKind::Scene,
+        ButtonIcon::Orbit => TileKind::Movement,
+        ButtonIcon::Bolt => TileKind::Blackout,
+        ButtonIcon::Eye => TileKind::Blind,
+        ButtonIcon::Tap => TileKind::Tap,
+        ButtonIcon::Metronome => TileKind::BpmToggle,
+        ButtonIcon::Loop => TileKind::LoopGroup,
+        ButtonIcon::None => match action {
+            ButtonAction::Blackout => TileKind::Blackout,
+            ButtonAction::Blind => TileKind::Blind,
+            ButtonAction::Tap => TileKind::Tap,
+            ButtonAction::ToggleOverallBpm => TileKind::BpmToggle,
+            ButtonAction::ToggleMovement { .. }
+            | ButtonAction::ToggleMovementByIndex { .. } => TileKind::Movement,
+            ButtonAction::RecallScene { .. } | ButtonAction::RecallSceneByIndex { .. } => {
+                TileKind::Scene
+            }
+            ButtonAction::StartLoopGroup { .. }
+            | ButtonAction::StartLoopGroupByIndex { .. }
+            | ButtonAction::StopLoopGroup => TileKind::LoopGroup,
+            _ => TileKind::Chaser,
+        },
+    }
 }
 
 fn diff_and_push(
@@ -747,13 +820,3 @@ fn slots_to_rgb(slots: Option<&[SlotOutput]>) -> [(u8, u8, u8); 8] {
     out
 }
 
-/// Build a label for a key. Falls back to `prefix + index` if the
-/// entity has no human-readable name yet.
-fn short_name(name: &str, idx: usize, prefix: &str) -> String {
-    let trimmed = name.trim();
-    if trimmed.is_empty() {
-        format!("{prefix}{idx}")
-    } else {
-        trimmed.to_string()
-    }
-}

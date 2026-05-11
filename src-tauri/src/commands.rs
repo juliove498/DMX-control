@@ -6,6 +6,7 @@ use tauri::{AppHandle, Emitter, State};
 use ts_rs::TS;
 
 use crate::chaser::AmbientChaser;
+use crate::engine::loop_playback::{dwell_ms_for, SharedLoopPlayback};
 use crate::engine::output_thread::{
     shared_bindings, OutputBinding, OutputThreadHandle, SharedChasers, SharedGlobals,
     SharedMovement,
@@ -24,6 +25,10 @@ use crate::programmer::{ProgrammerStatus, SharedProgrammer};
 use crate::show::file::{load as load_show_file, save as save_show_file, ShowError, ShowFileV1};
 use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, PatchReport};
 use crate::show::library::{ensure_seeded, library_dir, load_all, save_def};
+use crate::show::button_bindings::{
+    default_launchpad_bindings, default_streamdeck_bindings, ButtonBindings,
+};
+use crate::show::loop_group::SceneLoopGroup;
 use crate::show::scene::{Scene, SceneChannel, SceneFixture, SceneFxState, SceneStep};
 use crate::show::ShowState;
 
@@ -34,6 +39,7 @@ pub const SHOW_EVENT: &str = "show:updated";
 // retired without changing the rest of the contract.
 pub const PROGRAMMER_EVENT: &str = "programmer:changed";
 pub const SCENE_ACTIVE_EVENT: &str = "scene:active_changed";
+pub const LOOP_GROUP_EVENT: &str = "loop_group:active_changed";
 pub const MASTER_EVENT: &str = "engine:master_changed";
 pub const BLIND_EVENT: &str = "engine:blind_changed";
 
@@ -54,6 +60,14 @@ pub struct MasterChange {
 #[ts(export, export_to = "../bindings/")]
 pub struct BlindChange {
     pub pressed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct LoopGroupActiveChange {
+    pub active_group_id: Option<String>,
+    pub current_index: Option<u32>,
+    pub current_scene_id: Option<String>,
 }
 
 pub struct OutputThreadState(pub Mutex<Option<OutputThreadHandle>>);
@@ -2322,6 +2336,7 @@ pub fn connect_midi_device(
     movement: State<'_, SharedMovement>,
     globals: State<'_, SharedGlobals>,
     scenes: State<'_, SharedScenePlayback>,
+    loops: State<'_, SharedLoopPlayback>,
     engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
     name: String,
@@ -2345,6 +2360,7 @@ pub fn connect_midi_device(
             movement.inner().clone(),
             globals.inner().clone(),
             scenes.inner().clone(),
+            loops.inner().clone(),
             engine.inner().clone(),
             show.inner().clone(),
         );
@@ -2390,6 +2406,7 @@ pub fn connect_streamdeck_device(
     movement: State<'_, SharedMovement>,
     globals: State<'_, SharedGlobals>,
     scenes: State<'_, SharedScenePlayback>,
+    loops: State<'_, SharedLoopPlayback>,
     engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
     serial: Option<String>,
@@ -2406,6 +2423,7 @@ pub fn connect_streamdeck_device(
         movement.inner().clone(),
         globals.inner().clone(),
         scenes.inner().clone(),
+        loops.inner().clone(),
         engine.inner().clone(),
         show.inner().clone(),
     )
@@ -2776,3 +2794,321 @@ impl From<std::io::Error> for CommandError {
 
 #[allow(dead_code)]
 fn _ensure_used(_: &OutputBindingConfig, _: &[OutputBinding]) {}
+
+// ---- Sequence loop groups -----------------------------------------------
+
+#[tauri::command]
+pub fn list_loop_groups(show: State<'_, ShowState>) -> Vec<SceneLoopGroup> {
+    show.read().show.scene_loop_groups.clone()
+}
+
+#[tauri::command]
+pub fn create_loop_group(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    name: Option<String>,
+) -> Result<SceneLoopGroup, CommandError> {
+    let group = SceneLoopGroup::new(
+        uuid::Uuid::new_v4().to_string(),
+        name.unwrap_or_else(|| "Nueva lista".to_string()),
+    );
+    {
+        let mut s = show.write();
+        s.show.scene_loop_groups.push(group.clone());
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(group)
+}
+
+#[tauri::command]
+pub fn update_loop_group(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    group: SceneLoopGroup,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        let entry = s
+            .show
+            .scene_loop_groups
+            .iter_mut()
+            .find(|g| g.id == group.id)
+            .ok_or_else(|| CommandError::Other(format!("loop group {} not found", group.id)))?;
+        *entry = group;
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_loop_group(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+    id: String,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        let before = s.show.scene_loop_groups.len();
+        s.show.scene_loop_groups.retain(|g| g.id != id);
+        if s.show.scene_loop_groups.len() == before {
+            return Err(CommandError::Other(format!("loop group {id} not found")));
+        }
+        s.dirty = true;
+    }
+    {
+        // If the deleted group was playing, stop the driver too so
+        // nothing tries to recall scenes from a phantom group.
+        let mut pb = loops_pb.lock();
+        if pb.active_group_id() == Some(id.as_str()) {
+            pb.stop();
+        }
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    let _ = app.emit(
+        LOOP_GROUP_EVENT,
+        LoopGroupActiveChange {
+            active_group_id: None,
+            current_index: None,
+            current_scene_id: None,
+        },
+    );
+    Ok(())
+}
+
+/// Start a loop group: recall its first scene, schedule the next
+/// advance, and emit a status event. The background driver thread
+/// will keep advancing as each dwell expires.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn start_loop_group(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    scenes_pb: State<'_, SharedScenePlayback>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+    id: String,
+) -> Result<(), CommandError> {
+    start_loop_group_impl(
+        &app,
+        engine.inner(),
+        &show,
+        chasers.inner(),
+        movement.inner(),
+        scenes_pb.inner(),
+        loops_pb.inner(),
+        &id,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn start_loop_group_impl(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+    id: &str,
+) -> Result<(), CommandError> {
+    // Snapshot the group + resolve scene IDs. Filter out dead refs
+    // (deleted scenes) so the playlist plays only what still exists.
+    let (scene_ids, first_dwell, first_scene_id) = {
+        let s = show.read();
+        let group = s
+            .show
+            .scene_loop_groups
+            .iter()
+            .find(|g| g.id == id)
+            .cloned()
+            .ok_or_else(|| CommandError::Other(format!("loop group {id} not found")))?;
+        let valid_ids: Vec<String> = group
+            .scene_ids
+            .iter()
+            .filter(|sid| s.show.scenes.iter().any(|sc| &sc.id == *sid))
+            .cloned()
+            .collect();
+        if valid_ids.is_empty() {
+            return Err(CommandError::Other(
+                "loop group has no playable scenes".to_string(),
+            ));
+        }
+        let first_id = valid_ids[0].clone();
+        let first_scene = s
+            .show
+            .scenes
+            .iter()
+            .find(|sc| sc.id == first_id)
+            .ok_or_else(|| CommandError::Other("first scene missing".to_string()))?;
+        let dwell = dwell_ms_for(&group, first_scene);
+        (valid_ids, dwell, first_id)
+    };
+
+    recall_scene_impl(app, engine, show, chasers, movement, scenes_pb, &first_scene_id)?;
+    loops_pb.lock().start(
+        id.to_string(),
+        scene_ids,
+        first_dwell,
+        std::time::Instant::now(),
+    );
+    let _ = app.emit(
+        LOOP_GROUP_EVENT,
+        LoopGroupActiveChange {
+            active_group_id: Some(id.to_string()),
+            current_index: Some(0),
+            current_scene_id: Some(first_scene_id),
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+pub fn stop_loop_group(
+    app: AppHandle,
+    scenes_pb: State<'_, SharedScenePlayback>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+) {
+    stop_loop_group_impl(&app, &scenes_pb, &loops_pb);
+}
+
+pub fn stop_loop_group_impl(
+    app: &AppHandle,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+) {
+    loops_pb.lock().stop();
+    scenes_pb.lock().release(std::time::Instant::now());
+    let _ = app.emit(
+        SCENE_ACTIVE_EVENT,
+        SceneActiveChange {
+            active_scene_id: None,
+            step_index: None,
+        },
+    );
+    let _ = app.emit(
+        LOOP_GROUP_EVENT,
+        LoopGroupActiveChange {
+            active_group_id: None,
+            current_index: None,
+            current_scene_id: None,
+        },
+    );
+}
+
+#[tauri::command]
+pub fn active_loop_group(
+    loops_pb: State<'_, SharedLoopPlayback>,
+) -> LoopGroupActiveChange {
+    let pb = loops_pb.lock();
+    LoopGroupActiveChange {
+        active_group_id: pb.active_group_id().map(|s| s.to_string()),
+        current_index: pb.current_index(),
+        current_scene_id: pb.current_scene_id().map(|s| s.to_string()),
+    }
+}
+
+/// Background tick: called periodically from the loop-group driver
+/// thread. If the active group's current scene has dwelled long enough,
+/// advance to the next scene by recalling it and re-arming the timer.
+#[allow(clippy::too_many_arguments)]
+pub fn tick_loop_groups(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+) {
+    let now = std::time::Instant::now();
+    let next_scene_id = match loops_pb.lock().pop_if_ready(now) {
+        Some(id) => id,
+        None => return,
+    };
+    // Resolve dwell for the new scene before recalling so any failure
+    // here puts the driver into a safe state (no advance, no schedule).
+    let (group_id, dwell_ms, new_idx) = {
+        let s = show.read();
+        let pb = loops_pb.lock();
+        let Some(group_id) = pb.active_group_id().map(|s| s.to_string()) else {
+            return;
+        };
+        let Some(group) = s
+            .show
+            .scene_loop_groups
+            .iter()
+            .find(|g| g.id == group_id)
+        else {
+            return;
+        };
+        let Some(scene) = s.show.scenes.iter().find(|sc| sc.id == next_scene_id) else {
+            // Scene was deleted between recall and now — bail; the next
+            // tick will pick the next index in the cycle.
+            return;
+        };
+        (group_id, dwell_ms_for(group, scene), pb.current_index())
+    };
+    if let Err(err) = recall_scene_impl(
+        app,
+        engine,
+        show,
+        chasers,
+        movement,
+        scenes_pb,
+        &next_scene_id,
+    ) {
+        tracing::warn!(?err, "loop group advance: recall failed");
+        return;
+    }
+    loops_pb.lock().schedule_next(dwell_ms, std::time::Instant::now());
+    let _ = app.emit(
+        LOOP_GROUP_EVENT,
+        LoopGroupActiveChange {
+            active_group_id: Some(group_id),
+            current_index: new_idx,
+            current_scene_id: Some(next_scene_id),
+        },
+    );
+}
+
+// ---- Button bindings -----------------------------------------------------
+
+#[tauri::command]
+pub fn get_button_bindings(show: State<'_, ShowState>) -> ButtonBindings {
+    show.read().show.button_bindings.clone()
+}
+
+#[tauri::command]
+pub fn update_button_bindings(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    bindings: ButtonBindings,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        s.show.button_bindings = bindings;
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Factory defaults exposed as a command so the UI can offer "Load
+/// defaults" without having to re-encode the layout client-side.
+#[tauri::command]
+pub fn get_default_button_bindings() -> ButtonBindings {
+    ButtonBindings {
+        custom_enabled: true,
+        launchpad: default_launchpad_bindings(),
+        streamdeck: default_streamdeck_bindings(),
+    }
+}

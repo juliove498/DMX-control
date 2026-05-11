@@ -18,6 +18,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 use crate::commands::{apply_outputs, OutputThreadState};
+use crate::engine::loop_playback::shared_loop_playback;
 use crate::engine::output_thread::{shared_chasers, shared_globals, shared_movement};
 use crate::engine::scene_playback::{shared_scene_playback, SharedScenePlayback};
 use crate::engine::EngineState;
@@ -221,6 +222,7 @@ pub fn run() {
     let launchpad_handle = shared_launchpad();
     let streamdeck_handle = shared_streamdeck();
     let scene_playback_handle = shared_scene_playback();
+    let loop_playback_handle = shared_loop_playback();
     let programmer_handle = shared_programmer();
     let bridge_state = crate::bridge::BridgeState::new();
 
@@ -236,6 +238,7 @@ pub fn run() {
         .manage(launchpad_handle.clone())
         .manage(streamdeck_handle.clone())
         .manage(scene_playback_handle.clone())
+        .manage(loop_playback_handle.clone())
         .manage(programmer_handle.clone())
         .manage(bridge_state.clone())
         .setup(move |app| {
@@ -318,6 +321,7 @@ pub fn run() {
                             movement_st.inner().clone(),
                             globals_st.inner().clone(),
                             scenes_st.inner().clone(),
+                            loop_playback_handle.clone(),
                             engine_state.inner().clone(),
                             show_state_st.inner().clone(),
                         );
@@ -341,6 +345,7 @@ pub fn run() {
                     movement_st.inner().clone(),
                     globals_st.inner().clone(),
                     scenes_st.inner().clone(),
+                    loop_playback_handle.clone(),
                     engine_state.inner().clone(),
                     show_state_st.inner().clone(),
                 ) {
@@ -411,6 +416,33 @@ pub fn run() {
                     }
                 })
                 .expect("spawn scene FX consumer thread");
+
+            // Loop-group driver: ticks at 50 ms and, when the active
+            // group's dwell expires, advances to the next scene by
+            // routing through `recall_scene_impl`. Idle when no group
+            // is playing; cheap to keep alive permanently.
+            let app_for_loops = app_handle.clone();
+            let engine_for_loops = engine_state.inner().clone();
+            let show_for_loops = show_state_st.inner().clone();
+            let chasers_for_loops = chasers_st.inner().clone();
+            let movement_for_loops = movement_st.inner().clone();
+            let scenes_for_loops = scenes_st.inner().clone();
+            let loops_for_loops = loop_playback_handle.clone();
+            std::thread::Builder::new()
+                .name("dmx-loop-group-driver".into())
+                .spawn(move || loop {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    commands::tick_loop_groups(
+                        &app_for_loops,
+                        &engine_for_loops,
+                        &show_for_loops,
+                        &chasers_for_loops,
+                        &movement_for_loops,
+                        &scenes_for_loops,
+                        &loops_for_loops,
+                    );
+                })
+                .expect("spawn loop-group driver thread");
 
             Ok(())
         })
@@ -509,6 +541,18 @@ pub fn run() {
             commands::programmer_status,
             commands::programmer_clear,
             commands::programmer_untouch,
+            // Sequence loop groups
+            commands::list_loop_groups,
+            commands::create_loop_group,
+            commands::update_loop_group,
+            commands::delete_loop_group,
+            commands::start_loop_group,
+            commands::stop_loop_group,
+            commands::active_loop_group,
+            // Button bindings (Launchpad + Stream Deck)
+            commands::get_button_bindings,
+            commands::update_button_bindings,
+            commands::get_default_button_bindings,
             // AI scene generation (POC)
             commands::get_ai_config,
             commands::set_ai_config,

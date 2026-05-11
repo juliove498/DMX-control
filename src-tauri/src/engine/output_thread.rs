@@ -167,8 +167,14 @@ where
                 // Scene playback runs first because it writes directly
                 // into Universe.data (the base layer). Effects + blind
                 // + master + blackout will compose on top of that.
+                //
+                // Read the Overall BPM override once for this frame so
+                // every clock-driven module (scene playback, chaser,
+                // movement) shares one consistent view of the tempo and
+                // doesn't drift across the same frame.
+                let overall_bpm = globals_thread.lock().current_overall_bpm();
                 {
-                    let updates = scenes_thread.lock().tick(frame_start);
+                    let updates = scenes_thread.lock().tick(frame_start, overall_bpm);
                     if !updates.is_empty() {
                         let mut e = engine.write();
                         for ((u, ch), v) in updates {
@@ -181,12 +187,6 @@ where
                 // tick is a few arithmetic ops per slot so locks are
                 // released quickly.
                 {
-                    // Read the overall-BPM override BEFORE ticking the
-                    // effect modules so they share a consistent view —
-                    // and release the globals lock immediately so the
-                    // chaser/movement ticks can grab their own locks
-                    // without contention.
-                    let overall_bpm = globals_thread.lock().current_overall_bpm();
                     let chaser_ov = chasers_thread.lock().tick(frame_start, overall_bpm);
                     let movement_ov = movement_thread.lock().tick(frame_start, overall_bpm);
                     let merged = merge_overlays(chaser_ov, movement_ov);

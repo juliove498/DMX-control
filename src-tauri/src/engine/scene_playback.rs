@@ -120,6 +120,38 @@ enum Phase {
 const DEFAULT_RELEASE_FADE_MS: u32 = 800;
 const MIN_RELEASE_FADE_MS: u32 = 200;
 
+/// Resolve a step's `(fade_ms, hold_ms)` for this tick.
+///
+/// Without an Overall BPM override the step's authored values pass
+/// through unchanged. With an override every multi-step scene is
+/// quantised to one beat per step: total step duration = `60_000 / bpm`,
+/// split between fade and hold using the same ratio the step was
+/// authored with so a "smooth fade" step stays smooth and a "snap then
+/// hold" step stays snappy — just stretched or compressed to land on
+/// the beat. A single-step scene with `hold_ms = 0` is a "stay forever"
+/// cue and is left alone (it has no concept of "next beat").
+fn step_durations(step: &ResolvedStep, overall_bpm: Option<f32>, single_step: bool) -> (u32, u32) {
+    let Some(bpm) = overall_bpm else {
+        return (step.fade_in_ms, step.hold_ms);
+    };
+    if single_step && step.hold_ms == 0 {
+        return (step.fade_in_ms, step.hold_ms);
+    }
+    let beat_ms = (60_000.0 / bpm.max(1.0)).round() as u32;
+    let beat_ms = beat_ms.max(2); // floor guards a /0 in the fade phase
+    let total = step.fade_in_ms.saturating_add(step.hold_ms).max(1);
+    let fade_ratio = (step.fade_in_ms as f32 / total as f32).clamp(0.0, 1.0);
+    let mut new_fade = ((beat_ms as f32 * fade_ratio).round() as u32).max(1);
+    if new_fade >= beat_ms {
+        // Pure-fade step in a multi-step scene: never starve the hold
+        // entirely or the engine never advances past the fade frame's
+        // factor==1.0 trigger. Reserve a single-ms hold tick.
+        new_fade = beat_ms.saturating_sub(1).max(1);
+    }
+    let new_hold = beat_ms.saturating_sub(new_fade);
+    (new_fade, new_hold)
+}
+
 impl ScenePlayback {
     /// Wire the channel that carries FX-apply requests to the consumer
     /// thread. Call once at app startup; subsequent recalls and the
@@ -269,7 +301,18 @@ impl ScenePlayback {
     /// Compute the values to write into the universe for this frame.
     /// Returns empty when in `Idle` or `Hold` (during hold the values
     /// already sit in `Universe.data`; nothing to refresh).
-    pub fn tick(&mut self, now: Instant) -> Vec<((u16, u16), u8)> {
+    ///
+    /// `overall_bpm`, when `Some`, replaces every multi-step scene's
+    /// per-step fade + hold timings with one beat per step (fade and
+    /// hold split by the same ratio the step was authored with). A
+    /// single-step scene with `hold_ms = 0` is left alone because
+    /// "stay here forever" has no beat semantics.
+    pub fn tick(
+        &mut self,
+        now: Instant,
+        overall_bpm: Option<f32>,
+    ) -> Vec<((u16, u16), u8)> {
+        let single_step = self.steps.len() == 1;
         loop {
             // Borrow the phase by value to keep the match-arm logic
             // shorter; we'll write back as needed.
@@ -281,9 +324,10 @@ impl ScenePlayback {
                         self.clear_to_idle();
                         return Vec::new();
                     };
-                    let fade_ms = step.fade_in_ms as f32;
+                    let (fade_ms_u32, _) = step_durations(step, overall_bpm, single_step);
+                    let fade_ms = fade_ms_u32 as f32;
                     let elapsed = now.saturating_duration_since(started).as_secs_f32() * 1000.0;
-                    let factor = (elapsed / fade_ms).clamp(0.0, 1.0);
+                    let factor = (elapsed / fade_ms.max(1.0)).clamp(0.0, 1.0);
                     let mut out = Vec::with_capacity(step.targets.len());
                     for (key, &target_v) in &step.targets {
                         let from_v = self.fade_from.get(key).copied().unwrap_or(0) as f32;
@@ -309,14 +353,16 @@ impl ScenePlayback {
                         self.clear_to_idle();
                         return Vec::new();
                     };
-                    if step.hold_ms == 0 && self.steps.len() == 1 {
+                    if step.hold_ms == 0 && single_step {
                         // Single-step scene with no hold means "stay
                         // here forever". Nothing to emit until the next
-                        // recall releases us.
+                        // recall releases us. Overall BPM doesn't apply
+                        // because there's nothing to advance to.
                         return Vec::new();
                     }
+                    let (_, hold_ms_u32) = step_durations(step, overall_bpm, single_step);
                     let elapsed = now.saturating_duration_since(started).as_secs_f32() * 1000.0;
-                    if elapsed < step.hold_ms as f32 {
+                    if elapsed < hold_ms_u32 as f32 {
                         // Still inside hold, no updates needed.
                         return Vec::new();
                     }
@@ -409,7 +455,7 @@ mod tests {
     #[test]
     fn idle_emits_nothing() {
         let mut p = ScenePlayback::default();
-        assert!(p.tick(Instant::now()).is_empty());
+        assert!(p.tick(Instant::now(), None).is_empty());
     }
 
     #[test]
@@ -423,10 +469,10 @@ mod tests {
             no_fx(),
             t0,
         );
-        let out = p.tick(t0 + Duration::from_millis(150));
+        let out = p.tick(t0 + Duration::from_millis(150), None);
         assert_eq!(out, vec![((0, 0), 200)]);
         // Next tick we're in hold (single-step + hold=0 = sit forever).
-        assert!(p.tick(t0 + Duration::from_millis(200)).is_empty());
+        assert!(p.tick(t0 + Duration::from_millis(200), None).is_empty());
     }
 
     #[test]
@@ -444,7 +490,7 @@ mod tests {
             t0,
         );
         // After 60 ms: step 0 fade complete, target 100.
-        let out = p.tick(t0 + Duration::from_millis(60));
+        let out = p.tick(t0 + Duration::from_millis(60), None);
         assert_eq!(out.first().map(|x| x.1), Some(100));
         assert_eq!(p.current_step_index(), Some(0));
 
@@ -452,16 +498,16 @@ mod tests {
         // a sliver complete. We should be on step 1 now.
         // Hold ran from ~50ms to ~150ms. At 170ms we're in step 1's
         // fade, ~20ms in (40% of 50ms).
-        let _ = p.tick(t0 + Duration::from_millis(170));
+        let _ = p.tick(t0 + Duration::from_millis(170), None);
         assert_eq!(p.current_step_index(), Some(1));
 
         // After step 1 fade completes (200 ms target by 220 ms).
-        let out = p.tick(t0 + Duration::from_millis(220));
+        let out = p.tick(t0 + Duration::from_millis(220), None);
         assert_eq!(out.first().map(|x| x.1), Some(200));
 
         // After step 1 hold expires (100 ms hold, so by 330 ms) we're
         // back on step 0.
-        let _ = p.tick(t0 + Duration::from_millis(360));
+        let _ = p.tick(t0 + Duration::from_millis(360), None);
         assert_eq!(p.current_step_index(), Some(0));
     }
 
@@ -494,7 +540,7 @@ mod tests {
             Instant::now(),
         );
         assert_eq!(p.active_scene_id(), Some("empty"));
-        assert!(p.tick(Instant::now()).is_empty());
+        assert!(p.tick(Instant::now(), None).is_empty());
         // No current step since we never started a fade.
         assert!(p.current_step_index().is_none());
     }
@@ -557,7 +603,7 @@ mod tests {
             t0,
         );
         // Land on the target (factor=1).
-        let out = p.tick(t0 + Duration::from_millis(150));
+        let out = p.tick(t0 + Duration::from_millis(150), None);
         assert_eq!(out, vec![((0, 0), 200)]);
         // Release: should switch to Phase::Release with last_emitted=200,
         // pre_recall_values=0. Halfway through MIN_RELEASE_FADE_MS we
@@ -566,7 +612,7 @@ mod tests {
         p.release(t_rel);
         // Step 0's fade was 100 ms which is below MIN_RELEASE_FADE_MS
         // (200), so the floor kicks in.
-        let half = p.tick(t_rel + Duration::from_millis(100));
+        let half = p.tick(t_rel + Duration::from_millis(100), None);
         assert_eq!(half.len(), 1);
         let v = half[0].1 as i32;
         assert!(
@@ -574,9 +620,9 @@ mod tests {
             "expected ~100 mid-release, got {v}"
         );
         // After the full release fade, we should land at 0 and go idle.
-        let done = p.tick(t_rel + Duration::from_millis(300));
+        let done = p.tick(t_rel + Duration::from_millis(300), None);
         assert_eq!(done, vec![((0, 0), 0)]);
         assert!(p.active_scene_id().is_none());
-        assert!(p.tick(t_rel + Duration::from_millis(400)).is_empty());
+        assert!(p.tick(t_rel + Duration::from_millis(400), None).is_empty());
     }
 }

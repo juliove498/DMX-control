@@ -35,11 +35,13 @@ use tauri::AppHandle;
 
 use crate::chaser::runtime::SlotOutput;
 use crate::chaser::Rgb;
+use crate::engine::loop_playback::SharedLoopPlayback;
 use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
 use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::EngineState;
 use crate::midi::hub::SharedMidi;
 use crate::midi::MidiMessage;
+use crate::show::button_bindings::{ButtonAction, ButtonActiveMode, LaunchpadBinding};
 use crate::show::ShowState;
 
 /// MK2 row-1 pad notes, left-to-right. Each maps to a chaser slot.
@@ -81,55 +83,10 @@ pub const BLIND_NOTE: u8 = 29;
 pub const TAP_NOTE: u8 = 39;
 pub const BPM_TOGGLE_NOTE: u8 = 49;
 
-/// (dim, bright) palette pairs for chaser pads. Off pads sit at `dim`,
-/// active pads flash between `dim` and `bright`.
-const CHASER_PAD_PALETTE: [(u8, u8); 8] = [
-    (7, 5),   // red
-    (11, 9),  // orange
-    (15, 13), // yellow
-    (19, 17), // green
-    (39, 37), // cyan
-    (43, 41), // light blue
-    (47, 45), // blue
-    (55, 53), // magenta
-];
-
-/// Distinct palette for movement pads — picked so a glance at the LP
-/// instantly tells chasers (row 1) and movements (row 2) apart even
-/// when both rows are partly lit.
-const MOVEMENT_PAD_PALETTE: [(u8, u8); 8] = [
-    (96, 95),  // pink
-    (82, 81),  // purple
-    (85, 84),  // amber
-    (74, 73),  // lime
-    (34, 33),  // teal
-    (50, 49),  // fuchsia
-    (57, 56),  // pale pink
-    (100, 99), // periwinkle
-];
-
-/// Yet another distinct palette for scene pads — using the cool side of
-/// the wheel (blues, violets, teals, whites) so chasers/movements/
-/// scenes are all visually separable.
-const SCENE_PAD_PALETTE: [(u8, u8); 8] = [
-    (1, 3),     // white
-    (43, 41),   // light blue
-    (47, 45),   // blue
-    (78, 79),   // sea-green
-    (44, 117),  // pale teal
-    (115, 116), // pastel rose
-    (113, 114), // pastel violet
-    (60, 61),   // mint
-];
-
-const BLACKOUT_PALETTE: (u8, u8) = (7, 5); // dim red / bright red
-const BLIND_PALETTE: (u8, u8) = (1, 3); // dim white / bright white
-/// TAP: cool teal palette — distinct from the strobe/alarm-coloured
-/// blind+blackout pads above it, signalling "info / metronome" rather
-/// than "emergency".
-const TAP_PALETTE: (u8, u8) = (37, 33); // dim teal / bright cyan
-/// Overall-BPM toggle: magenta palette. Dim when override is off, flashing bright when on.
-const BPM_TOGGLE_PALETTE: (u8, u8) = (54, 53); // dim magenta / bright magenta
+// Legacy hardcoded palettes used to live here; they now live in
+// `show::button_bindings::default_launchpad_bindings()` so the factory
+// layout is the source of truth for both runtime and the UI's
+// "Load defaults" button.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum PadState {
@@ -154,33 +111,25 @@ struct TopRowRgb {
 
 /// Snapshot of every managed pad's desired LED state. Diffed against the
 /// previous tick so we only emit MIDI when something actually changed.
+///
+/// `pads` and `ccs` are keyed by raw note/CC number so the same struct
+/// covers both the legacy hardcoded layout and arbitrary user-customised
+/// layouts. The `top_row` array stays separate because those CCs
+/// double as the live RGB mirror — a passive visual that doesn't fit
+/// the binding model.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct LedTargets {
-    chasers: [PadState; 8],
-    movements: [PadState; 8],
-    scenes: [PadState; 8],
-    /// Top row of round buttons. Each entry is the live RGB the matching
-    /// chaser slot is being driven to right now (after intensity scaling).
-    /// All zeros means dark — either no chaser is enabled or that slot is
-    /// in its "off" frame within the pattern.
+    pads: std::collections::HashMap<u8, PadState>,
+    ccs: std::collections::HashMap<u8, PadState>,
     top_row: [TopRowRgb; 8],
-    blackout: PadState,
-    blind: PadState,
-    tap: PadState,
-    bpm_toggle: PadState,
 }
 
 impl LedTargets {
     fn empty() -> Self {
         Self {
-            chasers: [PadState::Empty; 8],
-            movements: [PadState::Empty; 8],
-            scenes: [PadState::Empty; 8],
+            pads: std::collections::HashMap::new(),
+            ccs: std::collections::HashMap::new(),
             top_row: [TopRowRgb::default(); 8],
-            blackout: PadState::Empty,
-            blind: PadState::Empty,
-            tap: PadState::Empty,
-            bpm_toggle: PadState::Empty,
         }
     }
 }
@@ -204,6 +153,7 @@ struct LpHandles {
     movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
+    loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
     blind_held: Arc<AtomicBool>,
@@ -253,6 +203,7 @@ pub fn start(
     movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
+    loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
 ) -> LaunchpadController {
@@ -264,6 +215,7 @@ pub fn start(
         movement,
         globals: globals.clone(),
         scenes,
+        loops,
         engine,
         show,
         blind_held: blind_held.clone(),
@@ -320,12 +272,125 @@ fn install_input_router(midi_for_install: &SharedMidi, handles: LpHandles) {
         })));
 }
 
-fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
-    let Some(note) = msg.data1 else { return };
-    let vel = msg.data2.unwrap_or(0);
+/// Resolve the effective bindings list — user-customised or the
+/// hardcoded factory layout — for this tick.
+fn resolve_bindings(handles: &LpHandles) -> Vec<LaunchpadBinding> {
+    let bindings = handles.show.read().show.button_bindings.clone();
+    if bindings.custom_enabled {
+        bindings.launchpad
+    } else {
+        crate::show::button_bindings::default_launchpad_bindings()
+    }
+}
 
-    if note == BLIND_NOTE {
-        let pressed = vel > 0;
+/// Resolve a `*ByIndex` action against the live show. Returns a
+/// concrete-id variant the dispatch and LED helpers can act on, or
+/// `None` if the index points past the end of the show's list.
+fn resolve_indexed_action(handles: &LpHandles, action: &ButtonAction) -> Option<ButtonAction> {
+    let s = handles.show.read();
+    Some(match action {
+        ButtonAction::ToggleChaserByIndex { index } => {
+            let id = s.show.chasers.get(*index as usize)?.id.clone();
+            ButtonAction::ToggleChaser { id }
+        }
+        ButtonAction::ToggleMovementByIndex { index } => {
+            let id = s.show.movements.get(*index as usize)?.id.clone();
+            ButtonAction::ToggleMovement { id }
+        }
+        ButtonAction::RecallSceneByIndex { index } => {
+            let id = s.show.scenes.get(*index as usize)?.id.clone();
+            ButtonAction::RecallScene { id }
+        }
+        ButtonAction::StartLoopGroupByIndex { index } => {
+            let id = s.show.scene_loop_groups.get(*index as usize)?.id.clone();
+            ButtonAction::StartLoopGroup { id }
+        }
+        // Already concrete: clone through.
+        other => other.clone(),
+    })
+}
+
+/// Decide whether a button should appear "active" (flash) on the LP.
+/// Mirrors the on-screen highlight rules: chaser toggle pads flash
+/// while the chaser is enabled, scene pads flash while the scene is
+/// the active playback, etc.
+fn is_action_active(action: &ButtonAction, handles: &LpHandles) -> bool {
+    match action {
+        ButtonAction::None => false,
+        ButtonAction::ToggleChaser { id } => handles
+            .show
+            .read()
+            .show
+            .chasers
+            .iter()
+            .any(|c| &c.id == id && c.enabled),
+        ButtonAction::ToggleMovement { id } => handles
+            .show
+            .read()
+            .show
+            .movements
+            .iter()
+            .any(|m| &m.id == id && m.enabled),
+        ButtonAction::RecallScene { id } => handles
+            .scenes
+            .lock()
+            .active_scene_id()
+            .map(|a| a == id)
+            .unwrap_or(false),
+        ButtonAction::Blackout => handles.show.read().show.globals.blackout.active,
+        ButtonAction::Blind => handles.blind_held.load(Ordering::Relaxed),
+        ButtonAction::Tap => false,
+        ButtonAction::ToggleOverallBpm => {
+            handles.show.read().show.globals.overall_bpm_enabled
+        }
+        ButtonAction::BumpActiveChaserBpm { .. } => false,
+        ButtonAction::StartLoopGroup { id } => handles
+            .loops
+            .lock()
+            .active_group_id()
+            .map(|a| a == id)
+            .unwrap_or(false),
+        ButtonAction::StopLoopGroup => false,
+        // *ByIndex never gets here — resolved upstream.
+        _ => false,
+    }
+}
+
+fn pad_state_for_binding(b: &LaunchpadBinding, handles: &LpHandles) -> PadState {
+    if let ButtonAction::None = b.action {
+        return PadState::Empty;
+    }
+    let active = match b.active_mode {
+        ButtonActiveMode::AlwaysIdle => false,
+        ButtonActiveMode::AlwaysActive => true,
+        ButtonActiveMode::Auto => {
+            let resolved = resolve_indexed_action(handles, &b.action);
+            resolved
+                .as_ref()
+                .map(|a| is_action_active(a, handles))
+                .unwrap_or(false)
+        }
+    };
+    if active {
+        PadState::OnFlash {
+            dim: b.color_dim,
+            bright: b.color_bright,
+        }
+    } else if b.color_dim == 0 {
+        // An explicit "dark when idle" — treat as Empty so the LED is
+        // turned off (vs. solid black-channel-0 which is the same on
+        // hardware but cleaner intent).
+        PadState::Empty
+    } else {
+        PadState::OffDim(b.color_dim)
+    }
+}
+
+fn dispatch_action(action: ButtonAction, vel: u8, handles: &LpHandles) {
+    let pressed = vel > 0;
+    // Blind is the one momentary action: both press and release fire.
+    // Everything else latches on press (vel > 0).
+    if let ButtonAction::Blind = action {
         handles.blind_held.store(pressed, Ordering::Relaxed);
         handles.globals.lock().set_blind(pressed);
         let _ = tauri::Emitter::emit(
@@ -335,76 +400,179 @@ fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
         );
         return;
     }
-
-    // Everything else latches on press only.
-    if vel == 0 {
+    if !pressed {
         return;
     }
-
-    if note == BLACKOUT_NOTE {
-        let on = !handles.show.read().show.globals.blackout.active;
-        if let Err(err) =
-            crate::commands::set_blackout_impl(&handles.app, &handles.show, &handles.globals, on)
-        {
-            tracing::warn!(?err, "launchpad blackout dispatch failed");
+    // Resolve *ByIndex variants once so the dispatch logic only deals
+    // with concrete id'd actions.
+    let Some(action) = resolve_indexed_action(handles, &action) else {
+        return;
+    };
+    match action {
+        ButtonAction::None => (),
+        ButtonAction::ToggleChaser { id } => {
+            let desired = !handles
+                .show
+                .read()
+                .show
+                .chasers
+                .iter()
+                .any(|c| c.id == id && c.enabled);
+            if let Err(err) = crate::commands::toggle_chaser_impl(
+                &handles.app,
+                &handles.show,
+                &handles.chasers,
+                &id,
+                desired,
+            ) {
+                tracing::warn!(?err, "launchpad action toggle_chaser failed");
+            }
         }
-        return;
-    }
-
-    if note == TAP_NOTE {
-        match crate::commands::tap_overall_bpm_impl(
-            &handles.app,
-            &handles.show,
-            &handles.globals,
-        ) {
-            Ok(Some(bpm)) => tracing::info!(bpm, "launchpad tap → bpm"),
-            Ok(None) => tracing::info!("launchpad tap → first of window"),
-            Err(err) => tracing::warn!(?err, "launchpad tap dispatch failed"),
+        ButtonAction::ToggleMovement { id } => {
+            let desired = !handles
+                .show
+                .read()
+                .show
+                .movements
+                .iter()
+                .any(|m| m.id == id && m.enabled);
+            if let Err(err) = crate::commands::toggle_movement_impl(
+                &handles.app,
+                &handles.show,
+                &handles.movement,
+                &id,
+                desired,
+            ) {
+                tracing::warn!(?err, "launchpad action toggle_movement failed");
+            }
         }
-        return;
-    }
-
-    if note == BPM_TOGGLE_NOTE {
-        let next = !handles.show.read().show.globals.overall_bpm_enabled;
-        if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
-            &handles.app,
-            &handles.show,
-            &handles.globals,
-            next,
-        ) {
-            tracing::warn!(?err, "launchpad bpm toggle dispatch failed");
+        ButtonAction::RecallScene { id } => {
+            let active_id = handles
+                .scenes
+                .lock()
+                .active_scene_id()
+                .map(|s| s.to_string());
+            if active_id.as_deref() == Some(id.as_str()) {
+                handles.scenes.lock().release(std::time::Instant::now());
+                let _ = tauri::Emitter::emit(
+                    &handles.app,
+                    crate::commands::SCENE_ACTIVE_EVENT,
+                    crate::commands::SceneActiveChange {
+                        active_scene_id: None,
+                        step_index: None,
+                    },
+                );
+                return;
+            }
+            if let Err(err) = crate::commands::recall_scene_impl(
+                &handles.app,
+                &handles.engine,
+                &handles.show,
+                &handles.chasers,
+                &handles.movement,
+                &handles.scenes,
+                &id,
+            ) {
+                tracing::warn!(?err, "launchpad action recall_scene failed");
+            }
         }
-        return;
+        ButtonAction::Blackout => {
+            let on = !handles.show.read().show.globals.blackout.active;
+            if let Err(err) = crate::commands::set_blackout_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+                on,
+            ) {
+                tracing::warn!(?err, "launchpad action blackout failed");
+            }
+        }
+        ButtonAction::Blind => {
+            // Handled above — kept for completeness.
+        }
+        ButtonAction::Tap => {
+            match crate::commands::tap_overall_bpm_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+            ) {
+                Ok(Some(bpm)) => tracing::info!(bpm, "launchpad action tap → bpm"),
+                Ok(None) => tracing::info!("launchpad action tap → first of window"),
+                Err(err) => tracing::warn!(?err, "launchpad action tap failed"),
+            }
+        }
+        ButtonAction::ToggleOverallBpm => {
+            let next = !handles.show.read().show.globals.overall_bpm_enabled;
+            if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+                next,
+            ) {
+                tracing::warn!(?err, "launchpad action toggle overall bpm failed");
+            }
+        }
+        ButtonAction::BumpActiveChaserBpm { delta } => {
+            bump_active_chaser_bpm(handles, delta);
+        }
+        ButtonAction::StartLoopGroup { id } => {
+            let active = handles
+                .loops
+                .lock()
+                .active_group_id()
+                .map(|s| s.to_string());
+            if active.as_deref() == Some(id.as_str()) {
+                // Same group is playing — pressing again stops it.
+                crate::commands::stop_loop_group_impl(
+                    &handles.app,
+                    &handles.scenes,
+                    &handles.loops,
+                );
+                return;
+            }
+            if let Err(err) = crate::commands::start_loop_group_impl(
+                &handles.app,
+                &handles.engine,
+                &handles.show,
+                &handles.chasers,
+                &handles.movement,
+                &handles.scenes,
+                &handles.loops,
+                &id,
+            ) {
+                tracing::warn!(?err, "launchpad action start loop group failed");
+            }
+        }
+        ButtonAction::StopLoopGroup => {
+            crate::commands::stop_loop_group_impl(
+                &handles.app,
+                &handles.scenes,
+                &handles.loops,
+            );
+        }
+        // *ByIndex were resolved upstream.
+        _ => (),
     }
+}
 
-    if let Some(pad_idx) = CHASER_PAD_NOTES.iter().position(|&n| n == note) {
-        handle_chaser_press(pad_idx, handles);
+fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
+    let Some(note) = msg.data1 else { return };
+    let vel = msg.data2.unwrap_or(0);
+    let bindings = resolve_bindings(handles);
+    let Some(binding) = bindings.iter().find(|b| !b.is_cc && b.note == note) else {
         return;
-    }
-
-    if let Some(pad_idx) = MOVEMENT_PAD_NOTES.iter().position(|&n| n == note) {
-        handle_movement_press(pad_idx, handles);
-        return;
-    }
-
-    if let Some(pad_idx) = SCENE_PAD_NOTES.iter().position(|&n| n == note) {
-        handle_scene_press(pad_idx, handles);
-    }
+    };
+    dispatch_action(binding.action.clone(), vel, handles);
 }
 
 fn handle_cc(msg: &MidiMessage, handles: &LpHandles) {
     let Some(cc) = msg.data1 else { return };
     let val = msg.data2.unwrap_or(0);
-    // CCs send press as val=127 and release as val=0 — only act on press
-    // so a single tap nudges BPM by exactly one step.
-    if val == 0 {
+    let bindings = resolve_bindings(handles);
+    let Some(binding) = bindings.iter().find(|b| b.is_cc && b.note == cc) else {
         return;
-    }
-    match cc {
-        BPM_UP_CC => bump_active_chaser_bpm(handles, BPM_STEP),
-        BPM_DOWN_CC => bump_active_chaser_bpm(handles, -BPM_STEP),
-        _ => (),
-    }
+    };
+    dispatch_action(binding.action.clone(), val, handles);
 }
 
 /// Find the currently-enabled chaser (exclusive activation guarantees at
@@ -434,133 +602,68 @@ fn bump_active_chaser_bpm(handles: &LpHandles, delta_bpm: f32) {
 
 fn compute_targets(handles: &LpHandles) -> LedTargets {
     let mut out = LedTargets::empty();
-
-    let (chasers_snapshot, movements_snapshot, scenes_snapshot, blackout_active) = {
-        let s = handles.show.read();
-        (
-            s.show.chasers.clone(),
-            s.show.movements.clone(),
-            s.show.scenes.clone(),
-            s.show.globals.blackout.active,
-        )
-    };
-    let active_scene_id = handles
-        .scenes
-        .lock()
-        .active_scene_id()
-        .map(|s| s.to_string());
-
-    // Chasers --------------------------------------------------------------
-    for (i, ch) in chasers_snapshot.iter().take(8).enumerate() {
-        let (dim, bright) = CHASER_PAD_PALETTE[i];
-        out.chasers[i] = if ch.enabled {
-            PadState::OnFlash { dim, bright }
+    let bindings = resolve_bindings(handles);
+    for b in &bindings {
+        let state = pad_state_for_binding(b, handles);
+        if b.is_cc {
+            out.ccs.insert(b.note, state);
         } else {
-            PadState::OffDim(dim)
-        };
+            out.pads.insert(b.note, state);
+        }
     }
-
-    // Top row --------------------------------------------------------------
-    // Live mirror of the active chaser's per-slot output so the round
-    // buttons emulate the actual fixtures. We pull the latest slot
-    // outputs straight from the engine — that's what the DMX universe
-    // received on the previous frame, scaled per-slot for intensity.
+    // Top row RGB mirror: only paint if the user has NOT explicitly
+    // bound those CCs themselves. The factory layout uses CC 104/105
+    // for BPM bump only — slots 106..=111 stay free and we use them
+    // to mirror the chaser's slot RGB. When the user binds those CCs
+    // for something else, their colour wins.
     if let Some(slots) = handles.chasers.lock().active_slot_outputs() {
         for (i, slot) in slots.iter().take(8).enumerate() {
+            let cc = TOP_ROW_CCS[i];
+            // Skip the slot if the user has bound that CC to an
+            // action — their LED state wins.
+            if bindings.iter().any(|b| b.is_cc && b.note == cc) {
+                continue;
+            }
             out.top_row[i] = slot_output_to_rgb(slot);
         }
     }
-
-    // Movements ------------------------------------------------------------
-    for (i, m) in movements_snapshot.iter().take(8).enumerate() {
-        let (dim, bright) = MOVEMENT_PAD_PALETTE[i];
-        out.movements[i] = if m.enabled {
-            PadState::OnFlash { dim, bright }
-        } else {
-            PadState::OffDim(dim)
-        };
-    }
-
-    // Scenes (row 3) -------------------------------------------------------
-    for (i, scene) in scenes_snapshot.iter().take(8).enumerate() {
-        let (dim, bright) = SCENE_PAD_PALETTE[i];
-        out.scenes[i] = if active_scene_id.as_deref() == Some(scene.id.as_str()) {
-            PadState::OnFlash { dim, bright }
-        } else {
-            PadState::OffDim(dim)
-        };
-    }
-
-    // Blackout (toggle) ---------------------------------------------------
-    let (bo_dim, bo_bright) = BLACKOUT_PALETTE;
-    out.blackout = if blackout_active {
-        PadState::OnFlash {
-            dim: bo_dim,
-            bright: bo_bright,
-        }
-    } else {
-        PadState::OffDim(bo_dim)
-    };
-
-    // Blind (momentary) ---------------------------------------------------
-    let (bl_dim, bl_bright) = BLIND_PALETTE;
-    out.blind = if handles.blind_held.load(Ordering::Relaxed) {
-        PadState::OnFlash {
-            dim: bl_dim,
-            bright: bl_bright,
-        }
-    } else {
-        PadState::OffDim(bl_dim)
-    };
-
-    // TAP (always lit dim teal — it's a momentary trigger, no state) ------
-    let (t_dim, _t_bright) = TAP_PALETTE;
-    out.tap = PadState::OffDim(t_dim);
-
-    // BPM toggle (flashes when the override is on, dim when off) ----------
-    let (bpm_dim, bpm_bright) = BPM_TOGGLE_PALETTE;
-    let bpm_enabled = {
-        let s = handles.show.read();
-        s.show.globals.overall_bpm_enabled
-    };
-    out.bpm_toggle = if bpm_enabled {
-        PadState::OnFlash {
-            dim: bpm_dim,
-            bright: bpm_bright,
-        }
-    } else {
-        PadState::OffDim(bpm_dim)
-    };
-
     out
 }
 
 fn diff_and_push(midi: &SharedMidi, last: &LedTargets, target: &LedTargets) {
+    // Union the key sets so a binding that was just removed gets blanked.
+    let mut pad_keys: std::collections::HashSet<u8> = std::collections::HashSet::new();
+    pad_keys.extend(last.pads.keys().copied());
+    pad_keys.extend(target.pads.keys().copied());
+    for note in pad_keys {
+        let prev = last.pads.get(&note).copied().unwrap_or(PadState::Empty);
+        let next = target.pads.get(&note).copied().unwrap_or(PadState::Empty);
+        if prev != next {
+            push_pad(midi, note, next);
+        }
+    }
+    let mut cc_keys: std::collections::HashSet<u8> = std::collections::HashSet::new();
+    cc_keys.extend(last.ccs.keys().copied());
+    cc_keys.extend(target.ccs.keys().copied());
+    for cc in cc_keys {
+        let prev = last.ccs.get(&cc).copied().unwrap_or(PadState::Empty);
+        let next = target.ccs.get(&cc).copied().unwrap_or(PadState::Empty);
+        if prev != next {
+            // CCs use NoteOn-on-CC palette wire format same as pads on
+            // the MK2 grid because the SysEx LED protocol addresses both
+            // by data1. push_pad sends 0x90 which the firmware also
+            // accepts for CC LEDs — but the canonical way is 0xB0. Stay
+            // consistent with the historical code: only the bottom-row
+            // pads use 0x90; the top-row CCs are RGB-only via SysEx.
+            // So for "palette colour on a top-row CC button", emit the
+            // closest dim white SysEx and call it a day.
+            push_cc_palette(midi, cc, next);
+        }
+    }
     for i in 0..8 {
-        if target.chasers[i] != last.chasers[i] {
-            push_pad(midi, CHASER_PAD_NOTES[i], target.chasers[i]);
-        }
-        if target.movements[i] != last.movements[i] {
-            push_pad(midi, MOVEMENT_PAD_NOTES[i], target.movements[i]);
-        }
-        if target.scenes[i] != last.scenes[i] {
-            push_pad(midi, SCENE_PAD_NOTES[i], target.scenes[i]);
-        }
         if target.top_row[i] != last.top_row[i] {
             push_top_rgb(midi, TOP_ROW_CCS[i], target.top_row[i]);
         }
-    }
-    if target.blackout != last.blackout {
-        push_pad(midi, BLACKOUT_NOTE, target.blackout);
-    }
-    if target.blind != last.blind {
-        push_pad(midi, BLIND_NOTE, target.blind);
-    }
-    if target.tap != last.tap {
-        push_pad(midi, TAP_NOTE, target.tap);
-    }
-    if target.bpm_toggle != last.bpm_toggle {
-        push_pad(midi, BPM_TOGGLE_NOTE, target.bpm_toggle);
     }
 }
 
@@ -609,36 +712,40 @@ fn push_top_rgb(midi: &SharedMidi, cc: u8, rgb: TopRowRgb) {
 }
 
 fn push_all(midi: &SharedMidi, target: &LedTargets) {
+    for (&note, &state) in &target.pads {
+        push_pad(midi, note, state);
+    }
+    for (&cc, &state) in &target.ccs {
+        push_cc_palette(midi, cc, state);
+    }
     for i in 0..8 {
-        push_pad(midi, CHASER_PAD_NOTES[i], target.chasers[i]);
-        push_pad(midi, MOVEMENT_PAD_NOTES[i], target.movements[i]);
-        push_pad(midi, SCENE_PAD_NOTES[i], target.scenes[i]);
         push_top_rgb(midi, TOP_ROW_CCS[i], target.top_row[i]);
     }
-    push_pad(midi, BLACKOUT_NOTE, target.blackout);
-    push_pad(midi, BLIND_NOTE, target.blind);
-    push_pad(midi, TAP_NOTE, target.tap);
-    push_pad(midi, BPM_TOGGLE_NOTE, target.bpm_toggle);
+}
+
+/// Send a palette-colour update for a top-row CC button. The MK2
+/// accepts NoteOn on CC numbers too, but for clarity we emit the
+/// RGB SysEx with a quantised palette — same hardware effect at a
+/// slight wire-cost.
+fn push_cc_palette(midi: &SharedMidi, cc: u8, state: PadState) {
+    let (r, g, b) = match state {
+        PadState::Empty => (0, 0, 0),
+        PadState::OffDim(_) => (32, 32, 32),
+        PadState::OnFlash { .. } => (255, 255, 255),
+    };
+    push_top_rgb(midi, cc, TopRowRgb { r, g, b });
 }
 
 fn clear_all_pads(midi: &SharedMidi) {
     let mut hub = midi.lock();
-    for &n in &CHASER_PAD_NOTES {
+    // Brute-force: blank every grid pad note and every top-row CC.
+    // Bounds chosen to cover the whole MK2 surface.
+    for n in 11..=88u8 {
         let _ = hub.send_raw(&[0x90, n, 0]);
     }
-    for &n in &MOVEMENT_PAD_NOTES {
-        let _ = hub.send_raw(&[0x90, n, 0]);
-    }
-    for &n in &SCENE_PAD_NOTES {
-        let _ = hub.send_raw(&[0x90, n, 0]);
-    }
-    for &cc in &TOP_ROW_CCS {
+    for cc in 104..=111u8 {
         let _ = hub.send_raw(&[0xB0, cc, 0]);
     }
-    let _ = hub.send_raw(&[0x90, BLACKOUT_NOTE, 0]);
-    let _ = hub.send_raw(&[0x90, BLIND_NOTE, 0]);
-    let _ = hub.send_raw(&[0x90, TAP_NOTE, 0]);
-    let _ = hub.send_raw(&[0x90, BPM_TOGGLE_NOTE, 0]);
 }
 
 /// Translate one chaser slot's output (intensity + RGB) into the actual
@@ -666,129 +773,26 @@ fn slot_output_to_rgb(slot: &SlotOutput) -> TopRowRgb {
     }
 }
 
-fn handle_chaser_press(pad_idx: usize, handles: &LpHandles) {
-    let target = {
-        let s = handles.show.read();
-        s.show
-            .chasers
-            .get(pad_idx)
-            .map(|c| (c.id.clone(), !c.enabled))
-    };
-    let Some((id, desired)) = target else {
-        return;
-    };
-    if let Err(err) = crate::commands::toggle_chaser_impl(
-        &handles.app,
-        &handles.show,
-        &handles.chasers,
-        &id,
-        desired,
-    ) {
-        tracing::warn!(?err, "launchpad pad toggle_chaser failed");
-    }
-}
-
-/// Toggle the n-th scene from the show: pressing the pad of the
-/// currently-active scene **releases** it (restoring the pre-recall FX
-/// context); pressing any other scene's pad recalls it. Routes through
-/// `recall_scene_impl` so the launchpad respects the same multi-step
-/// playback + FX capture activation as the UI's GO button.
-fn handle_scene_press(pad_idx: usize, handles: &LpHandles) {
-    let scene_id = {
-        let s = handles.show.read();
-        s.show.scenes.get(pad_idx).map(|c| c.id.clone())
-    };
-    let Some(scene_id) = scene_id else {
-        return;
-    };
-    // Snapshot the currently-active scene id and drop the lock before
-    // calling release/recall — both internally take the same lock.
-    let active_id = handles
-        .scenes
-        .lock()
-        .active_scene_id()
-        .map(|s| s.to_string());
-    if active_id.as_deref() == Some(scene_id.as_str()) {
-        // Same scene that's already playing → toggle off. release()
-        // also fires the pre-recall FX restoration request through the
-        // playback's channel, so chasers/movements come back to the
-        // pre-recall state.
-        handles.scenes.lock().release(std::time::Instant::now());
-        let _ = tauri::Emitter::emit(
-            &handles.app,
-            crate::commands::SCENE_ACTIVE_EVENT,
-            crate::commands::SceneActiveChange {
-                active_scene_id: None,
-                step_index: None,
-            },
-        );
-        tracing::info!(scene = %scene_id, "launchpad released active scene");
-        return;
-    }
-    if let Err(err) = crate::commands::recall_scene_impl(
-        &handles.app,
-        &handles.engine,
-        &handles.show,
-        &handles.chasers,
-        &handles.movement,
-        &handles.scenes,
-        &scene_id,
-    ) {
-        tracing::warn!(?err, "launchpad scene recall failed");
-    }
-}
-
-fn handle_movement_press(pad_idx: usize, handles: &LpHandles) {
-    let target = {
-        let s = handles.show.read();
-        s.show
-            .movements
-            .get(pad_idx)
-            .map(|m| (m.id.clone(), !m.enabled))
-    };
-    let Some((id, desired)) = target else {
-        return;
-    };
-    if let Err(err) = crate::commands::toggle_movement_impl(
-        &handles.app,
-        &handles.show,
-        &handles.movement,
-        &id,
-        desired,
-    ) {
-        tracing::warn!(?err, "launchpad pad toggle_movement failed");
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn pad_palette_covers_all_eight_pads() {
-        // Off-by-one in the palette would silently dim or mis-colour a
-        // pad — guard the table size matches the note row.
-        assert_eq!(CHASER_PAD_NOTES.len(), 8);
-        assert_eq!(CHASER_PAD_PALETTE.len(), 8);
-        assert_eq!(MOVEMENT_PAD_NOTES.len(), 8);
-        assert_eq!(MOVEMENT_PAD_PALETTE.len(), 8);
-        assert_eq!(SCENE_PAD_NOTES.len(), 8);
-        assert_eq!(SCENE_PAD_PALETTE.len(), 8);
-    }
-
-    #[test]
-    fn pad_layout_is_disjoint() {
+    fn default_layout_is_disjoint() {
         // Catch a layout drift before two different roles fight for
-        // the same note. Scene buttons + chaser/movement pads + the
-        // two scene-column notes should all be distinct.
-        let mut all = Vec::new();
-        all.extend_from_slice(&CHASER_PAD_NOTES);
-        all.extend_from_slice(&MOVEMENT_PAD_NOTES);
-        all.extend_from_slice(&SCENE_PAD_NOTES);
-        all.push(BLACKOUT_NOTE);
-        all.push(BLIND_NOTE);
-        let unique: std::collections::HashSet<_> = all.iter().copied().collect();
-        assert_eq!(all.len(), unique.len(), "duplicate pad note in layout");
+        // the same note. Every default binding (notes + CCs) should
+        // be unique within its address space.
+        let defaults = crate::show::button_bindings::default_launchpad_bindings();
+        let mut seen: std::collections::HashSet<(u8, bool)> = std::collections::HashSet::new();
+        for b in &defaults {
+            assert!(
+                seen.insert((b.note, b.is_cc)),
+                "duplicate binding at note {} cc={}",
+                b.note,
+                b.is_cc
+            );
+        }
     }
 
     #[test]

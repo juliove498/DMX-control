@@ -5,7 +5,9 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+use super::button_bindings::ButtonBindings;
 use super::fixture::{FixtureDefinition, FixtureInstance};
+use super::loop_group::SceneLoopGroup;
 use super::scene::Scene;
 use crate::chaser::AmbientChaser;
 use crate::globals::GlobalsConfig;
@@ -45,10 +47,20 @@ pub struct ShowFileV1 {
     #[serde(default)]
     pub globals: GlobalsConfig,
     /// Recorded scenes — Phase 4 MVP. Each entry is a per-fixture
-    /// per-channel snapshot the operator can recall with a fade. No
-    /// cuelist sequencing yet; that's Phase 5.
+    /// per-channel snapshot the operator can recall with a fade.
     #[serde(default)]
     pub scenes: Vec<Scene>,
+    /// Named playlists of scenes that loop on their own. Each group
+    /// holds an ordered list of scene IDs and cycles through them
+    /// using each scene's own fade/hold (or a per-group hold override).
+    #[serde(default)]
+    pub scene_loop_groups: Vec<SceneLoopGroup>,
+    /// User-customised Launchpad / Stream Deck button assignments.
+    /// `custom_enabled = false` (default) means the surface
+    /// controllers use the built-in factory layout; flipping it to
+    /// true makes the per-surface lists below authoritative.
+    #[serde(default)]
+    pub button_bindings: ButtonBindings,
     /// Snapshot of the fixture definitions referenced by this show.
     /// Saved alongside `fixtures` so a `.json` is portable across
     /// machines: open the file on a fresh install and the rig appears
@@ -73,6 +85,8 @@ impl Default for ShowFileV1 {
             movements: Vec::new(),
             globals: GlobalsConfig::default(),
             scenes: Vec::new(),
+            scene_loop_groups: Vec::new(),
+            button_bindings: ButtonBindings::default(),
             library: Vec::new(),
         }
     }

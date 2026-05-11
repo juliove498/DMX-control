@@ -1,8 +1,10 @@
 import type { AmbientChaser } from "@bindings/AmbientChaser";
+import type { ButtonBindings } from "@bindings/ButtonBindings";
 import type { D2xxDeviceInfo } from "@bindings/D2xxDeviceInfo";
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
 import type { GlobalsConfig } from "@bindings/GlobalsConfig";
+import type { LoopGroupActiveChange } from "@bindings/LoopGroupActiveChange";
 import type { MovementGenerator } from "@bindings/MovementGenerator";
 import type { AiAvailableModels } from "@bindings/AiAvailableModels";
 import type { AiConfig } from "@bindings/AiConfig";
@@ -11,6 +13,7 @@ import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { PatchReport } from "@bindings/PatchReport";
 import type { ProgrammerStatus } from "@bindings/ProgrammerStatus";
 import type { Scene } from "@bindings/Scene";
+import type { SceneLoopGroup } from "@bindings/SceneLoopGroup";
 import type { SerialPortInfo } from "@bindings/SerialPortInfo";
 import type { ShowFileV1 } from "@bindings/ShowFileV1";
 import { invoke } from "@tauri-apps/api/core";
@@ -93,6 +96,20 @@ interface ShowStoreState {
   releaseScene: () => Promise<void>;
   activeSceneId: () => Promise<string | null>;
   activeSceneStep: () => Promise<number | null>;
+
+  // Sequence loop groups (playlists of scenes)
+  listLoopGroups: () => Promise<SceneLoopGroup[]>;
+  createLoopGroup: (name?: string) => Promise<SceneLoopGroup>;
+  updateLoopGroup: (group: SceneLoopGroup) => Promise<void>;
+  deleteLoopGroup: (id: string) => Promise<void>;
+  startLoopGroup: (id: string) => Promise<void>;
+  stopLoopGroup: () => Promise<void>;
+  activeLoopGroup: () => Promise<LoopGroupActiveChange>;
+
+  // Button bindings (Launchpad + Stream Deck)
+  getButtonBindings: () => Promise<ButtonBindings>;
+  updateButtonBindings: (bindings: ButtonBindings) => Promise<void>;
+  getDefaultButtonBindings: () => Promise<ButtonBindings>;
   programmerStatus: () => Promise<ProgrammerStatus>;
   programmerClear: () => Promise<void>;
   programmerUntouch: (fixtureId: string) => Promise<void>;
@@ -411,6 +428,45 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
 
   async activeSceneStep() {
     return invoke<number | null>("active_scene_step");
+  },
+
+  // ---- Sequence loop groups ----
+  async listLoopGroups() {
+    return invoke<SceneLoopGroup[]>("list_loop_groups");
+  },
+  async createLoopGroup(name) {
+    const g = await invoke<SceneLoopGroup>("create_loop_group", { name: name ?? null });
+    await get().refresh();
+    return g;
+  },
+  async updateLoopGroup(group) {
+    await invoke("update_loop_group", { group });
+    await get().refresh();
+  },
+  async deleteLoopGroup(id) {
+    await invoke("delete_loop_group", { id });
+    await get().refresh();
+  },
+  async startLoopGroup(id) {
+    await invoke("start_loop_group", { id });
+  },
+  async stopLoopGroup() {
+    await invoke("stop_loop_group");
+  },
+  async activeLoopGroup() {
+    return invoke<LoopGroupActiveChange>("active_loop_group");
+  },
+
+  // ---- Button bindings ----
+  async getButtonBindings() {
+    return invoke<ButtonBindings>("get_button_bindings");
+  },
+  async updateButtonBindings(bindings) {
+    await invoke("update_button_bindings", { bindings });
+    await get().refresh();
+  },
+  async getDefaultButtonBindings() {
+    return invoke<ButtonBindings>("get_default_button_bindings");
   },
 
   async setBlackout(active) {

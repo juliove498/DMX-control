@@ -68,6 +68,10 @@ pub enum TileKind {
     /// Overall-BPM toggle — flips the global override on/off. Idle:
     /// dim metronome glyph. Active: bright pulsing metronome.
     BpmToggle,
+    /// Sequence loop group — a playlist of scenes that cycles on its
+    /// own. Active state pulses faster than a single scene so the
+    /// operator can tell at a glance which one is the playlist driver.
+    LoopGroup,
 }
 
 /// One key's desired visual. Cached when `state == Idle`; re-rendered
@@ -261,6 +265,7 @@ fn draw_tile(
         TileKind::Blackout => draw_bolt_glyph(img, icon_cy, fg),
         TileKind::Tap => draw_tap_glyph(img, icon_cy, fg, active, phase),
         TileKind::BpmToggle => draw_metronome_glyph(img, icon_cy, fg, active, phase),
+        TileKind::LoopGroup => draw_loop_glyph(img, icon_cy, fg, active, phase),
     }
 
     // -- chaser live RGB strip ------------------------------------------
@@ -438,6 +443,51 @@ fn draw_metronome_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, 
     );
     // Counterweight bead near the tip.
     draw_filled_circle_mut(img, tip, 3, fg);
+}
+
+fn draw_loop_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, phase: u32) {
+    // A circular arrow — outer arc with an arrowhead at one end, the
+    // whole thing rotating slowly when active to read as "this is a
+    // playlist cycling on its own."
+    let cx = KEY_IMAGE_SIZE as i32 / 2;
+    let radius = 13_i32;
+    // Hollow ring (draw two filled circles and punch out the inside).
+    draw_filled_circle_mut(img, (cx, cy), radius, fg);
+    let bg = img.get_pixel(0, 0).0;
+    draw_filled_circle_mut(img, (cx, cy), radius - 3, Rgb(bg));
+    // Arrowhead position: rotates with phase when active, parked at
+    // 3 o'clock when idle so the glyph reads as a clean cycle even
+    // sitting still.
+    let cycle = 20_u32; // 2 s per orbit
+    let t = if active { phase % cycle } else { 0 } as f32 / cycle as f32;
+    let angle = t * std::f32::consts::TAU;
+    let tx = cx + (radius as f32 * angle.cos()) as i32;
+    let ty = cy + (radius as f32 * angle.sin()) as i32;
+    // Small triangle pointing tangentially (90° from radial).
+    let tangent = angle + std::f32::consts::FRAC_PI_2;
+    let half = 5_f32;
+    let p1 = (
+        tx + (half * tangent.cos()) as i32,
+        ty + (half * tangent.sin()) as i32,
+    );
+    let p2 = (
+        tx - (half * tangent.cos()) as i32,
+        ty - (half * tangent.sin()) as i32,
+    );
+    let nose = angle;
+    let p3 = (
+        tx + (6.0 * nose.cos()) as i32,
+        ty + (6.0 * nose.sin()) as i32,
+    );
+    draw_polygon_mut(
+        img,
+        &[
+            Point::new(p1.0, p1.1),
+            Point::new(p3.0, p3.1),
+            Point::new(p2.0, p2.1),
+        ],
+        fg,
+    );
 }
 
 fn draw_bolt_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>) {

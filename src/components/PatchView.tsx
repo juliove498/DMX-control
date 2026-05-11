@@ -112,7 +112,7 @@ function AddFixtureForm({
   };
 
   return (
-    <div className="add-fixture">
+    <div className="add-fixture" data-doc="patch-add-form">
       <select value={defId} onChange={(e) => setDefId(e.currentTarget.value)}>
         {library.map((d) => (
           <option key={d.id} value={d.id}>
@@ -216,10 +216,14 @@ export function PatchView() {
   const problemsByFixture = new Set(patch.problems.map((p) => p.fixture));
 
   return (
-    <main className="page patch-view">
+    <main className="page patch-view" data-doc="patch-view">
       <header className="page-head">
         <h2>{t("patch.title", { count: show.fixtures.length })}</h2>
-        <span className={patch.conflicts.length || patch.problems.length ? "warn" : "ok"}>
+        <span
+          data-doc="patch-status"
+          data-doc-state={patch.conflicts.length || patch.problems.length ? "warn" : "ok"}
+          className={patch.conflicts.length || patch.problems.length ? "warn" : "ok"}
+        >
           {patch.conflicts.length === 0 && patch.problems.length === 0
             ? t("patch.statusClean")
             : t("patch.statusIssues", {
@@ -236,7 +240,7 @@ export function PatchView() {
         defaultUniverse={show.outputs.bindings[0]?.universes[0] ?? 0}
       />
 
-      <table className="fixtures">
+      <table className="fixtures" data-doc="patch-table">
         <thead>
           <tr>
             <th>{t("patch.col.id")}</th>
@@ -321,7 +325,7 @@ export function PatchView() {
       </table>
 
       {patch.conflicts.length || patch.problems.length ? (
-        <section className="patch-issues">
+        <section className="patch-issues" data-doc="patch-issues">
           {patch.problems.map((p) => (
             <div key={`p-${p.fixture}`} className="issue">
               <strong>{p.fixture}:</strong> {p.message}

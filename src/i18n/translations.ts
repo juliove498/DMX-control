@@ -53,6 +53,8 @@ export type Translation = {
   "config.tabs.patchHint": string;
   "config.tabs.blackoutBlind": string;
   "config.tabs.blackoutBlindHint": string;
+  "config.tabs.bindings": string;
+  "config.tabs.bindingsHint": string;
   "config.tabs.midi": string;
   "config.tabs.midiHint": string;
   "config.tabs.streamdeck": string;
@@ -780,6 +782,8 @@ export const en: Translation = {
   "config.tabs.blackoutBlind": "Globals",
   "config.tabs.blackoutBlindHint":
     "Master scaling, blackout fades, blind halogen — per-fixture channel sets",
+  "config.tabs.bindings": "Buttons",
+  "config.tabs.bindingsHint": "Custom Launchpad + Stream Deck button assignments",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Control surface (Launchpad, etc.)",
   "config.tabs.streamdeck": "Stream Deck",
@@ -1529,6 +1533,9 @@ export const es: Translation = {
   "config.tabs.blackoutBlind": "Globales",
   "config.tabs.blackoutBlindHint":
     "Master, blackout y blind — canales afectados por cada uno por fixture",
+  "config.tabs.bindings": "Botones",
+  "config.tabs.bindingsHint":
+    "Asignaciones personalizadas de botones del Launchpad + Stream Deck",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Superficie de control (Launchpad, etc.)",
   "config.tabs.streamdeck": "Stream Deck",

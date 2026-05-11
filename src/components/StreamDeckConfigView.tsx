@@ -76,7 +76,7 @@ export function StreamDeckConfigView() {
         </div>
       </header>
 
-      <p className="hint">{t("streamdeck.intro")}</p>
+      <p className="hint" data-doc="streamdeck-intro">{t("streamdeck.intro")}</p>
 
       {error ? (
         <output className="lib-error" aria-live="polite">
@@ -84,7 +84,7 @@ export function StreamDeckConfigView() {
         </output>
       ) : null}
 
-      <section className="config-section">
+      <section className="config-section" data-doc="streamdeck-devices">
         <h3>{t("streamdeck.detectedDevices", { count: devices.length })}</h3>
         {devices.length === 0 ? (
           <p className="empty">{t("streamdeck.empty")}</p>
@@ -118,7 +118,7 @@ export function StreamDeckConfigView() {
       </section>
 
       {status.connected ? (
-        <section className="config-section">
+        <section className="config-section" data-doc="streamdeck-status">
           <h3>{t("streamdeck.statusSection")}</h3>
           <p>
             {t("streamdeck.connectedToFmt", {

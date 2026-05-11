@@ -1,6 +1,8 @@
+pub mod button_bindings;
 pub mod file;
 pub mod fixture;
 pub mod library;
+pub mod loop_group;
 pub mod scene;
 pub mod session;
 pub mod state;

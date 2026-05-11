@@ -4771,3 +4771,419 @@ hr {
   padding: var(--sp-2) var(--sp-3);
   font-size: 13px;
 }
+
+/* =====================================================================
+   Loop groups panel (under the scene list)
+   ===================================================================== */
+.scenes-loop-panel {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.scenes-loop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.scenes-loop-head h4 {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.scenes-loop-new {
+  font-size: 12px;
+  padding: var(--sp-1) var(--sp-2);
+}
+.scenes-loop-hint {
+  font-size: 12px;
+  margin: 0;
+  color: var(--text-3, #8a8a8a);
+}
+.scenes-loop-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.scenes-loop-card {
+  background: var(--bg-1);
+  border: 1px solid var(--bg-2);
+  border-radius: var(--r-md);
+  padding: var(--sp-2);
+}
+.scenes-loop-card.active {
+  border-color: #d4af37;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.4);
+}
+.scenes-loop-card-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.scenes-loop-go {
+  font-size: 16px;
+  padding: var(--sp-1) var(--sp-2);
+  min-width: 32px;
+}
+.scenes-loop-name {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  color: inherit;
+  font-size: 14px;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-sm);
+}
+.scenes-loop-name:hover,
+.scenes-loop-name:focus {
+  border-color: var(--bg-2);
+}
+.scenes-loop-count {
+  font-size: 11px;
+  color: var(--text-3, #8a8a8a);
+}
+.scenes-loop-del {
+  font-size: 14px;
+  padding: 2px 8px;
+}
+.scenes-loop-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-3, #8a8a8a);
+  padding: var(--sp-1) 0;
+  user-select: none;
+}
+.scenes-loop-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+}
+.scenes-loop-hold {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.scenes-loop-hold input {
+  width: 120px;
+}
+.scenes-loop-hold-hint {
+  font-size: 11px;
+}
+.scenes-loop-items {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+.scenes-loop-item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--bg-0);
+  border-radius: var(--r-sm);
+  font-size: 13px;
+}
+.scenes-loop-item.live {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.16), transparent);
+  outline: 1px solid rgba(212, 175, 55, 0.4);
+}
+.scenes-loop-item.missing {
+  color: var(--text-3, #8a8a8a);
+  font-style: italic;
+}
+.scenes-loop-item-idx {
+  min-width: 22px;
+  color: var(--text-3, #8a8a8a);
+  font-variant-numeric: tabular-nums;
+}
+.scenes-loop-item-name {
+  flex: 1;
+}
+.scenes-loop-add-row select {
+  width: 100%;
+}
+
+/* =====================================================================
+   Button bindings view (Launchpad + Stream Deck grids)
+   ===================================================================== */
+.bindings-view .bindings-tabs {
+  display: flex;
+  gap: var(--sp-2);
+  border-bottom: 1px solid var(--bg-2);
+  margin: var(--sp-3) 0;
+}
+.bindings-view .bindings-tab {
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  padding: var(--sp-2) var(--sp-3);
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.bindings-view .bindings-tab.active {
+  color: var(--text-1, #fff);
+  border-bottom-color: #d4af37;
+}
+.bindings-custom-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: 13px;
+  color: var(--text-2);
+  margin-right: var(--sp-2);
+}
+.bindings-section h3 {
+  margin: 0 0 var(--sp-2);
+  font-size: 14px;
+}
+.bindings-section .hint.warn {
+  color: #f3c969;
+}
+
+/* Launchpad MK2 mock: 8×8 grid of square pads, plus a row of round
+   CC buttons across the top and a column of round scene buttons on
+   the right. Sized off a single `--lp-pad` token so future tweaks
+   land in one place. Round buttons are smaller than squares to
+   mirror the physical hardware. */
+.lp-grid-wrap {
+  --lp-pad: 48px;
+  --lp-round: 36px;
+  --lp-gap: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  background: var(--bg-0);
+  border-radius: var(--r-md);
+  width: fit-content;
+}
+.lp-top-row {
+  /* 8 round CCs aligned over the 8 square pad columns, plus a
+     phantom slot to keep widths matched with the grid's 9-column
+     rows below (which have a round scene button in the last slot). */
+  display: grid;
+  grid-template-columns: repeat(8, var(--lp-pad)) var(--lp-round);
+  gap: var(--lp-gap);
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--bg-2);
+  align-items: center;
+  justify-items: center;
+}
+.lp-top-row::after {
+  content: "";
+  width: var(--lp-round);
+  height: var(--lp-round);
+}
+.lp-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lp-gap);
+}
+.lp-grid-row {
+  display: grid;
+  grid-template-columns: repeat(8, var(--lp-pad)) var(--lp-round);
+  gap: var(--lp-gap);
+  align-items: center;
+  justify-items: center;
+}
+.lp-cell {
+  border: 1px solid var(--bg-2);
+  padding: 2px 4px;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.lp-cell--square {
+  border-radius: var(--r-sm);
+  width: var(--lp-pad);
+  height: var(--lp-pad);
+  font-size: 10px;
+}
+.lp-cell--round {
+  border-radius: 50%;
+  width: var(--lp-round);
+  height: var(--lp-round);
+  font-size: 8px;
+  padding: 2px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.lp-cell.bound {
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+.lp-cell--round.bound {
+  /* The inset ring is invisible at 36 px; switch to a soft outer
+     glow so bound round buttons still read as "configured". */
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.lp-cell-num {
+  font-size: 9px;
+  opacity: 0.7;
+}
+.lp-cell--round .lp-cell-num {
+  font-size: 8px;
+  opacity: 0.65;
+}
+.lp-cell-label {
+  font-size: 10px;
+  width: 100%;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+.lp-cell--round .lp-cell-label {
+  /* Round buttons are too small for a long label — hide the body
+     text; the tooltip carries the full label/action summary. */
+  display: none;
+}
+
+.sd-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--sp-2);
+  background: var(--bg-0);
+  border-radius: var(--r-md);
+  width: fit-content;
+}
+.sd-grid-row {
+  display: grid;
+  grid-template-columns: repeat(5, 84px);
+  gap: 6px;
+}
+.sd-cell {
+  height: 84px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--bg-2);
+  color: #fff;
+  font-size: 11px;
+  padding: var(--sp-1);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.sd-cell.bound {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+.sd-cell-num {
+  font-size: 10px;
+  opacity: 0.6;
+}
+.sd-cell-label {
+  font-size: 11px;
+  font-weight: 500;
+  white-space: pre-wrap;
+}
+
+.bindings-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-4);
+}
+.bindings-modal {
+  background: var(--bg-1);
+  border: 1px solid var(--bg-2);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 480px;
+  max-width: 100%;
+  max-height: 90vh;
+  overflow: auto;
+}
+.bindings-modal h3 {
+  margin: 0;
+}
+.bindings-modal label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  font-size: 12px;
+  color: var(--text-2);
+}
+.bindings-modal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-3);
+}
+.bindings-modal-actions {
+  display: flex;
+  gap: var(--sp-2);
+  align-items: center;
+  margin-top: var(--sp-2);
+}
+.lp-color-swatch {
+  display: inline-block;
+  width: 24px;
+  height: 16px;
+  border-radius: var(--r-xs);
+  border: 1px solid var(--bg-2);
+  margin-top: var(--sp-1);
+}
+.rgb-input {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.rgb-input input[type="color"] {
+  width: 40px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--bg-2);
+  background: var(--bg-0);
+}
+.rgb-input code {
+  font-size: 11px;
+  color: var(--text-3, #8a8a8a);
+}
+.action-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.action-target {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-3);
+  font-size: 12px;
+}
+.action-target label {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--sp-1);
+}

@@ -570,7 +570,7 @@ function Preview({
   const cornerSize = 0.05;
 
   return (
-    <div className={`movement-preview${gen.enabled ? "" : " off"}`}>
+    <div className={`movement-preview${gen.enabled ? "" : " off"}`} data-doc="movement-preview">
       {!gen.enabled ? (
         <div className="movement-preview-badge">{t("movement.previewBadgeOff")}</div>
       ) : null}
@@ -855,7 +855,7 @@ export function MovementView() {
       </header>
 
       <div className="movement-layout">
-        <aside className="movement-sidebar" aria-label="Movement list">
+        <aside className="movement-sidebar" aria-label="Movement list" data-doc="movement-list">
           {movements.map((m, i) => {
             const color = movementColor(i);
             const onLp = i < 8;
@@ -886,8 +886,8 @@ export function MovementView() {
           })}
         </aside>
 
-        <section className="movement-editor">
-          <div className="movement-editor-head">
+        <section className="movement-editor" data-doc="movement-editor">
+          <div className="movement-editor-head" data-doc="movement-head">
             <button
               type="button"
               className={`chaser-toggle${gen.enabled ? " on" : ""}`}
@@ -916,7 +916,7 @@ export function MovementView() {
           </div>
 
           <div className="movement-grid">
-            <section className="movement-column">
+            <section className="movement-column" data-doc="movement-params">
               <fieldset className="chaser-fieldset">
                 <legend>{t("movement.legend.fixtures", { count: gen.fixtures.length })}</legend>
                 {gen.fixtures.length === 0 ? (
@@ -972,7 +972,7 @@ export function MovementView() {
                 </select>
               </fieldset>
 
-              <fieldset className="chaser-fieldset">
+              <fieldset className="chaser-fieldset" data-doc="movement-shape">
                 <legend>{t("movement.legend.shape")}</legend>
                 <select
                   value={gen.shape.type}
@@ -1048,7 +1048,7 @@ export function MovementView() {
                 ) : null}
               </fieldset>
 
-              <fieldset className="chaser-fieldset">
+              <fieldset className="chaser-fieldset" data-doc="movement-canon">
                 <legend>{t("movement.legend.canon")}</legend>
                 <select
                   value={gen.spread_mode}
@@ -1092,7 +1092,7 @@ export function MovementView() {
                 ) : null}
               </fieldset>
 
-              <fieldset className="chaser-fieldset">
+              <fieldset className="chaser-fieldset" data-doc="movement-timing">
                 <legend>{t("movement.legend.timing")}</legend>
                 <label>
                   {t("movement.timing.bpm")}

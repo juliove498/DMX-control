@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useT } from "../i18n";
 import type { Translation } from "../i18n/translations";
 import { AiConfigView } from "./AiConfigView";
+import { ButtonBindingsView } from "./ButtonBindingsView";
 import { ButtonsConfigView } from "./ButtonsConfigView";
 import { DirectOutput } from "./DirectOutput";
 import { GeneralView } from "./GeneralView";
@@ -18,6 +19,7 @@ type ConfigTab =
   | "outputs"
   | "patch"
   | "blackout-blind"
+  | "bindings"
   | "midi"
   | "streamdeck"
   | "ai"
@@ -48,6 +50,11 @@ const GROUPS: Array<{ id: string; items: TabMeta[] }> = [
         id: "blackout-blind",
         labelKey: "config.tabs.blackoutBlind",
         hintKey: "config.tabs.blackoutBlindHint",
+      },
+      {
+        id: "bindings",
+        labelKey: "config.tabs.bindings",
+        hintKey: "config.tabs.bindingsHint",
       },
       { id: "midi", labelKey: "config.tabs.midi", hintKey: "config.tabs.midiHint" },
       {
@@ -86,6 +93,7 @@ export function ConfigView() {
               <button
                 key={tab.id}
                 type="button"
+                data-doc-config-tab={tab.id}
                 className={`config-tab-btn${sub === tab.id ? " active" : ""}`}
                 onClick={() => setSub(tab.id)}
                 title={t(tab.hintKey)}
@@ -101,6 +109,7 @@ export function ConfigView() {
         {sub === "outputs" && <OutputsView />}
         {sub === "patch" && <PatchView />}
         {sub === "blackout-blind" && <ButtonsConfigView />}
+        {sub === "bindings" && <ButtonBindingsView />}
         {sub === "midi" && <MidiConfigView />}
         {sub === "streamdeck" && <StreamDeckConfigView />}
         {sub === "ai" && <AiConfigView />}

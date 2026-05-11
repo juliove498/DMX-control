@@ -11,6 +11,7 @@ import { ScenesView } from "./components/ScenesView";
 import { StageView } from "./components/StageView";
 import { useT } from "./i18n";
 import type { Translation } from "./i18n/translations";
+import { isDocMode } from "./lib/docMode";
 import {
   type PopoutView,
   closeAppCascade,
@@ -84,6 +85,10 @@ function App() {
   }, [toast]);
 
   useEffect(() => {
+    // Doc mode drives the store directly via `window.__DOC__.hydrate()`,
+    // so the Tauri-backed refresh + event listener would only fight the
+    // mocked state and add noise to captures.
+    if (isDocMode()) return;
     refresh();
     let unlisten: (() => void) | null = null;
     initListeners().then((u) => {
@@ -117,6 +122,7 @@ function App() {
   // monitor" gesture and shouldn't tear the show down.
   useEffect(() => {
     if (popoutView) return;
+    if (isDocMode()) return;
     let unlisten: (() => void) | null = null;
     let confirming = false;
     (async () => {
@@ -187,6 +193,7 @@ function App() {
                   <button
                     type="button"
                     className={`tab${tab === meta.id ? " active" : ""}`}
+                    data-doc-tab={meta.id}
                     onClick={() => setTab(meta.id)}
                   >
                     {label}
@@ -207,11 +214,12 @@ function App() {
               );
             })}
         </div>
-        <div className="tabs-globals">
+        <div className="tabs-globals" data-doc="globals">
           <OverallBpmControl />
           <button
             type="button"
             className={`global-btn blackout-btn${blackoutActive ? " active" : ""}`}
+            data-doc="blackout"
             onClick={() => setBlackout(!blackoutActive)}
             title={t("app.global.blackoutTitle")}
           >
@@ -220,6 +228,7 @@ function App() {
           <button
             type="button"
             className="global-btn blind-btn"
+            data-doc="blind"
             onPointerDown={(e) => {
               e.preventDefault();
               e.currentTarget.setPointerCapture(e.pointerId);

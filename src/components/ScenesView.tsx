@@ -1,7 +1,10 @@
 import type { DraftScene } from "@bindings/DraftScene";
+import type { LoopGroupActiveChange } from "@bindings/LoopGroupActiveChange";
 import type { Scene } from "@bindings/Scene";
 import type { SceneFxState } from "@bindings/SceneFxState";
+import type { SceneLoopGroup } from "@bindings/SceneLoopGroup";
 import type { SceneStep } from "@bindings/SceneStep";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n";
 import type { Translation } from "../i18n/translations";
@@ -68,6 +71,19 @@ export function ScenesView() {
   // When set, the modal opens in iterate mode with this seed instead
   // of the from-scratch form. Cleared on close.
   const [aiSeed, setAiSeed] = useState<AiGenerateModalSeed | undefined>(undefined);
+  // Live state of any running loop group (the playlist driver). Polled
+  // alongside scene state so the panel stays in sync.
+  const [activeLoop, setActiveLoop] = useState<LoopGroupActiveChange>({
+    active_group_id: null,
+    current_index: null,
+    current_scene_id: null,
+  });
+  const activeLoopGroupQuery = useShowStore((s) => s.activeLoopGroup);
+  const createLoopGroup = useShowStore((s) => s.createLoopGroup);
+  const updateLoopGroup = useShowStore((s) => s.updateLoopGroup);
+  const deleteLoopGroup = useShowStore((s) => s.deleteLoopGroup);
+  const startLoopGroup = useShowStore((s) => s.startLoopGroup);
+  const stopLoopGroup = useShowStore((s) => s.stopLoopGroup);
 
   // Auto-select first scene when the list isn't empty and nothing is
   // selected. Reset selection if the selected scene was deleted.
@@ -111,6 +127,25 @@ export function ScenesView() {
       window.clearInterval(interval);
     };
   }, [activeSceneIdQuery, activeSceneStepQuery, programmerStatus]);
+
+  // Loop-group state poll: independent from the scene poll so the
+  // panel updates even when no scene is active.
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      activeLoopGroupQuery()
+        .then((s) => {
+          if (!cancelled) setActiveLoop(s);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const interval = window.setInterval(tick, 300);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeLoopGroupQuery]);
 
   if (!show) return <main className="page">{t("common.loading")}</main>;
   const fixtures = show.fixtures;
@@ -161,8 +196,8 @@ export function ScenesView() {
 
       <div className="scenes-layout">
         {/* ---- LEFT: list ---- */}
-        <aside className="scenes-list-pane">
-          <button type="button" className="scenes-new-btn" onClick={handleCreate}>
+        <aside className="scenes-list-pane" data-doc="scenes-list">
+          <button type="button" className="scenes-new-btn" data-doc="scenes-new" onClick={handleCreate}>
             {t("scenes.list.new")}
           </button>
           {scenes.length === 0 ? (
@@ -183,7 +218,7 @@ export function ScenesView() {
             </ul>
           )}
           {activeId ? (
-            <div className="scenes-list-footer">
+            <div className="scenes-list-footer" data-doc="scenes-active-footer">
               <span>
                 {t("scenes.list.activePrefix", {
                   name: scenes.find((s) => s.id === activeId)?.name ?? "—",
@@ -194,15 +229,56 @@ export function ScenesView() {
                   </span>
                 ) : null}
               </span>
-              <button type="button" onClick={() => releaseScene()}>
+              <button type="button" data-doc="scenes-release" onClick={() => releaseScene()}>
                 {t("scenes.list.release")}
               </button>
             </div>
           ) : null}
+
+          <LoopGroupsPanel
+            groups={show.scene_loop_groups ?? []}
+            scenes={scenes}
+            activeLoop={activeLoop}
+            onCreate={async () => {
+              try {
+                await createLoopGroup();
+              } catch (e) {
+                setError(stringifyError(e));
+              }
+            }}
+            onUpdate={async (g) => {
+              try {
+                await updateLoopGroup(g);
+              } catch (e) {
+                setError(stringifyError(e));
+              }
+            }}
+            onDelete={async (id) => {
+              try {
+                await deleteLoopGroup(id);
+              } catch (e) {
+                setError(stringifyError(e));
+              }
+            }}
+            onStart={async (id) => {
+              try {
+                await startLoopGroup(id);
+              } catch (e) {
+                setError(stringifyError(e));
+              }
+            }}
+            onStop={async () => {
+              try {
+                await stopLoopGroup();
+              } catch (e) {
+                setError(stringifyError(e));
+              }
+            }}
+          />
         </aside>
 
         {/* ---- RIGHT: editor ---- */}
-        <section className="scenes-editor-pane">
+        <section className="scenes-editor-pane" data-doc="scenes-editor">
           {selectedScene ? (
             <SceneEditor
               scene={selectedScene}
@@ -237,7 +313,7 @@ export function ScenesView() {
       </div>
 
       {touched.length > 0 ? (
-        <footer className="programmer-bar">
+        <footer className="programmer-bar" data-doc="programmer-bar">
           <span className="programmer-bar-label">
             {t("scenes.programmer.label", {
               count: touched.length,
@@ -280,10 +356,15 @@ function SceneListItem({
   const t = useT();
   const lpHint = index < 8 ? t("scenes.list.lpHint", { pad: index + 1 }) : null;
   return (
-    <li className={`scenes-list-item${isSelected ? " selected" : ""}${isActive ? " active" : ""}`}>
+    <li
+      data-doc="scene-list-item"
+      data-doc-active={isActive ? "true" : undefined}
+      className={`scenes-list-item${isSelected ? " selected" : ""}${isActive ? " active" : ""}`}
+    >
       <button
         type="button"
         className="scenes-list-go"
+        data-doc="scene-go"
         onClick={(e) => {
           e.stopPropagation();
           onRecall();
@@ -384,10 +465,14 @@ function SceneEditor({
 
   return (
     <div className="scene-editor">
-      <header className={`scene-editor-head${isActive ? " active" : ""}`}>
+      <header
+        data-doc="scene-editor-head"
+        className={`scene-editor-head${isActive ? " active" : ""}`}
+      >
         <button
           type="button"
           className="scene-editor-go"
+          data-doc="scene-editor-go"
           onClick={onRecall}
           title={t("scenes.editor.recallHint")}
         >
@@ -395,6 +480,7 @@ function SceneEditor({
         </button>
         <input
           className="scene-editor-name"
+          data-doc="scene-editor-name"
           value={name}
           onChange={(e) => setName(e.currentTarget.value)}
           onBlur={commitName}
@@ -428,7 +514,7 @@ function SceneEditor({
 
       <p className="hint scene-fx-hint">{t("scenes.editor.fxHint")}</p>
 
-      <div className="scene-steps-wrap">
+      <div className="scene-steps-wrap" data-doc="scene-steps-wrap">
         <h4>{t("scenes.editor.stepsHeading", { count: scene.steps.length })}</h4>
         {scene.steps.length === 0 ? (
           <p className="empty">{t("scenes.editor.stepsEmpty")}</p>
@@ -492,7 +578,7 @@ function SceneEditor({
           </ul>
         )}
 
-        <div className="scene-add-step">
+        <div className="scene-add-step" data-doc="scene-add-step">
           <h5>{t("scenes.editor.addStepHeading")}</h5>
           <div className="scene-add-row">
             <label>
@@ -754,6 +840,288 @@ function FxStateRow({
       </div>
     </div>
   );
+}
+
+/// Panel that lives under the scene list and lets the operator
+/// curate "loop groups" — ordered playlists of scenes that cycle on
+/// their own. Each group has a name, an ordered list of scenes, and
+/// an optional dwell-override that forces every scene in the group
+/// to hold for the same duration regardless of its own steps.
+///
+/// The panel intentionally stays compact: a one-line summary per
+/// group, with the editor inlined inside a `<details>` so a show
+/// with a dozen groups doesn't dominate the sidebar.
+function LoopGroupsPanel({
+  groups,
+  scenes,
+  activeLoop,
+  onCreate,
+  onUpdate,
+  onDelete,
+  onStart,
+  onStop,
+}: {
+  groups: SceneLoopGroup[];
+  scenes: Scene[];
+  activeLoop: LoopGroupActiveChange;
+  onCreate: () => void | Promise<void>;
+  onUpdate: (group: SceneLoopGroup) => void | Promise<void>;
+  onDelete: (id: string) => void | Promise<void>;
+  onStart: (id: string) => void | Promise<void>;
+  onStop: () => void | Promise<void>;
+}) {
+  return (
+    <section className="scenes-loop-panel" data-doc="loop-groups">
+      <header className="scenes-loop-head">
+        <h4>Listas en loop</h4>
+        <button type="button" className="scenes-loop-new" onClick={() => onCreate()}>
+          + Nueva
+        </button>
+      </header>
+      <p className="hint scenes-loop-hint">
+        Reproducí secuencias en cadena: secuencia 1 → 2 → 3 → 1…
+      </p>
+      {groups.length === 0 ? (
+        <p className="empty">Todavía no hay listas. Creá una y arrastrá secuencias adentro.</p>
+      ) : (
+        <ul className="scenes-loop-list">
+          {groups.map((g) => (
+            <LoopGroupCard
+              key={g.id}
+              group={g}
+              scenes={scenes}
+              isActive={activeLoop.active_group_id === g.id}
+              currentIndex={
+                activeLoop.active_group_id === g.id
+                  ? (activeLoop.current_index ?? null)
+                  : null
+              }
+              onUpdate={onUpdate}
+              onDelete={() => onDelete(g.id)}
+              onStart={() => onStart(g.id)}
+              onStop={() => onStop()}
+            />
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function LoopGroupCard({
+  group,
+  scenes,
+  isActive,
+  currentIndex,
+  onUpdate,
+  onDelete,
+  onStart,
+  onStop,
+}: {
+  group: SceneLoopGroup;
+  scenes: Scene[];
+  isActive: boolean;
+  currentIndex: number | null;
+  onUpdate: (group: SceneLoopGroup) => void | Promise<void>;
+  onDelete: () => void | Promise<void>;
+  onStart: () => void | Promise<void>;
+  onStop: () => void | Promise<void>;
+}) {
+  const [name, setName] = useState(group.name);
+  const [hold, setHold] = useState(group.hold_ms_override);
+  useEffect(() => setName(group.name), [group.name]);
+  useEffect(() => setHold(group.hold_ms_override), [group.hold_ms_override]);
+
+  const sceneById = useMemo(() => {
+    const map: Record<string, Scene> = {};
+    for (const s of scenes) map[s.id] = s;
+    return map;
+  }, [scenes]);
+
+  const liveCount = group.scene_ids.filter((id) => !!sceneById[id]).length;
+  const unassignedScenes = scenes.filter((s) => !group.scene_ids.includes(s.id));
+
+  const commitName = () => {
+    const next = name.trim();
+    if (next === "" || next === group.name) {
+      setName(group.name);
+      return;
+    }
+    onUpdate({ ...group, name: next });
+  };
+
+  const commitHold = () => {
+    const next = Math.max(0, Math.floor(hold));
+    if (next === group.hold_ms_override) return;
+    onUpdate({ ...group, hold_ms_override: next });
+  };
+
+  const moveScene = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= group.scene_ids.length) return;
+    const next = [...group.scene_ids];
+    [next[index], next[target]] = [next[target], next[index]];
+    onUpdate({ ...group, scene_ids: next });
+  };
+  const removeAt = (index: number) => {
+    const next = group.scene_ids.filter((_, i) => i !== index);
+    onUpdate({ ...group, scene_ids: next });
+  };
+  const appendScene = (id: string) => {
+    if (!id) return;
+    onUpdate({ ...group, scene_ids: [...group.scene_ids, id] });
+  };
+
+  return (
+    <li className={`scenes-loop-card${isActive ? " active" : ""}`}>
+      <div className="scenes-loop-card-row">
+        <button
+          type="button"
+          className="scenes-loop-go"
+          title={isActive ? "Detener loop" : "Iniciar loop"}
+          onClick={() => (isActive ? onStop() : onStart())}
+          disabled={!isActive && liveCount === 0}
+        >
+          {isActive ? "■" : "▶"}
+        </button>
+        <input
+          className="scenes-loop-name"
+          value={name}
+          onChange={(e) => setName(e.currentTarget.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitName();
+            else if (e.key === "Escape") setName(group.name);
+          }}
+        />
+        <span className="scenes-loop-count">
+          {liveCount} {liveCount === 1 ? "secuencia" : "secuencias"}
+        </span>
+        <button
+          type="button"
+          className="danger scenes-loop-del"
+          title="Eliminar lista"
+          onClick={async () => {
+            const ok = await ask(`¿Eliminar la lista "${group.name}"?`, {
+              title: "Eliminar lista en loop",
+              kind: "warning",
+            });
+            if (ok) onDelete();
+          }}
+        >
+          ×
+        </button>
+      </div>
+      <details className="scenes-loop-details">
+        <summary>Editar</summary>
+        <div className="scenes-loop-edit">
+          <label className="scenes-loop-hold">
+            Tiempo por secuencia (ms)
+            <input
+              type="number"
+              min={0}
+              max={120000}
+              step={100}
+              value={hold}
+              onChange={(e) => setHold(Number(e.currentTarget.value))}
+              onBlur={commitHold}
+              title="0 = usar el ciclo natural de cada secuencia (fade + hold de cada paso)"
+            />
+            <span className="hint scenes-loop-hold-hint">
+              0 = usa el ciclo natural de cada secuencia.
+            </span>
+          </label>
+          {group.scene_ids.length === 0 ? (
+            <p className="empty">Sin secuencias todavía.</p>
+          ) : (
+            <ol className="scenes-loop-items">
+              {assignSlotKeys(group.scene_ids).map(({ key, sid, i }) => {
+                const scene = sceneById[sid];
+                const label = scene?.name ?? "⚠ secuencia eliminada";
+                const live =
+                  isActive && currentIndex !== null && currentIndex === i;
+                return (
+                  <li
+                    key={key}
+                    className={`scenes-loop-item${live ? " live" : ""}${
+                      scene ? "" : " missing"
+                    }`}
+                  >
+                    <span className="scenes-loop-item-idx">{i + 1}.</span>
+                    <span className="scenes-loop-item-name">{label}</span>
+                    <button
+                      type="button"
+                      onClick={() => moveScene(i, -1)}
+                      disabled={i === 0}
+                      title="Mover arriba"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => moveScene(i, 1)}
+                      disabled={i === group.scene_ids.length - 1}
+                      title="Mover abajo"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className="danger"
+                      onClick={() => removeAt(i)}
+                      title="Quitar de la lista"
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          )}
+          <div className="scenes-loop-add-row">
+            <select
+              value=""
+              onChange={(e) => {
+                appendScene(e.currentTarget.value);
+                e.currentTarget.value = "";
+              }}
+            >
+              <option value="">+ Agregar secuencia…</option>
+              {unassignedScenes.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+              {scenes
+                .filter((s) => group.scene_ids.includes(s.id))
+                .map((s) => (
+                  <option key={`dup-${s.id}`} value={s.id}>
+                    {s.name} (repetir)
+                  </option>
+                ))}
+            </select>
+          </div>
+        </div>
+      </details>
+    </li>
+  );
+}
+
+/// Build stable React keys for a list that may contain duplicate scene
+/// ids. The same scene id repeats once for each occurrence, so we
+/// append `#N` where N is how many times that id has been seen so far.
+/// Avoids using the bare array index as the key (which would break
+/// reorders) while still letting the operator add the same scene
+/// twice to a playlist.
+function assignSlotKeys(
+  scene_ids: string[],
+): { key: string; sid: string; i: number }[] {
+  const seen: Record<string, number> = {};
+  return scene_ids.map((sid, i) => {
+    const count = (seen[sid] ?? 0) + 1;
+    seen[sid] = count;
+    return { key: `${sid}#${count}`, sid, i };
+  });
 }
 
 function stringifyError(e: unknown): string {

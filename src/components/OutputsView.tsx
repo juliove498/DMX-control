@@ -296,9 +296,7 @@ export function OutputsView() {
       </section>
 
       <footer className="page-foot">
-        <span className={dirty ? "dirty" : ""}>
-          {dirty ? t("outputs.dirty") : t("outputs.ok")}
-        </span>
+        <span className={dirty ? "dirty" : ""}>{dirty ? t("outputs.dirty") : t("outputs.ok")}</span>
         <div className="actions">
           <button type="button" disabled={!dirty} onClick={revert}>
             {t("outputs.discard")}

@@ -51,13 +51,9 @@ export function AiConfigView() {
   const update = (patch: Partial<AiConfig>) =>
     setConfig((prev) => (prev ? { ...prev, ...patch } : prev));
   const updateAnthropic = (patch: Partial<AiConfig["anthropic"]>) =>
-    setConfig((prev) =>
-      prev ? { ...prev, anthropic: { ...prev.anthropic, ...patch } } : prev,
-    );
+    setConfig((prev) => (prev ? { ...prev, anthropic: { ...prev.anthropic, ...patch } } : prev));
   const updateOpenAi = (patch: Partial<AiConfig["openai"]>) =>
-    setConfig((prev) =>
-      prev ? { ...prev, openai: { ...prev.openai, ...patch } } : prev,
-    );
+    setConfig((prev) => (prev ? { ...prev, openai: { ...prev.openai, ...patch } } : prev));
 
   const onSave = async () => {
     setError(null);
@@ -162,8 +158,7 @@ export function AiConfigView() {
           onChange={(model) => updateAnthropic({ model })}
         />
         <p className="hint">
-          {t("ai.keyHint.anthropic")}{" "}
-          <code>https://console.anthropic.com/settings/keys</code>
+          {t("ai.keyHint.anthropic")} <code>https://console.anthropic.com/settings/keys</code>
         </p>
       </section>
 
@@ -208,9 +203,7 @@ export function AiConfigView() {
           type="button"
           onClick={onTest}
           disabled={!activeProviderConfigured || testing}
-          title={
-            !activeProviderConfigured ? t("ai.testDisabledHint") : t("ai.testActiveHint")
-          }
+          title={!activeProviderConfigured ? t("ai.testDisabledHint") : t("ai.testActiveHint")}
         >
           {testing ? t("ai.testing") : t("ai.test")}
         </button>

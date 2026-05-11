@@ -48,26 +48,48 @@ function lpPaletteToRgb(idx: number): string {
   // Falls back to a hashed hue for unknown indices so the user still
   // sees *some* colour when they pick one outside our defaults.
   const swatches: Record<number, string> = {
-    1: "#3a3a3a", 3: "#dddddd",
-    5: "#ff3b3b", 7: "#7a0c0c",
-    9: "#ff8a30", 11: "#7a3a0a",
-    13: "#ffe640", 15: "#7a6e10",
-    17: "#37d137", 19: "#0e5a0e",
-    33: "#36c8c8", 37: "#56e8e8", 39: "#1a5454",
-    41: "#3aa1ff", 43: "#103a66",
-    45: "#3a5cff", 47: "#0e1a55",
-    49: "#9a36c8", 50: "#b85ce8",
-    53: "#ff39c2", 54: "#5a0e3e",
-    55: "#ff5fb7", 56: "#7e3055",
-    57: "#ffb6c1", 60: "#88e08c",
-    61: "#cefac7", 73: "#92e63a",
-    74: "#3e6e10", 78: "#3ec880",
-    79: "#7adda0", 81: "#9a3ad1",
-    82: "#502070", 84: "#ffae33", 85: "#7a4c12",
-    95: "#ff7aaf", 96: "#5e2a3e",
-    99: "#9ab1ff", 100: "#42548a",
-    113: "#a86aff", 114: "#c891ff",
-    115: "#ff7da6", 116: "#ffa9bf",
+    1: "#3a3a3a",
+    3: "#dddddd",
+    5: "#ff3b3b",
+    7: "#7a0c0c",
+    9: "#ff8a30",
+    11: "#7a3a0a",
+    13: "#ffe640",
+    15: "#7a6e10",
+    17: "#37d137",
+    19: "#0e5a0e",
+    33: "#36c8c8",
+    37: "#56e8e8",
+    39: "#1a5454",
+    41: "#3aa1ff",
+    43: "#103a66",
+    45: "#3a5cff",
+    47: "#0e1a55",
+    49: "#9a36c8",
+    50: "#b85ce8",
+    53: "#ff39c2",
+    54: "#5a0e3e",
+    55: "#ff5fb7",
+    56: "#7e3055",
+    57: "#ffb6c1",
+    60: "#88e08c",
+    61: "#cefac7",
+    73: "#92e63a",
+    74: "#3e6e10",
+    78: "#3ec880",
+    79: "#7adda0",
+    81: "#9a3ad1",
+    82: "#502070",
+    84: "#ffae33",
+    85: "#7a4c12",
+    95: "#ff7aaf",
+    96: "#5e2a3e",
+    99: "#9ab1ff",
+    100: "#42548a",
+    113: "#a86aff",
+    114: "#c891ff",
+    115: "#ff7da6",
+    116: "#ffa9bf",
     117: "#3ea6c2",
   };
   if (swatches[idx]) return swatches[idx];
@@ -185,9 +207,7 @@ function buildAction(
         ? { type: "toggle_movement_by_index", index }
         : { type: "toggle_movement", id };
     case "recall_scene":
-      return modeByIndex
-        ? { type: "recall_scene_by_index", index }
-        : { type: "recall_scene", id };
+      return modeByIndex ? { type: "recall_scene_by_index", index } : { type: "recall_scene", id };
     case "start_loop_group":
       return modeByIndex
         ? { type: "start_loop_group_by_index", index }
@@ -216,10 +236,8 @@ function summariseAction(
     loops: { id: string; name: string }[];
   },
 ): string {
-  const nameFor = (
-    list: { id: string; name: string }[],
-    id: string,
-  ): string => list.find((x) => x.id === id)?.name ?? "?";
+  const nameFor = (list: { id: string; name: string }[], id: string): string =>
+    list.find((x) => x.id === id)?.name ?? "?";
   switch (a.type) {
     case "none":
       return "—";
@@ -278,9 +296,7 @@ export function ButtonBindingsView() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"lp" | "sd">("lp");
   const [editing, setEditing] = useState<
-    | { kind: "lp"; note: number; is_cc: boolean }
-    | { kind: "sd"; key: number }
-    | null
+    { kind: "lp"; note: number; is_cc: boolean } | { kind: "sd"; key: number } | null
   >(null);
 
   // Load current bindings on mount. Subsequent edits go through
@@ -330,8 +346,7 @@ export function ButtonBindingsView() {
     // Use Tauri's native `ask` (plugin-dialog) instead of window.confirm
     // because the Tauri webview returns true without prompting for the
     // browser-level dialog APIs.
-    const hasCustom =
-      bindings.launchpad.length > 0 || bindings.streamdeck.length > 0;
+    const hasCustom = bindings.launchpad.length > 0 || bindings.streamdeck.length > 0;
     if (hasCustom) {
       const ok = await ask(
         `Esto va a reemplazar todas tus asignaciones actuales por el layout de fábrica:\n• ${bindings.launchpad.length} botones del Launchpad\n• ${bindings.streamdeck.length} botones del Stream Deck\n\n¿Continuar?`,
@@ -361,9 +376,7 @@ export function ButtonBindingsView() {
   const removeLp = (note: number, is_cc: boolean) => {
     commit({
       ...bindings,
-      launchpad: bindings.launchpad.filter(
-        (b) => !(b.note === note && b.is_cc === is_cc),
-      ),
+      launchpad: bindings.launchpad.filter((b) => !(b.note === note && b.is_cc === is_cc)),
     });
   };
   const upsertSd = (binding: StreamDeckBinding) => {
@@ -380,8 +393,7 @@ export function ButtonBindingsView() {
 
   const lpForNote = (note: number, is_cc: boolean) =>
     bindings.launchpad.find((b) => b.note === note && b.is_cc === is_cc) ?? null;
-  const sdForKey = (key: number) =>
-    bindings.streamdeck.find((b) => b.key === key) ?? null;
+  const sdForKey = (key: number) => bindings.streamdeck.find((b) => b.key === key) ?? null;
 
   return (
     <main className="page bindings-view">
@@ -506,11 +518,13 @@ function LaunchpadGridEditor({
 
   return (
     <section className="bindings-section">
-      <h3>Launchpad MK2 ({bindings.length} {bindings.length === 1 ? "botón" : "botones"})</h3>
+      <h3>
+        Launchpad MK2 ({bindings.length} {bindings.length === 1 ? "botón" : "botones"})
+      </h3>
       {!customEnabled ? (
         <p className="hint warn">
-          Las asignaciones de abajo se guardan, pero solo se aplican cuando activás <em>Layout
-          personalizado</em>. Mientras tanto el Launchpad usa el layout de fábrica.
+          Las asignaciones de abajo se guardan, pero solo se aplican cuando activás{" "}
+          <em>Layout personalizado</em>. Mientras tanto el Launchpad usa el layout de fábrica.
         </p>
       ) : null}
       <div className="lp-grid-wrap">
@@ -535,8 +549,7 @@ function LaunchpadGridEditor({
                 // Last column on the MK2 is the "scene" column —
                 // round buttons that physically read different from
                 // the 8×8 square pad grid.
-                const shape: "square" | "round" =
-                  ci === row.length - 1 ? "round" : "square";
+                const shape: "square" | "round" = ci === row.length - 1 ? "round" : "square";
                 return (
                   <LpCell
                     key={`n-${n}`}
@@ -623,7 +636,9 @@ function StreamDeckGridEditor({
 
   return (
     <section className="bindings-section">
-      <h3>Stream Deck MK2 ({bindings.length} {bindings.length === 1 ? "botón" : "botones"})</h3>
+      <h3>
+        Stream Deck MK2 ({bindings.length} {bindings.length === 1 ? "botón" : "botones"})
+      </h3>
       {!customEnabled ? (
         <p className="hint warn">
           Activá <em>Layout personalizado</em> para que el Stream Deck use estas asignaciones.
@@ -671,9 +686,7 @@ function SdCell({
         background: `linear-gradient(160deg, ${off} 0%, ${off} 55%, ${on} 100%)`,
       }}
       onClick={onPick}
-      title={
-        binding ? `Key ${k}\n${label}\n${summary}` : `Key ${k} (libre)`
-      }
+      title={binding ? `Key ${k}\n${label}\n${summary}` : `Key ${k} (libre)`}
     >
       <span className="sd-cell-num">{k}</span>
       <span className="sd-cell-label">{label || summary}</span>
@@ -707,20 +720,31 @@ function LpBindingModal({
   onSave: (b: LaunchpadBinding) => void;
   onRemove: () => void;
 }) {
-  const seed: LaunchpadBinding =
-    binding ?? {
-      note,
-      is_cc,
-      action: { type: "none" },
-      label: "",
-      color_dim: 1,
-      color_bright: 3,
-      active_mode: "auto",
-    };
+  const seed: LaunchpadBinding = binding ?? {
+    note,
+    is_cc,
+    action: { type: "none" },
+    label: "",
+    color_dim: 1,
+    color_bright: 3,
+    active_mode: "auto",
+  };
   const [draft, setDraft] = useState(seed);
   return (
-    <div className="bindings-modal-backdrop" onClick={onClose} onKeyDown={(e) => { if (e.key === "Escape") onClose(); }} role="presentation">
-      <div className="bindings-modal" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="presentation">
+    <div
+      className="bindings-modal-backdrop"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      role="presentation"
+    >
+      <div
+        className="bindings-modal"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="presentation"
+      >
         <h3>
           Launchpad {is_cc ? "CC" : "Note"} {note}
         </h3>
@@ -812,20 +836,31 @@ function SdBindingModal({
   onSave: (b: StreamDeckBinding) => void;
   onRemove: () => void;
 }) {
-  const seed: StreamDeckBinding =
-    binding ?? {
-      key: k,
-      action: { type: "none" },
-      label: "",
-      color_off: [40, 40, 40],
-      color_on: [200, 200, 200],
-      icon: "play",
-      active_mode: "auto",
-    };
+  const seed: StreamDeckBinding = binding ?? {
+    key: k,
+    action: { type: "none" },
+    label: "",
+    color_off: [40, 40, 40],
+    color_on: [200, 200, 200],
+    icon: "play",
+    active_mode: "auto",
+  };
   const [draft, setDraft] = useState(seed);
   return (
-    <div className="bindings-modal-backdrop" onClick={onClose} onKeyDown={(e) => { if (e.key === "Escape") onClose(); }} role="presentation">
-      <div className="bindings-modal" onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()} role="presentation">
+    <div
+      className="bindings-modal-backdrop"
+      onClick={onClose}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") onClose();
+      }}
+      role="presentation"
+    >
+      <div
+        className="bindings-modal"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        role="presentation"
+      >
         <h3>Stream Deck — Tecla {k}</h3>
         <label>
           Etiqueta
@@ -839,9 +874,7 @@ function SdBindingModal({
           Icono
           <select
             value={draft.icon}
-            onChange={(e) =>
-              setDraft({ ...draft, icon: e.currentTarget.value as ButtonIcon })
-            }
+            onChange={(e) => setDraft({ ...draft, icon: e.currentTarget.value as ButtonIcon })}
           >
             {ICON_OPTIONS.map((o) => (
               <option key={o.value} value={o.value}>
@@ -934,9 +967,7 @@ function ActionEditor({
   const [byIndex, setByIndex] = useState(actionParamIndex(action) !== null);
   const [id, setId] = useState(actionParamId(action) ?? "");
   const [index, setIndex] = useState(actionParamIndex(action) ?? 0);
-  const [delta, setDelta] = useState(
-    action.type === "bump_active_chaser_bpm" ? action.delta : 1,
-  );
+  const [delta, setDelta] = useState(action.type === "bump_active_chaser_bpm" ? action.delta : 1);
 
   useEffect(() => {
     setByIndex(actionParamIndex(action) !== null);
@@ -978,9 +1009,7 @@ function ActionEditor({
         Acción
         <select
           value={kind}
-          onChange={(e) =>
-            emit(e.currentTarget.value as ActionKind, byIndex, id, index, delta)
-          }
+          onChange={(e) => emit(e.currentTarget.value as ActionKind, byIndex, id, index, delta)}
         >
           {Object.entries(ACTION_KIND_LABELS).map(([v, l]) => (
             <option key={v} value={v}>
@@ -1075,10 +1104,7 @@ function ActiveModeEditor({
   return (
     <label>
       Estado activo
-      <select
-        value={mode}
-        onChange={(e) => onChange(e.currentTarget.value as ButtonActiveMode)}
-      >
+      <select value={mode} onChange={(e) => onChange(e.currentTarget.value as ButtonActiveMode)}>
         <option value="auto">Automático (según la acción)</option>
         <option value="always_idle">Siempre apagado/idle</option>
         <option value="always_active">Siempre encendido/activo</option>

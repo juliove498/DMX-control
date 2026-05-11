@@ -3,12 +3,12 @@ import type { FixtureInstance } from "@bindings/FixtureInstance";
 import { useMemo, useState } from "react";
 import { useT } from "../../i18n";
 import {
-  defaultDefinitionRenderOverrides,
-  defaultFixturePlacement,
   type DefinitionRenderOverrides,
   type FixturePlacement,
   type StageConfig,
   type TrussSegment,
+  defaultDefinitionRenderOverrides,
+  defaultFixturePlacement,
 } from "./stageConfig";
 
 const DEG = 180 / Math.PI;
@@ -63,18 +63,12 @@ export function FixturesPanel({
       else seen.set(def.id, { def, count: 1 });
     }
     return Array.from(seen.values()).sort((a, b) =>
-      `${a.def.manufacturer} ${a.def.name}`.localeCompare(
-        `${b.def.manufacturer} ${b.def.name}`,
-      ),
+      `${a.def.manufacturer} ${a.def.name}`.localeCompare(`${b.def.manufacturer} ${b.def.name}`),
     );
   }, [fixtures, library]);
 
-  const setDefOverride = (
-    defId: string,
-    patch: Partial<DefinitionRenderOverrides>,
-  ) => {
-    const current =
-      config.definitionOverrides[defId] ?? defaultDefinitionRenderOverrides();
+  const setDefOverride = (defId: string, patch: Partial<DefinitionRenderOverrides>) => {
+    const current = config.definitionOverrides[defId] ?? defaultDefinitionRenderOverrides();
     const next: DefinitionRenderOverrides = { ...current, ...patch };
     onChange({
       ...config,
@@ -182,11 +176,7 @@ function DefinitionTypeRow({
   const [open, setOpen] = useState(false);
   return (
     <div className={`p3d-fixrow${hasOverride ? " has-override" : ""}`}>
-      <button
-        type="button"
-        className="p3d-fixrow-head"
-        onClick={() => setOpen((v) => !v)}
-      >
+      <button type="button" className="p3d-fixrow-head" onClick={() => setOpen((v) => !v)}>
         <span className="p3d-fixrow-name">
           {def.manufacturer} {def.name}
         </span>
@@ -228,7 +218,7 @@ function DefinitionTypeRow({
                 onChange={(e) =>
                   onChange({
                     beamAngle: e.currentTarget.checked
-                      ? override.beamAngle ?? { minDeg: 4, maxDeg: 14 }
+                      ? (override.beamAngle ?? { minDeg: 4, maxDeg: 14 })
                       : null,
                   })
                 }
@@ -282,7 +272,7 @@ function DefinitionTypeRow({
                 onChange={(e) =>
                   onChange({
                     prism: e.currentTarget.checked
-                      ? override.prism ?? { threshold: 8, facets: 7, splayDeg: 6 }
+                      ? (override.prism ?? { threshold: 8, facets: 7, splayDeg: 6 })
                       : null,
                   })
                 }
@@ -511,7 +501,11 @@ function SliderRow({
   return (
     <label className="p3d-slider" title={hint}>
       <span className="p3d-slider-label">
-        {label} <span className="p3d-slider-value">{display}{suffix ?? ""}</span>
+        {label}{" "}
+        <span className="p3d-slider-value">
+          {display}
+          {suffix ?? ""}
+        </span>
       </span>
       <input
         type="range"

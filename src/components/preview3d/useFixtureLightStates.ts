@@ -101,7 +101,7 @@ function isPrismChannel(roleStr: string | null, name: string | null | undefined)
   // Prism is conventionally `Other("prism")` because the role enum
   // doesn't include it natively. We also match by channel name for
   // libraries that call it "Prism" / "Prisma" with a generic role.
-  if (roleStr && roleStr.includes("prism")) return true;
+  if (roleStr?.includes("prism")) return true;
   if (name && /\bprisma?\b/i.test(name)) return true;
   return false;
 }
@@ -116,10 +116,7 @@ function isGoboChannel(roleStr: string | null, name: string | null | undefined):
   return false;
 }
 
-function buildLayout(
-  fixture: FixtureInstance,
-  def: FixtureDefinition | undefined,
-): ChannelLayout {
+function buildLayout(fixture: FixtureInstance, def: FixtureDefinition | undefined): ChannelLayout {
   const layout: ChannelLayout = {
     intensity: null,
     red: null,
@@ -228,8 +225,7 @@ function buildLayout(
   }
   if (mode.pan_range) layout.panDegrees = mode.pan_range.physical_degrees;
   if (mode.tilt_range) layout.tiltDegrees = mode.tilt_range.physical_degrees;
-  layout.hasRGB =
-    layout.red !== null || layout.green !== null || layout.blue !== null;
+  layout.hasRGB = layout.red !== null || layout.green !== null || layout.blue !== null;
   // A "spot" is a fixture with a real optical system: zoom narrows
   // the beam, gobo carves shapes into it, prism splits it, iris
   // chokes it. Any of those = treat as a tight-beam spot in the 3D
@@ -237,10 +233,7 @@ function buildLayout(
   // (RGB pars, dimmer-only fresnels, etc.) and render with a wide
   // soft cone.
   layout.kind =
-    layout.zoom !== null ||
-    layout.gobo !== null ||
-    layout.prism !== null ||
-    layout.iris !== null
+    layout.zoom !== null || layout.gobo !== null || layout.prism !== null || layout.iris !== null
       ? "spot"
       : "wash";
   return layout;
@@ -285,7 +278,10 @@ const WHEEL_RGB: Record<string, [number, number, number]> = {
 };
 
 function normalizeWheelLabel(label: string): string {
-  return label.toLowerCase().trim().replace(/^color\s+/, "");
+  return label
+    .toLowerCase()
+    .trim()
+    .replace(/^color\s+/, "");
 }
 
 function wheelColor(value: number, ranges: ChannelRange[]): [number, number, number] | null {
@@ -351,10 +347,7 @@ export function fixtureHasGoboWheel(
 /// without a gobo (yet) might still need it later. Cheap to flip
 /// on for every spot since there's no actual shadow render cost
 /// when no receivers are in scope.
-export function fixtureIsSpotKind(
-  fixture: FixtureInstance,
-  library: FixtureDefinition[],
-): boolean {
+export function fixtureIsSpotKind(fixture: FixtureInstance, library: FixtureDefinition[]): boolean {
   const def = library.find((d) => d.id === fixture.definition_id);
   const mode = def?.modes?.[fixture.mode_index];
   if (!mode) return false;

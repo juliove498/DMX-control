@@ -70,12 +70,7 @@ function TrussSegmentMesh({ segment }: { segment: StageConfig["trusses"][number]
           it's visible even when no fixtures are pointing at it. */}
       <mesh receiveShadow>
         <boxGeometry args={[length, segment.diameter, segment.diameter]} />
-        <meshStandardMaterial
-          color="#7a8088"
-          metalness={0.7}
-          roughness={0.35}
-          emissive="#1a1d22"
-        />
+        <meshStandardMaterial color="#7a8088" metalness={0.7} roughness={0.35} emissive="#1a1d22" />
       </mesh>
       {/* End caps — visual hint of where the segment terminates. */}
       <mesh position={[length / 2, 0, 0]} receiveShadow>
@@ -89,4 +84,3 @@ function TrussSegmentMesh({ segment }: { segment: StageConfig["trusses"][number]
     </group>
   );
 }
-

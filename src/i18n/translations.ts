@@ -926,7 +926,8 @@ export const en: Translation = {
   "library.filesPath": "JSON files live in {path}.",
   "library.gobosToggle": "Edit gobos / colours",
   "library.gobosCollapse": "Collapse",
-  "library.gobosEmpty": "This fixture has no channels with ranges (no gobo / colour wheel / macro defined).",
+  "library.gobosEmpty":
+    "This fixture has no channels with ranges (no gobo / colour wheel / macro defined).",
   "library.gobosModeFmt": "{name} ({count}ch)",
   "library.gobosChannelFmt": "{name} · {role}",
   "library.gobosUpload": "Upload",
@@ -1103,8 +1104,7 @@ export const en: Translation = {
   "scenes.aiTriggerHint": "Generate a fresh scene with AI from a prompt",
   "scenes.errCreate": "Could not create the scene: {err}",
   "scenes.list.new": "+ New scene",
-  "scenes.list.empty":
-    "No scenes yet. Build a look in Stage and tap \"New scene\" to record it.",
+  "scenes.list.empty": 'No scenes yet. Build a look in Stage and tap "New scene" to record it.',
   "scenes.list.lpHint": "LP row 3, pad {pad}",
   "scenes.list.recallHint": "Recall (▶ GO)",
   "scenes.list.stepCount": "{count} step{plural}",
@@ -1119,7 +1119,7 @@ export const en: Translation = {
   "scenes.editor.aiIterateHint":
     "Iterate this scene with AI (refine values, fades, add/remove steps)",
   "scenes.editor.delete": "Delete",
-  "scenes.editor.deleteConfirm": "Delete \"{name}\"?",
+  "scenes.editor.deleteConfirm": 'Delete "{name}"?',
   "scenes.editor.fxHint":
     "Each step records the chaser and movement active at that moment. Releasing the scene restores whatever was running before recall. Edit the FX state per step below.",
   "scenes.editor.stepsHeading": "Steps ({count})",
@@ -1134,7 +1134,7 @@ export const en: Translation = {
   "scenes.editor.loopHint":
     "Steps play in order and loop back to the first when they finish. The next step starts when the current one's hold ends.",
   "scenes.editor.fixturesHint":
-    "{writes} total writes over {fixtures} patched fixtures. Tip: if needed, Clear the programmer and use \"Touched only\" to iterate steps without overwriting.",
+    '{writes} total writes over {fixtures} patched fixtures. Tip: if needed, Clear the programmer and use "Touched only" to iterate steps without overwriting.',
   "scenes.editor.clearProg": "Clear programmer",
   "scenes.programmer.label": "PROG · {count} fixture{plural} touched",
   "scenes.programmer.clear": "Clear",
@@ -1147,8 +1147,7 @@ export const en: Translation = {
   "scenes.step.updateAllHint":
     "Re-record this step with the rig's current state (all its fixtures)",
   "scenes.step.updateTouched": "⟳T",
-  "scenes.step.updateTouchedHint":
-    "Re-record only the touched fixtures (the rest stays as-is)",
+  "scenes.step.updateTouchedHint": "Re-record only the touched fixtures (the rest stays as-is)",
   "scenes.step.removeHint": "Remove this step",
   "scenes.step.removeOnlyHint": "Cannot remove the only step",
   "scenes.step.removeConfirm": "Remove step {n}?",
@@ -1262,7 +1261,7 @@ export const en: Translation = {
   "movement.empty":
     "No movements. Create one to start — the first maps to Launchpad pad 21 (row 2). Subsequent ones take the 7 pads to its right.",
   "movement.delete": "Delete",
-  "movement.deleteConfirm": "Delete \"{name}\"?",
+  "movement.deleteConfirm": 'Delete "{name}"?',
   "movement.lpHint": "Launchpad pad {pad} (row 2)",
   "movement.legend.fixtures": "Fixtures ({count})",
   "movement.legend.shape": "Shape",
@@ -1396,7 +1395,7 @@ export const en: Translation = {
   "stage.sqp.removeStep": "Remove step",
   "stage.sqp.removeOnlyHint": "Cannot remove the only step",
   "stage.sqp.recordHeadingNew": "Record new scene",
-  "stage.sqp.recordHeadingAdd": "Add step to \"{name}\"",
+  "stage.sqp.recordHeadingAdd": 'Add step to "{name}"',
   "stage.sqp.fade": "Fade",
   "stage.sqp.hold": "Hold",
   "stage.sqp.ms": "ms",
@@ -1404,8 +1403,7 @@ export const en: Translation = {
   "stage.sqp.addStep": "+ Add step",
   "stage.sqp.recordNew": "● Record",
   "stage.sqp.touchedHelperOn": "Hide touched halos in the canvas",
-  "stage.sqp.touchedHelperOff":
-    "Show touched halos in the canvas while this panel is open",
+  "stage.sqp.touchedHelperOff": "Show touched halos in the canvas while this panel is open",
   "stage.sqp.touchedToggle": "👁 Touched",
   "stage.sqp.locateHint": "Pulse the touched fixtures to find them on the canvas",
   "stage.sqp.locate": "📍 Locate",
@@ -1424,15 +1422,14 @@ export const en: Translation = {
   "stage.menu.duplicate": "Duplicate",
   "stage.menu.untouch": "Untouch",
   "stage.menu.remove": "Remove",
-  "stage.confirm.removeOne": "Remove \"{name}\"?",
+  "stage.confirm.removeOne": 'Remove "{name}"?',
   "stage.confirm.removeMany": "Remove {count} fixtures?",
 
   "aiGen.aria": "Generate scene with AI",
   "aiGen.title": "Generate scene with AI",
   "aiGen.titleIterating": "Iterating: {name}",
   "aiGen.errPromptEmpty": "Write a prompt — e.g. 'warm amber with slow fade'.",
-  "aiGen.errScopeEmpty":
-    "Tick at least one fixture in the list or switch the scope to 'all'.",
+  "aiGen.errScopeEmpty": "Tick at least one fixture in the list or switch the scope to 'all'.",
   "aiGen.errRefineEmpty": "Write what you want to change (e.g. 'step 2 faster').",
   "aiGen.field.prompt": "Prompt",
   "aiGen.field.promptPlaceholder":
@@ -1449,8 +1446,7 @@ export const en: Translation = {
   "aiGen.generate": "✨ Generate",
   "aiGen.preview.stepCount": "{count} step{plural}",
   "aiGen.preview.stepPlaceholder": "Step {n}",
-  "aiGen.preview.stepMeta":
-    "fade {fade}ms · hold {hold}ms · {count} fixture{plural}",
+  "aiGen.preview.stepMeta": "fade {fade}ms · hold {hold}ms · {count} fixture{plural}",
   "aiGen.refine": "Refine",
   "aiGen.refinePlaceholder":
     "e.g. 'step 2 faster' · 'less blue, more amber' · 'add strobe on the last one'",
@@ -1459,7 +1455,7 @@ export const en: Translation = {
   "aiGen.refineLabel": "↻ Refine",
   "aiGen.resetFromScratch": "Start over",
   "aiGen.replaceOriginal": "Replace original",
-  "aiGen.replaceOriginalHint": "Overwrite the steps of \"{name}\" with this draft",
+  "aiGen.replaceOriginalHint": 'Overwrite the steps of "{name}" with this draft',
   "aiGen.replacing": "Replacing…",
   "aiGen.applyNew": "Apply as new scene",
   "aiGen.applying": "Applying…",
@@ -1534,8 +1530,7 @@ export const es: Translation = {
   "config.tabs.blackoutBlindHint":
     "Master, blackout y blind — canales afectados por cada uno por fixture",
   "config.tabs.bindings": "Botones",
-  "config.tabs.bindingsHint":
-    "Asignaciones personalizadas de botones del Launchpad + Stream Deck",
+  "config.tabs.bindingsHint": "Asignaciones personalizadas de botones del Launchpad + Stream Deck",
   "config.tabs.midi": "MIDI",
   "config.tabs.midiHint": "Superficie de control (Launchpad, etc.)",
   "config.tabs.streamdeck": "Stream Deck",
@@ -1679,7 +1674,8 @@ export const es: Translation = {
   "library.filesPath": "Los archivos JSON viven en {path}.",
   "library.gobosToggle": "Editar gobos / colores",
   "library.gobosCollapse": "Cerrar",
-  "library.gobosEmpty": "Este fixture no tiene canales con ranges (sin rueda de gobos / colores / macros definida).",
+  "library.gobosEmpty":
+    "Este fixture no tiene canales con ranges (sin rueda de gobos / colores / macros definida).",
   "library.gobosModeFmt": "{name} ({count}ch)",
   "library.gobosChannelFmt": "{name} · {role}",
   "library.gobosUpload": "Subir",
@@ -1766,8 +1762,7 @@ export const es: Translation = {
   "buttons.assignedBlind": "Fixtures asignados al Blind ({count})",
   "buttons.emptyBlackout": "Patcheá fixtures primero para poder asignarlos al blackout.",
   "buttons.emptyBlind": "Patcheá fixtures primero para poder asignarlos al blind.",
-  "buttons.blackoutHintAuto":
-    "Auto: intensity (o RGB si no hay) + strobe → 0. Pan/tilt intactos.",
+  "buttons.blackoutHintAuto": "Auto: intensity (o RGB si no hay) + strobe → 0. Pan/tilt intactos.",
   "buttons.blackoutHintCustom": "Solo estos canales se llevan a 0.",
   "buttons.blindHintAuto": "Halógeno default (warm-white sobre intensity + RGB).",
   "buttons.blindHintCustom": "Solo estos canales se mandan a 255 (sin halógeno).",
@@ -1857,7 +1852,7 @@ export const es: Translation = {
   "scenes.errCreate": "No se pudo crear la escena: {err}",
   "scenes.list.new": "+ Nueva escena",
   "scenes.list.empty":
-    "Sin escenas todavía. Armá un look en Stage y tocá \"Nueva escena\" para grabarlo.",
+    'Sin escenas todavía. Armá un look en Stage y tocá "Nueva escena" para grabarlo.',
   "scenes.list.lpHint": "LP fila 3, pad {pad}",
   "scenes.list.recallHint": "Recall (▶ GO)",
   "scenes.list.stepCount": "{count} step{plural}",
@@ -1872,7 +1867,7 @@ export const es: Translation = {
   "scenes.editor.aiIterateHint":
     "Iterar esta escena con IA (refinar valores, fades, agregar/quitar steps)",
   "scenes.editor.delete": "Eliminar",
-  "scenes.editor.deleteConfirm": "¿Eliminar \"{name}\"?",
+  "scenes.editor.deleteConfirm": '¿Eliminar "{name}"?',
   "scenes.editor.fxHint":
     "Cada step graba el chaser y movement activos en ese instante. Al frenar la escena se restaura lo que estaba corriendo antes del recall. Editá el FX state por step abajo.",
   "scenes.editor.stepsHeading": "Steps ({count})",
@@ -1887,7 +1882,7 @@ export const es: Translation = {
   "scenes.editor.loopHint":
     "Los pasos se reproducen en orden y vuelven al primero al final, formando un loop. El siguiente paso arranca cuando termina el hold del actual.",
   "scenes.editor.fixturesHint":
-    "{writes} writes totales sobre {fixtures} fixtures patcheados. Tip: si hace falta, hacé Clear del programmer y usá \"Solo touched\" para iterar steps sin pisarte de más.",
+    '{writes} writes totales sobre {fixtures} fixtures patcheados. Tip: si hace falta, hacé Clear del programmer y usá "Solo touched" para iterar steps sin pisarte de más.',
   "scenes.editor.clearProg": "Clear programmer",
   "scenes.programmer.label": "PROG · {count} fixture{plural} tocado{plural}",
   "scenes.programmer.clear": "Clear",
@@ -1900,8 +1895,7 @@ export const es: Translation = {
   "scenes.step.updateAllHint":
     "Re-grabar este step con el estado actual del rig (todos sus fixtures)",
   "scenes.step.updateTouched": "⟳T",
-  "scenes.step.updateTouchedHint":
-    "Re-grabar solo los fixtures touched (resto queda como está)",
+  "scenes.step.updateTouchedHint": "Re-grabar solo los fixtures touched (resto queda como está)",
   "scenes.step.removeHint": "Eliminar este step",
   "scenes.step.removeOnlyHint": "No se puede eliminar el único step",
   "scenes.step.removeConfirm": "¿Eliminar el step {n}?",
@@ -2015,7 +2009,7 @@ export const es: Translation = {
   "movement.empty":
     "Sin movements. Creá uno para empezar — el primero queda mapeado al pad 21 del Launchpad (fila 2). Los siguientes ocupan los 7 pads a la derecha.",
   "movement.delete": "Eliminar",
-  "movement.deleteConfirm": "¿Eliminar \"{name}\"?",
+  "movement.deleteConfirm": '¿Eliminar "{name}"?',
   "movement.lpHint": "Launchpad pad {pad} (fila 2)",
   "movement.legend.fixtures": "Fixtures ({count})",
   "movement.legend.shape": "Shape",
@@ -2150,7 +2144,7 @@ export const es: Translation = {
   "stage.sqp.removeStep": "Eliminar step",
   "stage.sqp.removeOnlyHint": "No se puede eliminar el único step",
   "stage.sqp.recordHeadingNew": "Grabar nueva escena",
-  "stage.sqp.recordHeadingAdd": "Agregar step a \"{name}\"",
+  "stage.sqp.recordHeadingAdd": 'Agregar step a "{name}"',
   "stage.sqp.fade": "Fade",
   "stage.sqp.hold": "Hold",
   "stage.sqp.ms": "ms",
@@ -2178,15 +2172,14 @@ export const es: Translation = {
   "stage.menu.duplicate": "Duplicar",
   "stage.menu.untouch": "Untouch",
   "stage.menu.remove": "Eliminar",
-  "stage.confirm.removeOne": "¿Eliminar \"{name}\"?",
+  "stage.confirm.removeOne": '¿Eliminar "{name}"?',
   "stage.confirm.removeMany": "¿Eliminar {count} fixtures?",
 
   "aiGen.aria": "Generar escena con IA",
   "aiGen.title": "Generar escena con IA",
   "aiGen.titleIterating": "Mejorando: {name}",
   "aiGen.errPromptEmpty": "Escribí un prompt — ej: 'cálido amber con fade lento'.",
-  "aiGen.errScopeEmpty":
-    "Tildá al menos un fixture en la lista o cambiá el scope a 'todos'.",
+  "aiGen.errScopeEmpty": "Tildá al menos un fixture en la lista o cambiá el scope a 'todos'.",
   "aiGen.errRefineEmpty": "Escribí qué querés cambiar (ej: 'el step 2 más rápido').",
   "aiGen.field.prompt": "Prompt",
   "aiGen.field.promptPlaceholder":
@@ -2203,8 +2196,7 @@ export const es: Translation = {
   "aiGen.generate": "✨ Generar",
   "aiGen.preview.stepCount": "{count} step{plural}",
   "aiGen.preview.stepPlaceholder": "Step {n}",
-  "aiGen.preview.stepMeta":
-    "fade {fade}ms · hold {hold}ms · {count} fixture{plural}",
+  "aiGen.preview.stepMeta": "fade {fade}ms · hold {hold}ms · {count} fixture{plural}",
   "aiGen.refine": "Refinar",
   "aiGen.refinePlaceholder":
     "ej: 'el step 2 más rápido' · 'menos azul, más amber' · 'agregá strobe en el último'",
@@ -2213,7 +2205,7 @@ export const es: Translation = {
   "aiGen.refineLabel": "↻ Refinar",
   "aiGen.resetFromScratch": "Empezar de cero",
   "aiGen.replaceOriginal": "Reemplazar original",
-  "aiGen.replaceOriginalHint": "Sobrescribir los steps de \"{name}\" con este draft",
+  "aiGen.replaceOriginalHint": 'Sobrescribir los steps de "{name}" con este draft',
   "aiGen.replacing": "Reemplazando…",
   "aiGen.applyNew": "Aplicar como escena nueva",
   "aiGen.applying": "Aplicando…",

@@ -34,11 +34,17 @@ export function CameraRig({
   const { camera } = useThree();
   const controlsRef = useRef<React.ComponentRef<typeof OrbitControls> | null>(null);
 
+  // Width/depth are the only stage dims the preset math depends on;
+  // height/etc. would force unnecessary tween restarts.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: width/depth-only on purpose.
   const presets = useMemo(() => buildPresets(dims), [dims.width, dims.depth]);
   const targetCamPos = useRef(new THREE.Vector3());
   const targetLook = useRef(new THREE.Vector3());
   const tweening = useRef(0); // remaining tween time in seconds
 
+  // request.stamp bumps on every preset click — it's the trigger that
+  // tells us "user wants to re-tween, even if preset is the same".
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stamp is the explicit re-tween signal.
   useEffect(() => {
     const p = presets[request.preset];
     targetCamPos.current.copy(p.position);
@@ -92,10 +98,9 @@ export function CameraRig({
   );
 }
 
-function buildPresets(dims: RigDimensions): Record<
-  CameraPreset,
-  { position: THREE.Vector3; lookAt: THREE.Vector3 }
-> {
+function buildPresets(
+  dims: RigDimensions,
+): Record<CameraPreset, { position: THREE.Vector3; lookAt: THREE.Vector3 }> {
   const w = dims.width;
   const d = dims.depth;
   const lookAtCentre = new THREE.Vector3(0, 1.5, 0);

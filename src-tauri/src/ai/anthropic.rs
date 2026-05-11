@@ -25,7 +25,11 @@ pub async fn generate_scene(
     fixtures: &[ContextFixture],
     seed: Option<&DraftScene>,
 ) -> Result<DraftScene, String> {
-    let model = if model.is_empty() { DEFAULT_MODEL } else { model };
+    let model = if model.is_empty() {
+        DEFAULT_MODEL
+    } else {
+        model
+    };
     let body = build_request_body(model, user_prompt, step_count, fixtures, seed);
 
     let client = reqwest::Client::new();
@@ -55,7 +59,11 @@ pub async fn generate_scene(
 /// model accepts requests. Calls `messages` with a 1-token cap so the
 /// cost is essentially zero.
 pub async fn test_connection(api_key: &str, model: &str) -> Result<String, String> {
-    let model = if model.is_empty() { DEFAULT_MODEL } else { model };
+    let model = if model.is_empty() {
+        DEFAULT_MODEL
+    } else {
+        model
+    };
     let body = json!({
         "model": model,
         "max_tokens": 1,
@@ -207,8 +215,8 @@ enum ContentBlock {
 }
 
 fn parse_tool_call(body: &str) -> Result<DraftScene, String> {
-    let resp: AnthropicResponse =
-        serde_json::from_str(body).map_err(|e| format!("anthropic JSON parse: {e} · body: {body}"))?;
+    let resp: AnthropicResponse = serde_json::from_str(body)
+        .map_err(|e| format!("anthropic JSON parse: {e} · body: {body}"))?;
     let truncated = resp.stop_reason.as_deref() == Some("max_tokens");
     for block in resp.content {
         match block {

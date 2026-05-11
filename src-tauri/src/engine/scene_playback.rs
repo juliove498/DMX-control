@@ -307,11 +307,7 @@ impl ScenePlayback {
     /// hold split by the same ratio the step was authored with). A
     /// single-step scene with `hold_ms = 0` is left alone because
     /// "stay here forever" has no beat semantics.
-    pub fn tick(
-        &mut self,
-        now: Instant,
-        overall_bpm: Option<f32>,
-    ) -> Vec<((u16, u16), u8)> {
+    pub fn tick(&mut self, now: Instant, overall_bpm: Option<f32>) -> Vec<((u16, u16), u8)> {
         let single_step = self.steps.len() == 1;
         loop {
             // Borrow the phase by value to keep the match-arm logic

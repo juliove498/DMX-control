@@ -202,7 +202,9 @@ export function RemoteBridgeView() {
                   <strong>{d.name}</strong>
                   <small>
                     {" "}
-                    {t("remote.devices.pairedAgo", { ago: formatRelative(t, Number(d.created_at)) })}
+                    {t("remote.devices.pairedAgo", {
+                      ago: formatRelative(t, Number(d.created_at)),
+                    })}
                     {d.last_seen != null
                       ? ` ${t("remote.devices.seenAgo", { ago: formatRelative(t, Number(d.last_seen)) })}`
                       : ""}

@@ -165,12 +165,22 @@ fn render_uncached(font: &FontRef<'static>, visual: &KeyVisual) -> DynamicImage 
             phase,
             slots,
         } => {
-            draw_tile(&mut img, font, *kind, label, *palette, *active, *phase, slots.as_ref());
+            draw_tile(
+                &mut img,
+                font,
+                *kind,
+                label,
+                *palette,
+                *active,
+                *phase,
+                slots.as_ref(),
+            );
         }
     }
     DynamicImage::ImageRgb8(img)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn draw_tile(
     img: &mut RgbImage,
     font: &FontRef<'static>,
@@ -194,13 +204,21 @@ fn draw_tile(
         // Blind: rapid full-power strobe — toggles between near-black
         // and full white-tone every animation frame to read as "alarm".
         (TileKind::Blind, true) => {
-            if phase % 2 == 0 { on_color } else { dim(on_color, 0.10) }
+            if phase.is_multiple_of(2) {
+                on_color
+            } else {
+                dim(on_color, 0.10)
+            }
         }
         // Blackout: red strobe with the same on/off shape but at half
         // the rate, so when both are pressed at once they're audibly
         // distinguishable as different rhythms.
         (TileKind::Blackout, true) => {
-            if (phase / 2) % 2 == 0 { on_color } else { dim(on_color, 0.10) }
+            if (phase / 2).is_multiple_of(2) {
+                on_color
+            } else {
+                dim(on_color, 0.10)
+            }
         }
         // Chaser / Movement / Scene: smooth sine pulse 55 %–100 %.
         _ => {
@@ -362,7 +380,7 @@ fn draw_eye_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, phase:
     draw_filled_rect_mut(img, Rect::at(cx - 8, cy - 7).of_size(16, 14), fg);
     // Pupil.
     let bg = img.get_pixel(0, 0).0;
-    let pupil_visible = !active || phase % 2 == 0;
+    let pupil_visible = !active || phase.is_multiple_of(2);
     if pupil_visible {
         draw_filled_circle_mut(img, (cx, cy), 4, Rgb(bg));
         draw_filled_circle_mut(img, (cx, cy), 2, fg);
@@ -425,7 +443,7 @@ fn draw_metronome_glyph(img: &mut RgbImage, cy: i32, fg: Rgb<u8>, active: bool, 
     let cycle = 10_u32; // 1.0 s/cycle at 10 fps ≈ 60 BPM swing — close enough
     let pivot = (cx, cy + 11);
     let angle = if active {
-        let t = pulse(phase, cycle);  // 0..1 sine
+        let t = pulse(phase, cycle); // 0..1 sine
         (t - 0.5) * 2.0 * std::f32::consts::FRAC_PI_4 // ±π/4
     } else {
         0.0 // idle: arm dead-centre
@@ -522,9 +540,7 @@ fn pulse(phase: u32, period_frames: u32) -> f32 {
 
 /// Lerp two RGB colours by `t` ∈ [0,1].
 fn mix_color(a: (u8, u8, u8), b: (u8, u8, u8), t: f32) -> (u8, u8, u8) {
-    let lerp = |x: u8, y: u8| {
-        ((x as f32 * (1.0 - t)) + (y as f32 * t)).clamp(0.0, 255.0) as u8
-    };
+    let lerp = |x: u8, y: u8| ((x as f32 * (1.0 - t)) + (y as f32 * t)).clamp(0.0, 255.0) as u8;
     (lerp(a.0, b.0), lerp(a.1, b.1), lerp(a.2, b.2))
 }
 

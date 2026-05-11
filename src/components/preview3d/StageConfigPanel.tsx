@@ -88,8 +88,8 @@ export function StageConfigPanel({
           onChange={(v) => updateFloor({ color: v })}
         />
         <p className="hint">
-          Pisos oscuros se tragan el bounce de los pares RGB. Subí a un gris medio para que la
-          luz se vea sobre el piso.
+          Pisos oscuros se tragan el bounce de los pares RGB. Subí a un gris medio para que la luz
+          se vea sobre el piso.
         </p>
       </section>
 
@@ -248,9 +248,7 @@ export function StageConfigPanel({
             <ColorRow
               label="Color silueta"
               value={config.audience.color}
-              onChange={(v) =>
-                onChange({ ...config, audience: { ...config.audience, color: v } })
-              }
+              onChange={(v) => onChange({ ...config, audience: { ...config.audience, color: v } })}
             />
           </>
         ) : null}
@@ -273,12 +271,7 @@ export function StageConfigPanel({
         ))}
       </section>
 
-      <FixturesPanel
-        fixtures={fixtures}
-        library={library}
-        config={config}
-        onChange={onChange}
-      />
+      <FixturesPanel fixtures={fixtures} library={library} config={config} onChange={onChange} />
     </aside>
   );
 }
@@ -306,10 +299,30 @@ function TrussEditor({
         </button>
       </div>
       <div className="p3d-truss-grid">
-        <NumberRow label="X1" value={truss.fromX} step={0.25} onChange={(v) => onChange({ fromX: v })} />
-        <NumberRow label="Z1" value={truss.fromZ} step={0.25} onChange={(v) => onChange({ fromZ: v })} />
-        <NumberRow label="X2" value={truss.toX} step={0.25} onChange={(v) => onChange({ toX: v })} />
-        <NumberRow label="Z2" value={truss.toZ} step={0.25} onChange={(v) => onChange({ toZ: v })} />
+        <NumberRow
+          label="X1"
+          value={truss.fromX}
+          step={0.25}
+          onChange={(v) => onChange({ fromX: v })}
+        />
+        <NumberRow
+          label="Z1"
+          value={truss.fromZ}
+          step={0.25}
+          onChange={(v) => onChange({ fromZ: v })}
+        />
+        <NumberRow
+          label="X2"
+          value={truss.toX}
+          step={0.25}
+          onChange={(v) => onChange({ toX: v })}
+        />
+        <NumberRow
+          label="Z2"
+          value={truss.toZ}
+          step={0.25}
+          onChange={(v) => onChange({ toZ: v })}
+        />
         <NumberRow
           label="Altura"
           value={truss.height}

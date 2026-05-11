@@ -32,16 +32,9 @@ impl Discovery {
         self.stop();
         let daemon = ServiceDaemon::new().map_err(|e| e.to_string())?;
         let host_name = format!("{}.local.", instance_name);
-        let info = ServiceInfo::new(
-            SERVICE_TYPE,
-            instance_name,
-            &host_name,
-            host_ip,
-            port,
-            None,
-        )
-        .map_err(|e| e.to_string())?
-        .enable_addr_auto();
+        let info = ServiceInfo::new(SERVICE_TYPE, instance_name, &host_name, host_ip, port, None)
+            .map_err(|e| e.to_string())?
+            .enable_addr_auto();
         daemon.register(info).map_err(|e| e.to_string())?;
         *self.daemon.lock() = Some(daemon);
         *self.instance.lock() = Some(instance_name.to_string());

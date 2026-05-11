@@ -126,12 +126,7 @@ export function AiGenerateModal({
     setError(null);
     setGenerating(true);
     try {
-      const result = await aiGenerateSceneDraft(
-        refinePrompt.trim(),
-        stepCount,
-        null,
-        seedForLlm,
-      );
+      const result = await aiGenerateSceneDraft(refinePrompt.trim(), stepCount, null, seedForLlm);
       setDraft(result);
       setSeedForLlm(result);
       setRefinePrompt("");
@@ -311,9 +306,7 @@ function PromptForm({
             onChange={(e) => onScope(e.currentTarget.value as "all" | "selected")}
             disabled={generating}
           >
-            <option value="all">
-              {t("aiGen.scope.all", { count: fixtures.length })}
-            </option>
+            <option value="all">{t("aiGen.scope.all", { count: fixtures.length })}</option>
             <option value="selected">{t("aiGen.scope.selected")}</option>
           </select>
         </label>
@@ -410,12 +403,14 @@ function DraftPreview({
       </div>
       <ul className="ai-draft-steps">
         {draft.steps.map((step, i) => (
+          // Read-only preview of a frozen draft; rows hold no state
+          // and the list is regenerated whole on every prompt iteration,
+          // so the position is a fine stable identity here.
+          // biome-ignore lint/suspicious/noArrayIndexKey: draft preview is read-only.
           <li key={i} className="ai-draft-step">
             <header>
               <span className="ai-step-num">{i + 1}</span>
-              <strong>
-                {step.name ?? t("aiGen.preview.stepPlaceholder", { n: i + 1 })}
-              </strong>
+              <strong>{step.name ?? t("aiGen.preview.stepPlaceholder", { n: i + 1 })}</strong>
               <span className="hint">
                 {t("aiGen.preview.stepMeta", {
                   fade: step.fade_in_ms,
@@ -427,6 +422,8 @@ function DraftPreview({
             </header>
             <ul className="ai-draft-fixtures">
               {step.fixtures.map((fx, j) => (
+                // Same reasoning as above — preview, not editable.
+                // biome-ignore lint/suspicious/noArrayIndexKey: draft preview is read-only.
                 <li key={j}>
                   <span className="ai-fix-label">{fixtureLabel(fx.fixture_id)}</span>
                   <span className="ai-fix-values">
@@ -476,12 +473,7 @@ function DraftPreview({
             {applying ? t("aiGen.replacing") : t("aiGen.replaceOriginal")}
           </button>
         ) : null}
-        <button
-          type="button"
-          className="ai-primary"
-          onClick={onApplyAsNew}
-          disabled={busy}
-        >
+        <button type="button" className="ai-primary" onClick={onApplyAsNew} disabled={busy}>
           {applying ? t("aiGen.applying") : t("aiGen.applyNew")}
         </button>
       </div>

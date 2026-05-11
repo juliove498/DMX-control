@@ -197,7 +197,12 @@ export function ScenesView() {
       <div className="scenes-layout">
         {/* ---- LEFT: list ---- */}
         <aside className="scenes-list-pane" data-doc="scenes-list">
-          <button type="button" className="scenes-new-btn" data-doc="scenes-new" onClick={handleCreate}>
+          <button
+            type="button"
+            className="scenes-new-btn"
+            data-doc="scenes-new"
+            onClick={handleCreate}
+          >
             {t("scenes.list.new")}
           </button>
           {scenes.length === 0 ? (
@@ -892,9 +897,7 @@ function LoopGroupsPanel({
               scenes={scenes}
               isActive={activeLoop.active_group_id === g.id}
               currentIndex={
-                activeLoop.active_group_id === g.id
-                  ? (activeLoop.current_index ?? null)
-                  : null
+                activeLoop.active_group_id === g.id ? (activeLoop.current_index ?? null) : null
               }
               onUpdate={onUpdate}
               onDelete={() => onDelete(g.id)}
@@ -1038,14 +1041,11 @@ function LoopGroupCard({
               {assignSlotKeys(group.scene_ids).map(({ key, sid, i }) => {
                 const scene = sceneById[sid];
                 const label = scene?.name ?? "⚠ secuencia eliminada";
-                const live =
-                  isActive && currentIndex !== null && currentIndex === i;
+                const live = isActive && currentIndex !== null && currentIndex === i;
                 return (
                   <li
                     key={key}
-                    className={`scenes-loop-item${live ? " live" : ""}${
-                      scene ? "" : " missing"
-                    }`}
+                    className={`scenes-loop-item${live ? " live" : ""}${scene ? "" : " missing"}`}
                   >
                     <span className="scenes-loop-item-idx">{i + 1}.</span>
                     <span className="scenes-loop-item-name">{label}</span>
@@ -1113,9 +1113,7 @@ function LoopGroupCard({
 /// Avoids using the bare array index as the key (which would break
 /// reorders) while still letting the operator add the same scene
 /// twice to a playlist.
-function assignSlotKeys(
-  scene_ids: string[],
-): { key: string; sid: string; i: number }[] {
+function assignSlotKeys(scene_ids: string[]): { key: string; sid: string; i: number }[] {
   const seen: Record<string, number> = {};
   return scene_ids.map((sid, i) => {
     const count = (seen[sid] ?? 0) + 1;

@@ -5,11 +5,11 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useShowStore } from "../stores/show";
 import { Audience } from "./preview3d/Audience";
-import { CameraRig, type CameraPreset, type PresetTransition } from "./preview3d/CameraRig";
+import { type CameraPreset, CameraRig, type PresetTransition } from "./preview3d/CameraRig";
 import { Fixture3D } from "./preview3d/Fixture3D";
 import { StageConfigPanel } from "./preview3d/StageConfigPanel";
 import { StageGeometry } from "./preview3d/StageGeometry";
-import { loadStageConfig, saveStageConfig, type StageConfig } from "./preview3d/stageConfig";
+import { type StageConfig, loadStageConfig, saveStageConfig } from "./preview3d/stageConfig";
 import {
   fixtureHasGoboWheel,
   fixtureIsSpotKind,
@@ -206,11 +206,7 @@ export function Preview3D() {
       </header>
       <div
         className={`p3d-layout${showPanel ? "" : " no-panel"}${splitterActive ? " splitter-active" : ""}`}
-        style={
-          showPanel
-            ? { gridTemplateColumns: `1fr 6px ${panelWidth}px` }
-            : undefined
-        }
+        style={showPanel ? { gridTemplateColumns: `1fr 6px ${panelWidth}px` } : undefined}
       >
         <div className="p3d-canvas-wrap">
           <Canvas
@@ -239,13 +235,8 @@ export function Preview3D() {
                 at 1 the room reads as a lit space (rehearsal hall /
                 house-lights-on / load-in). Hemi + ambient scale
                 together so colour temperature stays neutral. */}
-            <color
-              attach="background"
-              args={[ambientBackground(config.ambientLevel)]}
-            />
-            <hemisphereLight
-              args={["#9aa8c0", "#1a2030", 0.25 + config.ambientLevel * 1.4]}
-            />
+            <color attach="background" args={[ambientBackground(config.ambientLevel)]} />
+            <hemisphereLight args={["#9aa8c0", "#1a2030", 0.25 + config.ambientLevel * 1.4]} />
             <ambientLight intensity={0.05 + config.ambientLevel * 0.6} />
 
             {/* Fog density derived from atmosphere slider. Fog and
@@ -263,10 +254,7 @@ export function Preview3D() {
                 hazier instead of disappearing. Density tuned so
                 atmosphere=0.5 yields ~12 % fog at 5 m, ~27 % at
                 12 m, ~50 % at 25 m — visible but breathable. */}
-            <fogExp2
-              attach="fog"
-              args={["#0a0e15", config.atmosphere * 0.028]}
-            />
+            <fogExp2 attach="fog" args={["#0a0e15", config.atmosphere * 0.028]} />
 
             <CameraRig
               request={cameraReq}
@@ -312,11 +300,7 @@ export function Preview3D() {
         </div>
         {showPanel ? (
           <>
-            <div
-              className="p3d-splitter"
-              onPointerDown={onSplitterDown}
-              aria-hidden="true"
-            />
+            <div className="p3d-splitter" onPointerDown={onSplitterDown} aria-hidden="true" />
             <StageConfigPanel
               config={config}
               onChange={setConfig}

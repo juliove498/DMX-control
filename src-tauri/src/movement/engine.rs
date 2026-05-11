@@ -121,11 +121,7 @@ impl MovementEngine {
     /// at the toggle command, so in practice at most one entry contributes
     /// per tick — but if two were briefly enabled the later iteration
     /// would simply overwrite the earlier one's pan/tilt cells.
-    pub fn tick(
-        &mut self,
-        now: Instant,
-        overall_bpm: Option<f32>,
-    ) -> HashMap<u16, ChannelOverlay> {
+    pub fn tick(&mut self, now: Instant, overall_bpm: Option<f32>) -> HashMap<u16, ChannelOverlay> {
         let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
         for entry in &mut self.entries {
             if !entry.config.enabled || entry.resolved.is_empty() {
@@ -195,7 +191,7 @@ fn advance_phase(
     // Same override semantics as the chaser side — keep both effects
     // locked to one tempo when the operator is driving the rig from
     // the header's overall BPM.
-    let bpm = overall_bpm.unwrap_or_else(|| match cfg.tempo {
+    let bpm = overall_bpm.unwrap_or(match cfg.tempo {
         TempoSource::Fixed { bpm } => bpm,
     });
     let beats_per_loop = beats_per_loop(cfg.subdivision);

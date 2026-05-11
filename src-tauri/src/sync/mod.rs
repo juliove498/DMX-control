@@ -20,7 +20,9 @@ use crate::commands::{persist_show, CommandError, SHOW_EVENT};
 use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
 use crate::show::{ShowFileV1, ShowState};
 
-use gist::{create_gist, fetch_gist, patch_gist, pull_payload, whoami, SyncPayload, SCHEMA_VERSION};
+use gist::{
+    create_gist, fetch_gist, patch_gist, pull_payload, whoami, SyncPayload, SCHEMA_VERSION,
+};
 use settings::{load as load_settings, save as save_settings, SyncSettings};
 
 /// What the UI needs to render the Sync tab — everything from
@@ -240,8 +242,8 @@ pub async fn sync_pull(
         ));
     }
 
-    let mut incoming: ShowFileV1 = serde_json::from_str(&payload.show_json)
-        .map_err(|e| format!("show parse: {e}"))?;
+    let mut incoming: ShowFileV1 =
+        serde_json::from_str(&payload.show_json).map_err(|e| format!("show parse: {e}"))?;
 
     // Auto-snapshot the current show before overwriting, so a bad
     // pull is recoverable. Best-effort — if writing fails we still

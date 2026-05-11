@@ -262,7 +262,7 @@ fn half_swap(step: u64, slot: usize, total: usize) -> SlotState {
     }
     let half = total.div_ceil(2);
     let in_left = slot < half;
-    let left_on = step % 2 == 0;
+    let left_on = step.is_multiple_of(2);
     if (in_left && left_on) || (!in_left && !left_on) {
         SlotState::On
     } else {
@@ -280,7 +280,7 @@ fn edges(step: u64, slot: usize, total: usize) -> SlotState {
     if total <= 2 {
         return all_together(step);
     }
-    let on_step = step % 2 == 0;
+    let on_step = step.is_multiple_of(2);
     let is_edge = slot == 0 || slot == total - 1;
     if is_edge && on_step {
         SlotState::On
@@ -813,12 +813,12 @@ mod tests {
         let total = 6;
         let states = snapshot(&Pattern::GroupsOfThree, 0, total);
         assert_eq!(count_on(&states), 3);
-        for slot in 0..3 {
-            assert_eq!(states[slot], SlotState::On);
+        for slot_state in &states[0..3] {
+            assert_eq!(*slot_state, SlotState::On);
         }
         let states = snapshot(&Pattern::GroupsOfThree, 1, total);
-        for slot in 3..6 {
-            assert_eq!(states[slot], SlotState::On);
+        for slot_state in &states[3..6] {
+            assert_eq!(*slot_state, SlotState::On);
         }
     }
 

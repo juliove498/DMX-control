@@ -165,7 +165,10 @@ async fn pair(
 ) -> Result<Json<PairResponse>, (StatusCode, String)> {
     if !is_lan_peer(peer.ip()) {
         tracing::warn!(%peer, "pair rejected: peer is not on a private network");
-        return Err((StatusCode::FORBIDDEN, "peer must be on private network".into()));
+        return Err((
+            StatusCode::FORBIDDEN,
+            "peer must be on private network".into(),
+        ));
     }
     let pending = {
         let mut g = state.pending.lock();
@@ -346,11 +349,15 @@ fn encode_event(ev: &BridgeEvent) -> Result<String, serde_json::Error> {
 pub fn is_lan_peer(ip: IpAddr) -> bool {
     match ip {
         IpAddr::V4(v4) => is_private_v4(v4) || v4.is_loopback() || v4.is_link_local(),
-        IpAddr::V6(v6) => v6.is_loopback() || matches!(
-            v6.octets()[0],
-            // fc00::/7 unique local + fe80::/10 link-local prefix.
-            0xfc | 0xfd
-        ) || (v6.octets()[0] == 0xfe && (v6.octets()[1] & 0xc0) == 0x80),
+        IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || matches!(
+                    v6.octets()[0],
+                    // fc00::/7 unique local + fe80::/10 link-local prefix.
+                    0xfc | 0xfd
+                )
+                || (v6.octets()[0] == 0xfe && (v6.octets()[1] & 0xc0) == 0x80)
+        }
     }
 }
 

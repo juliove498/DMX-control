@@ -94,7 +94,7 @@ pub fn build_context(
 
     show.fixtures
         .iter()
-        .filter(|f| allowed.as_ref().map_or(true, |s| s.contains(f.id.as_str())))
+        .filter(|f| allowed.as_ref().is_none_or(|s| s.contains(f.id.as_str())))
         .filter_map(|f| {
             let def = library.get(&f.definition_id)?;
             let mode = def.mode(f.mode_index as usize)?;
@@ -229,9 +229,7 @@ pub fn parse_draft_lenient(raw: Value) -> Result<DraftScene, String> {
             // Unwrap a stringified-JSON layer if present.
             if let Value::String(s) = &raw {
                 let inner: Value = serde_json::from_str(s).map_err(|e| {
-                    format!(
-                        "draft scene parse: string content was not JSON ({e}); content: {s}"
-                    )
+                    format!("draft scene parse: string content was not JSON ({e}); content: {s}")
                 })?;
                 return parse_draft_lenient(inner);
             }
@@ -260,7 +258,9 @@ pub fn parse_draft_lenient(raw: Value) -> Result<DraftScene, String> {
             } else {
                 raw_str
             };
-            Err(format!("draft scene parse: {direct_err} · input: {raw_str}"))
+            Err(format!(
+                "draft scene parse: {direct_err} · input: {raw_str}"
+            ))
         }
     }
 }
@@ -280,9 +280,7 @@ fn validate_and_clamp(mut draft: DraftScene, fixtures: &[ContextFixture]) -> Dra
                 .fixtures
                 .into_iter()
                 .filter_map(|mut fx| {
-                    let Some(ctx) = by_id.get(fx.fixture_id.as_str()) else {
-                        return None;
-                    };
+                    let ctx = by_id.get(fx.fixture_id.as_str())?;
                     let max_offset = ctx.channels.len() as u16;
                     fx.values.retain(|v| v.channel_offset < max_offset);
                     if fx.values.is_empty() {

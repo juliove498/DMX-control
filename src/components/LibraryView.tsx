@@ -149,7 +149,8 @@ export function LibraryView() {
                     onClick={() => setOpenId(open ? null : d.id)}
                     title={open ? t("library.gobosCollapse") : t("library.gobosToggle")}
                   >
-                    {open ? "▾" : "▸"} {open ? t("library.gobosCollapse") : t("library.gobosToggle")}
+                    {open ? "▾" : "▸"}{" "}
+                    {open ? t("library.gobosCollapse") : t("library.gobosToggle")}
                   </button>
                 </div>
               </div>
@@ -201,9 +202,7 @@ function RangesEditor({
   // `{ ...other fields, /* no ranges */ }`. Defensive `?? []`
   // everywhere we touch it — without it, "Editar gobos" on any
   // fixture with at least one continuous channel would blow up.
-  const hasAnyRanges = def.modes.some((m) =>
-    m.channels.some((c) => (c.ranges ?? []).length > 0),
-  );
+  const hasAnyRanges = def.modes.some((m) => m.channels.some((c) => (c.ranges ?? []).length > 0));
   if (!hasAnyRanges) {
     return (
       <div className="lib-ranges">

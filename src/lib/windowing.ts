@@ -1,7 +1,7 @@
 import {
+  WebviewWindow,
   getAllWebviewWindows,
   getCurrentWebviewWindow,
-  WebviewWindow,
 } from "@tauri-apps/api/webviewWindow";
 
 export const POPOUT_VIEWS = [
@@ -60,8 +60,6 @@ export async function toggleFullscreen(): Promise<void> {
 export async function closeAppCascade(): Promise<void> {
   const me = getCurrentWebviewWindow();
   const all = await getAllWebviewWindows();
-  await Promise.allSettled(
-    all.filter((w) => w.label !== me.label).map((w) => w.close()),
-  );
+  await Promise.allSettled(all.filter((w) => w.label !== me.label).map((w) => w.close()));
   await me.destroy();
 }

@@ -22,12 +22,12 @@ use crate::output::config::{instantiate, OutputBindingConfig, OutputsConfig};
 use crate::output::d2xx::{list_devices as list_d2xx_devices, D2xxDeviceInfo};
 use crate::output::discovery::{list_serial_ports, SerialPortInfo};
 use crate::programmer::{ProgrammerStatus, SharedProgrammer};
-use crate::show::file::{load as load_show_file, save as save_show_file, ShowError, ShowFileV1};
-use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, PatchReport};
-use crate::show::library::{ensure_seeded, library_dir, load_all, save_def};
 use crate::show::button_bindings::{
     default_launchpad_bindings, default_streamdeck_bindings, ButtonBindings,
 };
+use crate::show::file::{load as load_show_file, save as save_show_file, ShowError, ShowFileV1};
+use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, PatchReport};
+use crate::show::library::{ensure_seeded, library_dir, load_all, save_def};
 use crate::show::loop_group::SceneLoopGroup;
 use crate::show::scene::{Scene, SceneChannel, SceneFixture, SceneFxState, SceneStep};
 use crate::show::ShowState;
@@ -1150,7 +1150,8 @@ pub fn set_channel_range_image(
         .unwrap_or_else(|| "png".to_string());
     let mime = mime_for_extension(&ext);
 
-    let bytes = std::fs::read(&src).map_err(|e| CommandError::Io(format!("read {source_path}: {e}")))?;
+    let bytes =
+        std::fs::read(&src).map_err(|e| CommandError::Io(format!("read {source_path}: {e}")))?;
     if bytes.len() > MAX_RANGE_IMAGE_BYTES {
         return Err(CommandError::Other(format!(
             "image is {} KB; per-range thumbnails are capped at {} KB so the fixture JSON stays portable across many ranges",
@@ -1182,9 +1183,10 @@ pub fn set_channel_range_image(
         // Bounds-check the requested mode/channel/range path before
         // writing — a stale UI sending an out-of-bounds index should
         // get a clear error instead of silently corrupting the file.
-        let mode = def.modes.get_mut(mode_index as usize).ok_or_else(|| {
-            CommandError::Other(format!("mode index {mode_index} out of bounds"))
-        })?;
+        let mode = def
+            .modes
+            .get_mut(mode_index as usize)
+            .ok_or_else(|| CommandError::Other(format!("mode index {mode_index} out of bounds")))?;
         let channel = mode
             .channels
             .get_mut(channel_index as usize)
@@ -1202,7 +1204,8 @@ pub fn set_channel_range_image(
         // import flow; clear it so future readers don't think the
         // bitmap lives at some external path.
         range.image_path = None;
-        let body = serde_json::to_vec_pretty(&def).map_err(|e| CommandError::Show(e.to_string()))?;
+        let body =
+            serde_json::to_vec_pretty(&def).map_err(|e| CommandError::Show(e.to_string()))?;
         let tmp = path.with_extension("json.tmp");
         std::fs::write(&tmp, &body).map_err(|e| CommandError::Io(e.to_string()))?;
         std::fs::rename(&tmp, &path).map_err(|e| CommandError::Io(e.to_string()))?;
@@ -2952,7 +2955,15 @@ pub fn start_loop_group_impl(
         (valid_ids, dwell, first_id)
     };
 
-    recall_scene_impl(app, engine, show, chasers, movement, scenes_pb, &first_scene_id)?;
+    recall_scene_impl(
+        app,
+        engine,
+        show,
+        chasers,
+        movement,
+        scenes_pb,
+        &first_scene_id,
+    )?;
     loops_pb.lock().start(
         id.to_string(),
         scene_ids,
@@ -3004,9 +3015,7 @@ pub fn stop_loop_group_impl(
 }
 
 #[tauri::command]
-pub fn active_loop_group(
-    loops_pb: State<'_, SharedLoopPlayback>,
-) -> LoopGroupActiveChange {
+pub fn active_loop_group(loops_pb: State<'_, SharedLoopPlayback>) -> LoopGroupActiveChange {
     let pb = loops_pb.lock();
     LoopGroupActiveChange {
         active_group_id: pb.active_group_id().map(|s| s.to_string()),
@@ -3041,12 +3050,7 @@ pub fn tick_loop_groups(
         let Some(group_id) = pb.active_group_id().map(|s| s.to_string()) else {
             return;
         };
-        let Some(group) = s
-            .show
-            .scene_loop_groups
-            .iter()
-            .find(|g| g.id == group_id)
-        else {
+        let Some(group) = s.show.scene_loop_groups.iter().find(|g| g.id == group_id) else {
             return;
         };
         let Some(scene) = s.show.scenes.iter().find(|sc| sc.id == next_scene_id) else {
@@ -3068,7 +3072,9 @@ pub fn tick_loop_groups(
         tracing::warn!(?err, "loop group advance: recall failed");
         return;
     }
-    loops_pb.lock().schedule_next(dwell_ms, std::time::Instant::now());
+    loops_pb
+        .lock()
+        .schedule_next(dwell_ms, std::time::Instant::now());
     let _ = app.emit(
         LOOP_GROUP_EVENT,
         LoopGroupActiveChange {

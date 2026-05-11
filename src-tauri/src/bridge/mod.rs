@@ -29,9 +29,7 @@ use crate::engine::EngineState;
 use crate::programmer::SharedProgrammer;
 use crate::show::ShowState;
 
-use auth::{
-    generate_pin, load_devices, save_devices, PairedDevice, PendingPairing,
-};
+use auth::{generate_pin, load_devices, save_devices, PairedDevice, PendingPairing};
 
 const DEFAULT_PORT: u16 = 7878;
 
@@ -132,12 +130,9 @@ fn snapshot_status(inner: &BridgeStateInner) -> BridgeStatus {
                 port.unwrap_or(DEFAULT_PORT),
                 p.pin,
             );
-            let qr = qrcodegen::QrCode::encode_text(
-                &pair_url,
-                qrcodegen::QrCodeEcc::Medium,
-            )
-            .map(|c| qr_to_svg(&c, 2))
-            .unwrap_or_default();
+            let qr = qrcodegen::QrCode::encode_text(&pair_url, qrcodegen::QrCodeEcc::Medium)
+                .map(|c| qr_to_svg(&c, 2))
+                .unwrap_or_default();
             Some(PairingState {
                 pin: p.pin.clone(),
                 qr_svg: qr,
@@ -160,6 +155,7 @@ fn snapshot_status(inner: &BridgeStateInner) -> BridgeStatus {
 // ---- Tauri commands ------------------------------------------------------
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn bridge_start(
     app: tauri::AppHandle,
     state: tauri::State<'_, BridgeState>,

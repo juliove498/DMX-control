@@ -158,7 +158,12 @@ pub async fn patch_gist(
                 .map_err(|e| e.to_string())? },
         },
     });
-    let resp = c.patch(&url).json(&body).send().await.map_err(|e| e.to_string())?;
+    let resp = c
+        .patch(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
         return Err(format!(
             "patch gist failed ({}): {}",
@@ -171,14 +176,12 @@ pub async fn patch_gist(
 
 /// Pull the show payload from a gist. Returns `(payload, gist_view)` so
 /// the caller can stash the new `updated_at` after applying.
-pub async fn pull_payload(
-    token: &str,
-    gist_id: &str,
-) -> Result<(SyncPayload, GistView), String> {
+pub async fn pull_payload(token: &str, gist_id: &str) -> Result<(SyncPayload, GistView), String> {
     let view = fetch_gist(token, gist_id).await?;
-    let file = view.files.get(FILE_NAME).ok_or_else(|| {
-        format!("gist has no {FILE_NAME}; was it created by this app?")
-    })?;
+    let file = view
+        .files
+        .get(FILE_NAME)
+        .ok_or_else(|| format!("gist has no {FILE_NAME}; was it created by this app?"))?;
     let content = match (&file.content, &file.raw_url) {
         (Some(c), _) => c.clone(),
         (None, Some(raw)) => {

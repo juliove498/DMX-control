@@ -322,17 +322,12 @@ function buildDiscMaterial(radius: number, falloffK: number): THREE.ShaderMateri
 /// isn't perpendicular to the beam.
 const BEAM_DISC_COUNT = 24;
 
-function buildBeamDiscs(
-  beamLength: number,
-  maxRadius: number,
-  falloffK: number,
-): BeamDisc[] {
+function buildBeamDiscs(beamLength: number, maxRadius: number, falloffK: number): BeamDisc[] {
   const arr: BeamDisc[] = [];
   for (let i = 0; i < BEAM_DISC_COUNT; i++) {
     const t = (i + 0.5) / BEAM_DISC_COUNT;
     const radius = Math.max(t * maxRadius, 1e-4);
-    const axial =
-      smoothstepEase(0, 0.05, t) * (1 - smoothstepEase(0.55, 1, t));
+    const axial = smoothstepEase(0, 0.05, t) * (1 - smoothstepEase(0.55, 1, t));
     arr.push({
       t,
       depth: t * beamLength,
@@ -366,11 +361,7 @@ function smoothstepEase(edge0: number, edge1: number, x: number): number {
 /// per-plane opacity is reduced to keep total brightness flat.
 const BEAM_PLANE_COUNT = 8;
 
-function buildBeamPlanes(
-  beamLength: number,
-  maxRadius: number,
-  falloffK: number,
-): BeamPlane[] {
+function buildBeamPlanes(beamLength: number, maxRadius: number, falloffK: number): BeamPlane[] {
   const planes: BeamPlane[] = [];
   for (let i = 0; i < BEAM_PLANE_COUNT; i++) {
     const angle = (i / BEAM_PLANE_COUNT) * Math.PI; // 0..π, the other half is the same plane
@@ -566,13 +557,7 @@ export function Fixture3D({
     for (const p of prismBeamPlanes) p.mat.clippingPlanes = clippingPlanes;
     for (const d of mainBeamDiscs) d.mat.clippingPlanes = clippingPlanes;
     for (const d of prismBeamDiscs) d.mat.clippingPlanes = clippingPlanes;
-  }, [
-    mainBeamPlanes,
-    prismBeamPlanes,
-    mainBeamDiscs,
-    prismBeamDiscs,
-    clippingPlanes,
-  ]);
+  }, [mainBeamPlanes, prismBeamPlanes, mainBeamDiscs, prismBeamDiscs, clippingPlanes]);
 
   // Prism behaviour. Hoisted above useFrame so the closure has
   // access without a TDZ error. The renderer block uses these
@@ -610,9 +595,7 @@ export function Fixture3D({
       return;
     }
     const strobeFactor =
-      s.strobe > 0.02
-        ? 0.5 + 0.5 * Math.sin(performance.now() * 0.001 * (4 + s.strobe * 50))
-        : 1;
+      s.strobe > 0.02 ? 0.5 + 0.5 * Math.sin(performance.now() * 0.001 * (4 + s.strobe * 50)) : 1;
     // Per-fixture-definition brightness multiplier. Folded into `lit`
     // so beam haze, spotlight, and lens halo all scale together —
     // dialing this down dims the whole representation uniformly.
@@ -721,19 +704,12 @@ export function Fixture3D({
       }
     }
     if (bodyMatRef.current) {
-      bodyMatRef.current.emissive.setRGB(
-        s.color.r * 0.9,
-        s.color.g * 0.9,
-        s.color.b * 0.9,
-      );
+      bodyMatRef.current.emissive.setRGB(s.color.r * 0.9, s.color.g * 0.9, s.color.b * 0.9);
       bodyMatRef.current.emissiveIntensity = lit;
     }
     if (haloMatRef.current) {
       haloMatRef.current.color.setRGB(s.color.r, s.color.g, s.color.b);
-      haloMatRef.current.opacity = Math.min(
-        1,
-        lit * (s.kind === "wash" ? 0.85 : 0.5),
-      );
+      haloMatRef.current.opacity = Math.min(1, lit * (s.kind === "wash" ? 0.85 : 0.5));
     }
 
     // Smooth pan/tilt: exponential follow ~250ms time constant.
@@ -764,132 +740,132 @@ export function Fixture3D({
           <group ref={yokeRef} position={[0, -0.18, 0]}>
             {/* Tilt child — beam, light, lens all rotate around X here. */}
             <group>
-          {/* Lens face — the bright disc you see when looking up at
+              {/* Lens face — the bright disc you see when looking up at
               a fixture. Small + emissive, drives the bloom hot
               core. */}
-          <mesh rotation={[Math.PI, 0, 0]}>
-            <circleGeometry args={[0.12, 32]} />
-            <meshStandardMaterial
-              ref={bodyMatRef}
-              color="#0e0e10"
-              emissive={new THREE.Color(0x000000)}
-              emissiveIntensity={0}
-              toneMapped={false}
-            />
-          </mesh>
-          {/* Halo — wider washes should have a much fuller halo so
+              <mesh rotation={[Math.PI, 0, 0]}>
+                <circleGeometry args={[0.12, 32]} />
+                <meshStandardMaterial
+                  ref={bodyMatRef}
+                  color="#0e0e10"
+                  emissive={new THREE.Color(0x000000)}
+                  emissiveIntensity={0}
+                  toneMapped={false}
+                />
+              </mesh>
+              {/* Halo — wider washes should have a much fuller halo so
               the soft-floor-glow look reads even when the cone is
               dim through bloom. */}
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]}>
-            <circleGeometry args={[kind === "wash" ? 0.5 : 0.32, 32]} />
-            <meshBasicMaterial
-              ref={haloMatRef}
-              color={new THREE.Color(0xffffff)}
-              transparent
-              opacity={0}
-              blending={THREE.AdditiveBlending}
-              depthWrite={false}
-              toneMapped={false}
-              clippingPlanes={clippingPlanes}
-            />
-          </mesh>
+              <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.001, 0]}>
+                <circleGeometry args={[kind === "wash" ? 0.5 : 0.32, 32]} />
+                <meshBasicMaterial
+                  ref={haloMatRef}
+                  color={new THREE.Color(0xffffff)}
+                  transparent
+                  opacity={0}
+                  blending={THREE.AdditiveBlending}
+                  depthWrite={false}
+                  toneMapped={false}
+                  clippingPlanes={clippingPlanes}
+                />
+              </mesh>
 
-          {/* === Beam cones === */}
-          {/* Spots get a real beam cone (additive volumetric look,
+              {/* === Beam cones === */}
+              {/* Spots get a real beam cone (additive volumetric look,
               prism splat when active). Washes (RGB pars / RGBW
               wash heads / dimmer-only fresnels) DON'T render a
               cone — their visual is a glow at the lens plus the
               SpotLight bathing the surfaces below with very soft
               edges. That matches what an LED par actually looks
               like in a smokeless room. */}
-          {kind === "spot"
-            ? mainBeamPlanes.map((p) => (
-                <mesh
-                  key={`plane-${p.angle}`}
-                  position={[0, -beamLength / 2, 0]}
-                  rotation={[0, p.angle, 0]}
-                >
-                  <planeGeometry args={[2 * maxRadius, beamLength]} />
-                  <primitive object={p.mat} attach="material" />
-                </mesh>
-              ))
-            : null}
-          {/* Disc cross-sections paired with the planes — these
+              {kind === "spot"
+                ? mainBeamPlanes.map((p) => (
+                    <mesh
+                      key={`plane-${p.angle}`}
+                      position={[0, -beamLength / 2, 0]}
+                      rotation={[0, p.angle, 0]}
+                    >
+                      <planeGeometry args={[2 * maxRadius, beamLength]} />
+                      <primitive object={p.mat} attach="material" />
+                    </mesh>
+                  ))
+                : null}
+              {/* Disc cross-sections paired with the planes — these
               carry the gobo's actual 2D pattern (planes only see
               chords). They mostly show when the camera isn't
               perpendicular to the beam axis. */}
-          {kind === "spot"
-            ? mainBeamDiscs.map((d) => (
-                <mesh
-                  key={`disc-${d.depth}`}
-                  position={[0, -d.depth, 0]}
-                  rotation={[-Math.PI / 2, 0, 0]}
-                >
-                  <circleGeometry args={[d.radius, 48]} />
-                  <primitive object={d.mat} attach="material" />
-                </mesh>
-              ))
-            : null}
-          {kind === "spot" && prismActive
-            ? Array.from({ length: prismFacets }).flatMap((_, i, arr) => {
-                if (i === 0) return [];
-                const angle = ((i - 1) / (arr.length - 1)) * Math.PI * 2;
-                const splay = prismSplayDeg * THREE.MathUtils.DEG2RAD;
-                const rx = Math.sin(angle) * splay;
-                const rz = Math.cos(angle) * splay;
-                return [
-                  <group key={`prism-${angle}`} rotation={[rx, 0, rz]}>
-                    {prismBeamPlanes.map((p) => (
-                      <mesh
-                        key={`prism-plane-${p.angle}`}
-                        position={[0, -beamLength / 2, 0]}
-                        rotation={[0, p.angle, 0]}
-                      >
-                        <planeGeometry args={[2 * maxRadius * 0.55, beamLength]} />
-                        <primitive object={p.mat} attach="material" />
-                      </mesh>
-                    ))}
-                    {prismBeamDiscs.map((d) => (
-                      <mesh
-                        key={`prism-disc-${d.depth}`}
-                        position={[0, -d.depth, 0]}
-                        rotation={[-Math.PI / 2, 0, 0]}
-                      >
-                        <circleGeometry args={[d.radius, 32]} />
-                        <primitive object={d.mat} attach="material" />
-                      </mesh>
-                    ))}
-                  </group>,
-                ];
-              })
-            : null}
+              {kind === "spot"
+                ? mainBeamDiscs.map((d) => (
+                    <mesh
+                      key={`disc-${d.depth}`}
+                      position={[0, -d.depth, 0]}
+                      rotation={[-Math.PI / 2, 0, 0]}
+                    >
+                      <circleGeometry args={[d.radius, 48]} />
+                      <primitive object={d.mat} attach="material" />
+                    </mesh>
+                  ))
+                : null}
+              {kind === "spot" && prismActive
+                ? Array.from({ length: prismFacets }).flatMap((_, i, arr) => {
+                    if (i === 0) return [];
+                    const angle = ((i - 1) / (arr.length - 1)) * Math.PI * 2;
+                    const splay = prismSplayDeg * THREE.MathUtils.DEG2RAD;
+                    const rx = Math.sin(angle) * splay;
+                    const rz = Math.cos(angle) * splay;
+                    return [
+                      <group key={`prism-${angle}`} rotation={[rx, 0, rz]}>
+                        {prismBeamPlanes.map((p) => (
+                          <mesh
+                            key={`prism-plane-${p.angle}`}
+                            position={[0, -beamLength / 2, 0]}
+                            rotation={[0, p.angle, 0]}
+                          >
+                            <planeGeometry args={[2 * maxRadius * 0.55, beamLength]} />
+                            <primitive object={p.mat} attach="material" />
+                          </mesh>
+                        ))}
+                        {prismBeamDiscs.map((d) => (
+                          <mesh
+                            key={`prism-disc-${d.depth}`}
+                            position={[0, -d.depth, 0]}
+                            rotation={[-Math.PI / 2, 0, 0]}
+                          >
+                            <circleGeometry args={[d.radius, 32]} />
+                            <primitive object={d.mat} attach="material" />
+                          </mesh>
+                        ))}
+                      </group>,
+                    ];
+                  })
+                : null}
 
-          {/* Real spotLight illuminating geometry. castShadow is
+              {/* Real spotLight illuminating geometry. castShadow is
               enabled ONLY for fixtures that need gobo projection —
               each shadow-casting spotLight reserves a fragment
               texture unit, and the GPU caps that at 16. Wash /
               par fixtures keep castShadow=false so the shader
               compiles cleanly even with 30+ lights in the scene. */}
-          <spotLight
-            ref={lightRef}
-            position={[0, 0, 0]}
-            angle={0.3}
-            penumbra={0.4}
-            intensity={0}
-            distance={beamLength * 1.2}
-            decay={1.4}
-            castShadow={isSpot}
-            shadow-mapSize-width={256}
-            shadow-mapSize-height={256}
-          />
-          {/* Target sits in the same local space as the light, 1m
+              <spotLight
+                ref={lightRef}
+                position={[0, 0, 0]}
+                angle={0.3}
+                penumbra={0.4}
+                intensity={0}
+                distance={beamLength * 1.2}
+                decay={1.4}
+                castShadow={isSpot}
+                shadow-mapSize-width={256}
+                shadow-mapSize-height={256}
+              />
+              {/* Target sits in the same local space as the light, 1m
               "below" along the tilt-group's -Y. Because it's a
               real scene graph child, its matrixWorld actually
               updates when pan/tilt rotate, so the shadow camera
               looks where the fixture is aimed instead of always
               at world origin. */}
-          <primitive object={targetObj} position={[0, -1, 0]} />
-        </group>
+              <primitive object={targetObj} position={[0, -1, 0]} />
+            </group>
           </group>
         </group>
       </group>
@@ -898,7 +874,6 @@ export function Fixture3D({
         <sphereGeometry args={[0.05, 12, 12]} />
         <meshBasicMaterial color="#3a3a3a" toneMapped={false} />
       </mesh>
-
 
       {rigHeight > 0 ? (
         <mesh position={[0, rigHeight / 2, 0]}>
@@ -929,16 +904,7 @@ function beamHalfAngleRad(
   // Defaults by kind. Spots = small-format beam-class (2-8°);
   // washes = wide ambient bath (25-55°).
   if (kind === "spot") {
-    return THREE.MathUtils.lerp(
-      2 * THREE.MathUtils.DEG2RAD,
-      8 * THREE.MathUtils.DEG2RAD,
-      zoom,
-    );
+    return THREE.MathUtils.lerp(2 * THREE.MathUtils.DEG2RAD, 8 * THREE.MathUtils.DEG2RAD, zoom);
   }
-  return THREE.MathUtils.lerp(
-    25 * THREE.MathUtils.DEG2RAD,
-    55 * THREE.MathUtils.DEG2RAD,
-    zoom,
-  );
+  return THREE.MathUtils.lerp(25 * THREE.MathUtils.DEG2RAD, 55 * THREE.MathUtils.DEG2RAD, zoom);
 }
-

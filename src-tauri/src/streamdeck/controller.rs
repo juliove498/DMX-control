@@ -24,9 +24,7 @@ use crate::engine::loop_playback::SharedLoopPlayback;
 use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
 use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::EngineState;
-use crate::show::button_bindings::{
-    ButtonAction, ButtonActiveMode, ButtonIcon, StreamDeckBinding,
-};
+use crate::show::button_bindings::{ButtonAction, ButtonActiveMode, ButtonIcon, StreamDeckBinding};
 use crate::show::ShowState;
 use crate::streamdeck::render::{KeyVisual, RenderCache, TileKind};
 use crate::streamdeck::StreamDeckDeviceInfo;
@@ -244,12 +242,7 @@ pub fn start(
     })
 }
 
-fn run_worker(
-    device: StreamDeck,
-    key_count: usize,
-    handles: SdHandles,
-    shutdown: Arc<AtomicBool>,
-) {
+fn run_worker(device: StreamDeck, key_count: usize, handles: SdHandles, shutdown: Arc<AtomicBool>) {
     let mut cache = RenderCache::default();
     let mut last_button_state = vec![false; key_count];
 
@@ -317,7 +310,7 @@ fn run_worker(
     let _ = device.reset();
 }
 
-fn process_button_changes(state: &[bool], last_state: &mut Vec<bool>, handles: &SdHandles) {
+fn process_button_changes(state: &[bool], last_state: &mut [bool], handles: &SdHandles) {
     // The crate gives us the full state vector each event — we have to
     // diff to detect transitions. Press = false→true, release = true→false.
     let len = state.len().min(last_state.len());
@@ -391,9 +384,7 @@ fn is_action_active(action: &ButtonAction, handles: &SdHandles) -> bool {
         ButtonAction::Blackout => handles.show.read().show.globals.blackout.active,
         ButtonAction::Blind => handles.blind_held.load(Ordering::Relaxed),
         ButtonAction::Tap => false,
-        ButtonAction::ToggleOverallBpm => {
-            handles.show.read().show.globals.overall_bpm_enabled
-        }
+        ButtonAction::ToggleOverallBpm => handles.show.read().show.globals.overall_bpm_enabled,
         ButtonAction::BumpActiveChaserBpm { .. } => false,
         ButtonAction::StartLoopGroup { id } => handles
             .loops
@@ -580,21 +571,13 @@ fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
             }
         }
         ButtonAction::StopLoopGroup => {
-            crate::commands::stop_loop_group_impl(
-                &handles.app,
-                &handles.scenes,
-                &handles.loops,
-            );
+            crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops);
         }
         _ => (),
     }
 }
 
-fn compute_targets(
-    handles: &SdHandles,
-    key_count: usize,
-    animation_phase: u32,
-) -> Vec<KeyVisual> {
+fn compute_targets(handles: &SdHandles, key_count: usize, animation_phase: u32) -> Vec<KeyVisual> {
     let mut out = vec![KeyVisual::Empty; key_count];
     let bindings = resolve_bindings(handles);
     let active_slots = handles.chasers.lock().active_slot_outputs();
@@ -673,8 +656,9 @@ fn tile_kind_for(icon: ButtonIcon, action: &ButtonAction) -> TileKind {
             ButtonAction::Blind => TileKind::Blind,
             ButtonAction::Tap => TileKind::Tap,
             ButtonAction::ToggleOverallBpm => TileKind::BpmToggle,
-            ButtonAction::ToggleMovement { .. }
-            | ButtonAction::ToggleMovementByIndex { .. } => TileKind::Movement,
+            ButtonAction::ToggleMovement { .. } | ButtonAction::ToggleMovementByIndex { .. } => {
+                TileKind::Movement
+            }
             ButtonAction::RecallScene { .. } | ButtonAction::RecallSceneByIndex { .. } => {
                 TileKind::Scene
             }
@@ -711,7 +695,10 @@ fn diff_and_push(
         // toggles — not on every animation tick of an already-active
         // tile.
         if let (
-            Some(KeyVisual::Tile { active: prev_active, .. }),
+            Some(KeyVisual::Tile {
+                active: prev_active,
+                ..
+            }),
             KeyVisual::Tile { active, kind, .. },
         ) = (last.get(key), visual)
         {
@@ -733,9 +720,15 @@ fn diff_and_push(
         // spread across the image so a constant background change is
         // visible without paying for a full sha256.
         let fingerprint = if let DynamicImage::ImageRgb8(buf) = &img {
-            let s = KEY_IMAGE_SIZE_FOR_FINGERPRINT as u32;
+            let s = KEY_IMAGE_SIZE_FOR_FINGERPRINT;
             let mut acc: u32 = 0;
-            for (px, py) in [(s/4, s/4), (s/2, s/2), (3*s/4, 3*s/4), (s/2, s/4), (s/4, 3*s/4)] {
+            for (px, py) in [
+                (s / 4, s / 4),
+                (s / 2, s / 2),
+                (3 * s / 4, 3 * s / 4),
+                (s / 2, s / 4),
+                (s / 4, 3 * s / 4),
+            ] {
                 let p = buf.get_pixel(px, py).0;
                 acc = acc.wrapping_mul(131).wrapping_add(p[0] as u32);
                 acc = acc.wrapping_mul(131).wrapping_add(p[1] as u32);
@@ -748,7 +741,11 @@ fn diff_and_push(
         match device.set_button_image(key as u8, img) {
             Ok(_) => {
                 pushed += 1;
-                tracing::debug!(key, fingerprint = format!("{:08x}", fingerprint), "pushed key");
+                tracing::debug!(
+                    key,
+                    fingerprint = format!("{:08x}", fingerprint),
+                    "pushed key"
+                );
             }
             Err(e) => {
                 errored += 1;
@@ -819,4 +816,3 @@ fn slots_to_rgb(slots: Option<&[SlotOutput]>) -> [(u8, u8, u8); 8] {
     }
     out
 }
-

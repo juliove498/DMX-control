@@ -37,15 +37,27 @@ pub enum ButtonAction {
     None,
     /// Toggle the chaser with the given id. No-op if the id no
     /// longer exists in the show.
-    ToggleChaser { id: String },
+    ToggleChaser {
+        id: String,
+    },
     /// Toggle the n-th chaser (0-based). Used by the factory defaults
     /// so swapping a chaser preserves the binding.
-    ToggleChaserByIndex { index: u8 },
-    ToggleMovement { id: String },
-    ToggleMovementByIndex { index: u8 },
+    ToggleChaserByIndex {
+        index: u8,
+    },
+    ToggleMovement {
+        id: String,
+    },
+    ToggleMovementByIndex {
+        index: u8,
+    },
     /// Recall a scene; pressing the active scene's button releases it.
-    RecallScene { id: String },
-    RecallSceneByIndex { index: u8 },
+    RecallScene {
+        id: String,
+    },
+    RecallSceneByIndex {
+        index: u8,
+    },
     /// Toggle blackout, blind (momentary), tap-tempo, overall BPM
     /// override. These are global and have no id.
     Blackout,
@@ -54,12 +66,18 @@ pub enum ButtonAction {
     ToggleOverallBpm,
     /// Nudge the currently-active chaser's BPM by `delta` (negative
     /// values decrease). Mirrors the Launchpad CC up/down arrows.
-    BumpActiveChaserBpm { delta: f32 },
+    BumpActiveChaserBpm {
+        delta: f32,
+    },
     /// Start a sequence loop group (a playlist of scenes that cycles).
     /// Stop the playing group if a group is active; pressing the
     /// active group's button stops it.
-    StartLoopGroup { id: String },
-    StartLoopGroupByIndex { index: u8 },
+    StartLoopGroup {
+        id: String,
+    },
+    StartLoopGroupByIndex {
+        index: u8,
+    },
     StopLoopGroup,
 }
 
@@ -208,16 +226,34 @@ pub const DEFAULT_LP_TAP_NOTE: u8 = 39;
 pub const DEFAULT_LP_BPM_TOGGLE_NOTE: u8 = 49;
 
 const LP_CHASER_PALETTE: [(u8, u8); 8] = [
-    (7, 5), (11, 9), (15, 13), (19, 17),
-    (39, 37), (43, 41), (47, 45), (55, 53),
+    (7, 5),
+    (11, 9),
+    (15, 13),
+    (19, 17),
+    (39, 37),
+    (43, 41),
+    (47, 45),
+    (55, 53),
 ];
 const LP_MOVEMENT_PALETTE: [(u8, u8); 8] = [
-    (96, 95), (82, 81), (85, 84), (74, 73),
-    (34, 33), (50, 49), (57, 56), (100, 99),
+    (96, 95),
+    (82, 81),
+    (85, 84),
+    (74, 73),
+    (34, 33),
+    (50, 49),
+    (57, 56),
+    (100, 99),
 ];
 const LP_SCENE_PALETTE: [(u8, u8); 8] = [
-    (1, 3), (43, 41), (47, 45), (78, 79),
-    (44, 117), (115, 116), (113, 114), (60, 61),
+    (1, 3),
+    (43, 41),
+    (47, 45),
+    (78, 79),
+    (44, 117),
+    (115, 116),
+    (113, 114),
+    (60, 61),
 ];
 const LP_BLACKOUT_PALETTE: (u8, u8) = (7, 5);
 const LP_BLIND_PALETTE: (u8, u8) = (1, 3);
@@ -234,27 +270,32 @@ pub const DEFAULT_SD_SCENE_KEYS: [u8; 3] = [10, 11, 12];
 pub const DEFAULT_SD_BLIND_KEY: u8 = 13;
 pub const DEFAULT_SD_BLACKOUT_KEY: u8 = 14;
 
-const SD_CHASER_PALETTE: [((u8, u8, u8), (u8, u8, u8)); 4] = [
+/// `(idle_rgb, active_rgb)` pair used across every Stream Deck palette
+/// constant. Aliased so clippy's `type_complexity` lint stops flagging
+/// the nested tuple literal at every palette site.
+type SdColorPair = ((u8, u8, u8), (u8, u8, u8));
+
+const SD_CHASER_PALETTE: [SdColorPair; 4] = [
     ((50, 0, 0), (255, 30, 30)),
     ((50, 25, 0), (255, 130, 30)),
     ((50, 50, 0), (255, 230, 30)),
     ((0, 50, 0), (30, 200, 30)),
 ];
-const SD_MOVEMENT_PALETTE: [((u8, u8, u8), (u8, u8, u8)); 4] = [
+const SD_MOVEMENT_PALETTE: [SdColorPair; 4] = [
     ((45, 10, 30), (255, 90, 170)),
     ((25, 0, 40), (160, 50, 230)),
     ((45, 30, 0), (255, 180, 50)),
     ((30, 45, 0), (180, 255, 50)),
 ];
-const SD_SCENE_PALETTE: [((u8, u8, u8), (u8, u8, u8)); 3] = [
+const SD_SCENE_PALETTE: [SdColorPair; 3] = [
     ((50, 50, 50), (235, 235, 245)),
     ((0, 30, 50), (50, 150, 255)),
     ((30, 0, 50), (180, 80, 255)),
 ];
-const SD_BLACKOUT_COLORS: ((u8, u8, u8), (u8, u8, u8)) = ((40, 0, 0), (255, 40, 40));
-const SD_BLIND_COLORS: ((u8, u8, u8), (u8, u8, u8)) = ((40, 40, 40), (235, 235, 235));
-const SD_TAP_COLORS: ((u8, u8, u8), (u8, u8, u8)) = ((10, 40, 50), (40, 220, 255));
-const SD_BPM_TOGGLE_COLORS: ((u8, u8, u8), (u8, u8, u8)) = ((40, 10, 30), (255, 50, 180));
+const SD_BLACKOUT_COLORS: SdColorPair = ((40, 0, 0), (255, 40, 40));
+const SD_BLIND_COLORS: SdColorPair = ((40, 40, 40), (235, 235, 235));
+const SD_TAP_COLORS: SdColorPair = ((10, 40, 50), (40, 220, 255));
+const SD_BPM_TOGGLE_COLORS: SdColorPair = ((40, 10, 30), (255, 50, 180));
 
 /// Build the factory Launchpad layout. Used by the "Load defaults"
 /// UI action; never read at runtime when `custom_enabled = false`

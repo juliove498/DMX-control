@@ -43,7 +43,13 @@ struct ActiveState {
 }
 
 impl LoopGroupPlayback {
-    pub fn start(&mut self, group_id: String, scene_ids: Vec<String>, first_dwell_ms: u32, now: Instant) {
+    pub fn start(
+        &mut self,
+        group_id: String,
+        scene_ids: Vec<String>,
+        first_dwell_ms: u32,
+        now: Instant,
+    ) {
         if scene_ids.is_empty() {
             self.state = None;
             return;
@@ -130,7 +136,12 @@ mod tests {
     fn pop_returns_next_after_dwell() {
         let mut p = LoopGroupPlayback::default();
         let t0 = Instant::now();
-        p.start("g".into(), vec!["a".into(), "b".into(), "c".into()], 100, t0);
+        p.start(
+            "g".into(),
+            vec!["a".into(), "b".into(), "c".into()],
+            100,
+            t0,
+        );
         assert_eq!(p.current_scene_id(), Some("a"));
         // Before dwell expires: no advance.
         assert_eq!(p.pop_if_ready(t0 + Duration::from_millis(50)), None);

@@ -76,7 +76,9 @@ export function StreamDeckConfigView() {
         </div>
       </header>
 
-      <p className="hint" data-doc="streamdeck-intro">{t("streamdeck.intro")}</p>
+      <p className="hint" data-doc="streamdeck-intro">
+        {t("streamdeck.intro")}
+      </p>
 
       {error ? (
         <output className="lib-error" aria-live="polite">

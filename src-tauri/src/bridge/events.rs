@@ -54,6 +54,12 @@ pub struct EventBus {
     cached_stats: Arc<Mutex<Option<EngineStats>>>,
 }
 
+impl Default for EventBus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventBus {
     pub fn new() -> Self {
         let (tx, _) = broadcast::channel(CHANNEL_CAPACITY);

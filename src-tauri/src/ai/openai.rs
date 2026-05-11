@@ -23,7 +23,11 @@ pub async fn generate_scene(
     fixtures: &[ContextFixture],
     seed: Option<&DraftScene>,
 ) -> Result<DraftScene, String> {
-    let model = if model.is_empty() { DEFAULT_MODEL } else { model };
+    let model = if model.is_empty() {
+        DEFAULT_MODEL
+    } else {
+        model
+    };
     let body = build_request_body(model, user_prompt, step_count, fixtures, seed);
 
     let client = reqwest::Client::new();
@@ -50,7 +54,11 @@ pub async fn generate_scene(
 
 /// Cheap probe: ask the model to echo "ok" with a 1-token cap.
 pub async fn test_connection(api_key: &str, model: &str) -> Result<String, String> {
-    let model = if model.is_empty() { DEFAULT_MODEL } else { model };
+    let model = if model.is_empty() {
+        DEFAULT_MODEL
+    } else {
+        model
+    };
     let body = json!({
         "model": model,
         "max_tokens": 1,
@@ -83,12 +91,8 @@ fn build_request_body(
     fixtures: &[ContextFixture],
     seed: Option<&DraftScene>,
 ) -> Value {
-    let user_message = crate::ai::anthropic::build_user_message(
-        user_prompt,
-        step_count,
-        fixtures,
-        seed,
-    );
+    let user_message =
+        crate::ai::anthropic::build_user_message(user_prompt, step_count, fixtures, seed);
 
     json!({
         "model": model,

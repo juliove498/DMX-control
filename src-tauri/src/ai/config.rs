@@ -22,16 +22,12 @@ use ts_rs::TS;
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export, export_to = "../bindings/")]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum AiProvider {
+    #[default]
     None,
     Anthropic,
     Openai,
-}
-
-impl Default for AiProvider {
-    fn default() -> Self {
-        AiProvider::None
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, Default)]

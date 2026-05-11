@@ -92,33 +92,34 @@ function makeDefaultShape(type: Shape["type"]): Shape {
   }
 }
 
-const SINE_PRESETS: Array<{ labelKey: keyof Translation; pan: WaveFunction; tilt: WaveFunction }> = [
-  {
-    labelKey: "movement.presetLabel.circle",
-    pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
-    tilt: { waveform: "cosine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
-  },
-  {
-    labelKey: "movement.presetLabel.figureEight",
-    pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
-    tilt: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
-  },
-  {
-    labelKey: "movement.presetLabel.lissajous32",
-    pan: { waveform: "sine", frequency: 3, phase_shift: 0, amplitude: 1, offset: 0 },
-    tilt: { waveform: "sine", frequency: 2, phase_shift: 0.25, amplitude: 1, offset: 0 },
-  },
-  {
-    labelKey: "movement.presetLabel.lissajous54",
-    pan: { waveform: "sine", frequency: 5, phase_shift: 0, amplitude: 1, offset: 0 },
-    tilt: { waveform: "sine", frequency: 4, phase_shift: 0.125, amplitude: 1, offset: 0 },
-  },
-  {
-    labelKey: "movement.presetLabel.wavePan",
-    pan: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
-    tilt: { waveform: "sine", frequency: 0, phase_shift: 0, amplitude: 0, offset: 0 },
-  },
-];
+const SINE_PRESETS: Array<{ labelKey: keyof Translation; pan: WaveFunction; tilt: WaveFunction }> =
+  [
+    {
+      labelKey: "movement.presetLabel.circle",
+      pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
+      tilt: { waveform: "cosine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
+    },
+    {
+      labelKey: "movement.presetLabel.figureEight",
+      pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
+      tilt: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
+    },
+    {
+      labelKey: "movement.presetLabel.lissajous32",
+      pan: { waveform: "sine", frequency: 3, phase_shift: 0, amplitude: 1, offset: 0 },
+      tilt: { waveform: "sine", frequency: 2, phase_shift: 0.25, amplitude: 1, offset: 0 },
+    },
+    {
+      labelKey: "movement.presetLabel.lissajous54",
+      pan: { waveform: "sine", frequency: 5, phase_shift: 0, amplitude: 1, offset: 0 },
+      tilt: { waveform: "sine", frequency: 4, phase_shift: 0.125, amplitude: 1, offset: 0 },
+    },
+    {
+      labelKey: "movement.presetLabel.wavePan",
+      pan: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
+      tilt: { waveform: "sine", frequency: 0, phase_shift: 0, amplitude: 0, offset: 0 },
+    },
+  ];
 
 const SUBDIVISION_BEATS: Record<Subdivision, number> = {
   quarter: 0.25,

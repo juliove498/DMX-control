@@ -340,9 +340,7 @@ fn is_action_active(action: &ButtonAction, handles: &LpHandles) -> bool {
         ButtonAction::Blackout => handles.show.read().show.globals.blackout.active,
         ButtonAction::Blind => handles.blind_held.load(Ordering::Relaxed),
         ButtonAction::Tap => false,
-        ButtonAction::ToggleOverallBpm => {
-            handles.show.read().show.globals.overall_bpm_enabled
-        }
+        ButtonAction::ToggleOverallBpm => handles.show.read().show.globals.overall_bpm_enabled,
         ButtonAction::BumpActiveChaserBpm { .. } => false,
         ButtonAction::StartLoopGroup { id } => handles
             .loops
@@ -544,11 +542,7 @@ fn dispatch_action(action: ButtonAction, vel: u8, handles: &LpHandles) {
             }
         }
         ButtonAction::StopLoopGroup => {
-            crate::commands::stop_loop_group_impl(
-                &handles.app,
-                &handles.scenes,
-                &handles.loops,
-            );
+            crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops);
         }
         // *ByIndex were resolved upstream.
         _ => (),
@@ -660,9 +654,9 @@ fn diff_and_push(midi: &SharedMidi, last: &LedTargets, target: &LedTargets) {
             push_cc_palette(midi, cc, next);
         }
     }
-    for i in 0..8 {
+    for (i, &cc) in TOP_ROW_CCS.iter().enumerate() {
         if target.top_row[i] != last.top_row[i] {
-            push_top_rgb(midi, TOP_ROW_CCS[i], target.top_row[i]);
+            push_top_rgb(midi, cc, target.top_row[i]);
         }
     }
 }
@@ -718,8 +712,8 @@ fn push_all(midi: &SharedMidi, target: &LedTargets) {
     for (&cc, &state) in &target.ccs {
         push_cc_palette(midi, cc, state);
     }
-    for i in 0..8 {
-        push_top_rgb(midi, TOP_ROW_CCS[i], target.top_row[i]);
+    for (i, &cc) in TOP_ROW_CCS.iter().enumerate() {
+        push_top_rgb(midi, cc, target.top_row[i]);
     }
 }
 
@@ -772,7 +766,6 @@ fn slot_output_to_rgb(slot: &SlotOutput) -> TopRowRgb {
         (None, None) => TopRowRgb::default(),
     }
 }
-
 
 #[cfg(test)]
 mod tests {

@@ -76,9 +76,7 @@ function StageFixture({
   // Tooltip lists the labels so the user can see *what* they touched
   // without opening the per-channel editor. Falls back to the bare
   // label when nothing is touched.
-  const tooltip = isTouched
-    ? `${labelText} · touched: ${touchedLabels.join(", ")}`
-    : labelText;
+  const tooltip = isTouched ? `${labelText} · touched: ${touchedLabels.join(", ")}` : labelText;
   return (
     <button
       ref={setNodeRef}
@@ -119,11 +117,7 @@ function StageFixture({
         // Re-keying on flashStamp restarts the CSS keyframe each time
         // the operator presses Localizar — even on already-touched
         // fixtures, so the pulse is felt as a fresh ping.
-        <span
-          key={`halo-${flashStamp}`}
-          className="touched-halo"
-          aria-hidden="true"
-        />
+        <span key={`halo-${flashStamp}`} className="touched-halo" aria-hidden="true" />
       ) : null}
       {isTouched ? (
         // The badge is rendered as a span (the parent is already a
@@ -131,6 +125,7 @@ function StageFixture({
         // with a click handler + stopPropagation. Hover swaps the dot
         // for a × so the un-touch affordance is discoverable without
         // adding a second visible chrome element.
+        // biome-ignore lint/a11y/useSemanticElements: <button> can't nest inside another <button>.
         <span
           role="button"
           tabIndex={0}
@@ -959,9 +954,7 @@ function StageFxBar({
             type="button"
             className={`stage-fx-scenes-btn${scenePopupOpen ? " open" : ""}`}
             onClick={onToggleScenePopup}
-            title={
-              scenePopupOpen ? t("stage.fxbar.closeScenes") : t("stage.fxbar.openScenes")
-            }
+            title={scenePopupOpen ? t("stage.fxbar.closeScenes") : t("stage.fxbar.openScenes")}
           >
             {scenePopupOpen ? t("stage.fxbar.scenesBtnClose") : t("stage.fxbar.scenesBtnOpen")}
           </button>
@@ -1287,7 +1280,12 @@ function SceneQuickPanel({
         <span className="sqp-meta">
           {t("stage.sqp.metaFmt", { scenes: scenes.length, touched: touched.length })}
         </span>
-        <button type="button" className="sqp-close" onClick={onClose} aria-label={t("common.close")}>
+        <button
+          type="button"
+          className="sqp-close"
+          onClick={onClose}
+          aria-label={t("common.close")}
+        >
           ×
         </button>
       </div>
@@ -1528,9 +1526,7 @@ function SceneQuickPanel({
             className={`sqp-btn ghost${touchedHelperOn ? " toggled" : ""}`}
             onClick={onToggleTouchedHelper}
             title={
-              touchedHelperOn
-                ? t("stage.sqp.touchedHelperOn")
-                : t("stage.sqp.touchedHelperOff")
+              touchedHelperOn ? t("stage.sqp.touchedHelperOn") : t("stage.sqp.touchedHelperOff")
             }
             aria-pressed={touchedHelperOn}
           >
@@ -1622,9 +1618,7 @@ function FixtureContextMenu({
   return (
     <div ref={ref} className="fixture-context-menu" style={{ left, top }} role="menu">
       <div className="fcm-header">
-        {multi
-          ? t("stage.menu.fixturePlural", { count })
-          : t("stage.menu.fixtureSingular")}
+        {multi ? t("stage.menu.fixturePlural", { count }) : t("stage.menu.fixtureSingular")}
       </div>
       <button type="button" className="fcm-item" onClick={onCenterPanTilt}>
         {t("stage.menu.centerPanTilt")}
@@ -2296,9 +2290,7 @@ export function StageView() {
         <h2>{t("stage.title")}</h2>
         <span className="meta">
           {t("stage.meta", { count: show.fixtures.length, grid: GRID_SIZE })}
-          {selectedIds.size > 0
-            ? t("stage.metaSelected", { count: selectedIds.size })
-            : ""}
+          {selectedIds.size > 0 ? t("stage.metaSelected", { count: selectedIds.size }) : ""}
         </span>
       </header>
       <div className="stage-and-panel">
@@ -2340,7 +2332,7 @@ export function StageView() {
                   // helper enabled. Empty array means "no halo, no
                   // badge, plain tooltip".
                   scenePopupOpen && touchedHelperOn
-                    ? touchedLabelsByFixture[f.id] ?? EMPTY_LABELS
+                    ? (touchedLabelsByFixture[f.id] ?? EMPTY_LABELS)
                     : EMPTY_LABELS
                 }
                 flashStamp={flashStamp}

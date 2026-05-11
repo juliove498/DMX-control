@@ -64,16 +64,12 @@ export function ButtonsConfigView() {
   // ---- Master ------------------------------------------------------------
   const setMasterFixtures = (next: MasterFixture[]) =>
     updateGlobals({ ...cfg, master: { ...cfg.master, fixtures: next } });
-  const isMasterAssigned = (id: string) =>
-    cfg.master.fixtures.some((f) => f.fixture_id === id);
+  const isMasterAssigned = (id: string) => cfg.master.fixtures.some((f) => f.fixture_id === id);
   const toggleMasterFixture = (id: string) => {
     if (isMasterAssigned(id)) {
       setMasterFixtures(cfg.master.fixtures.filter((f) => f.fixture_id !== id));
     } else {
-      setMasterFixtures([
-        ...cfg.master.fixtures,
-        { fixture_id: id, channels_to_scale: [] },
-      ]);
+      setMasterFixtures([...cfg.master.fixtures, { fixture_id: id, channels_to_scale: [] }]);
     }
   };
   const toggleMasterChannel = (fixtureId: string, role: string) => {
@@ -88,18 +84,14 @@ export function ButtonsConfigView() {
     );
   };
   // ---- Blackout ----------------------------------------------------------
-  const isBlackoutAssigned = (id: string) =>
-    cfg.blackout.fixtures.some((f) => f.fixture_id === id);
+  const isBlackoutAssigned = (id: string) => cfg.blackout.fixtures.some((f) => f.fixture_id === id);
   const setBlackoutFixtures = (next: BlackoutFixture[]) =>
     updateGlobals({ ...cfg, blackout: { ...cfg.blackout, fixtures: next } });
   const toggleBlackoutFixture = (id: string) => {
     if (isBlackoutAssigned(id)) {
       setBlackoutFixtures(cfg.blackout.fixtures.filter((f) => f.fixture_id !== id));
     } else {
-      setBlackoutFixtures([
-        ...cfg.blackout.fixtures,
-        { fixture_id: id, channels_to_zero: [] },
-      ]);
+      setBlackoutFixtures([...cfg.blackout.fixtures, { fixture_id: id, channels_to_zero: [] }]);
     }
   };
   const toggleBlackoutChannel = (fixtureId: string, role: string) => {
@@ -121,10 +113,7 @@ export function ButtonsConfigView() {
     if (isBlindAssigned(id)) {
       setBlindFixtures(cfg.blind.fixtures.filter((f) => f.fixture_id !== id));
     } else {
-      setBlindFixtures([
-        ...cfg.blind.fixtures,
-        { fixture_id: id, channels_at_full: [] },
-      ]);
+      setBlindFixtures([...cfg.blind.fixtures, { fixture_id: id, channels_at_full: [] }]);
     }
   };
   const toggleBlindChannel = (fixtureId: string, role: string) => {
@@ -302,10 +291,7 @@ function FixtureGroupSection({
   fadeControls?: React.ReactNode;
 }) {
   const t = useT();
-  const assignedCount = fixtures.reduce(
-    (acc, f) => (assignmentForId(f.id) ? acc + 1 : acc),
-    0,
-  );
+  const assignedCount = fixtures.reduce((acc, f) => (assignmentForId(f.id) ? acc + 1 : acc), 0);
   const isAuto = assignedCount === 0;
   return (
     <section className="config-section">

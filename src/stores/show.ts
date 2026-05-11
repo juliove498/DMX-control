@@ -1,14 +1,14 @@
+import type { AiAvailableModels } from "@bindings/AiAvailableModels";
+import type { AiConfig } from "@bindings/AiConfig";
 import type { AmbientChaser } from "@bindings/AmbientChaser";
 import type { ButtonBindings } from "@bindings/ButtonBindings";
 import type { D2xxDeviceInfo } from "@bindings/D2xxDeviceInfo";
+import type { DraftScene } from "@bindings/DraftScene";
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
 import type { GlobalsConfig } from "@bindings/GlobalsConfig";
 import type { LoopGroupActiveChange } from "@bindings/LoopGroupActiveChange";
 import type { MovementGenerator } from "@bindings/MovementGenerator";
-import type { AiAvailableModels } from "@bindings/AiAvailableModels";
-import type { AiConfig } from "@bindings/AiConfig";
-import type { DraftScene } from "@bindings/DraftScene";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { PatchReport } from "@bindings/PatchReport";
 import type { ProgrammerStatus } from "@bindings/ProgrammerStatus";
@@ -129,9 +129,7 @@ interface ShowStoreState {
   disconnectMidi: () => Promise<void>;
   sendMidiRaw: (bytes: number[]) => Promise<void>;
 
-  listStreamDeckDevices: () => Promise<
-    { serial: string; kind: string; key_count: number }[]
-  >;
+  listStreamDeckDevices: () => Promise<{ serial: string; kind: string; key_count: number }[]>;
   connectStreamDeckDevice: (serial?: string) => Promise<void>;
   disconnectStreamDeck: () => Promise<void>;
 
@@ -519,9 +517,7 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   },
 
   async listStreamDeckDevices() {
-    return invoke<{ serial: string; kind: string; key_count: number }[]>(
-      "list_streamdeck_devices",
-    );
+    return invoke<{ serial: string; kind: string; key_count: number }[]>("list_streamdeck_devices");
   },
 
   async connectStreamDeckDevice(serial) {

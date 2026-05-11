@@ -24,13 +24,13 @@ use crate::engine::scene_playback::{shared_scene_playback, SharedScenePlayback};
 use crate::engine::EngineState;
 use crate::midi::hub::{shared_midi, SharedMidi};
 use crate::midi::launchpad::{shared_launchpad, SharedLaunchpad};
-use crate::streamdeck::controller::{shared_streamdeck, SharedStreamDeck};
 use crate::programmer::shared_programmer;
 use crate::show::library::{ensure_seeded, library_dir, load_all};
 use crate::show::session::{
     read_autosave, read_engine_autosave, write_engine_autosave, EngineAutosave, UniverseAutosave,
 };
 use crate::show::{ShowFileV1, ShowState, ShowStateInner};
+use crate::streamdeck::controller::{shared_streamdeck, SharedStreamDeck};
 
 /// Catch any panic before `panic = "abort"` calls `abort()`, dump the
 /// payload + backtrace to a file we can read after the fact, and also

@@ -15,9 +15,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 use crate::commands::{BlindChange, MasterChange, BLIND_EVENT, MASTER_EVENT};
-use crate::engine::EngineState;
-use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
+use crate::engine::scene_playback::SharedScenePlayback;
+use crate::engine::EngineState;
 use crate::globals::GlobalsConfig;
 use crate::programmer::SharedProgrammer;
 use crate::show::ShowState;
@@ -123,7 +123,11 @@ pub fn dispatch(ctx: &Arc<RpcContext>, req: RpcRequest) -> RpcResponse {
             RpcResponse::ok(req.id, serde_json::to_value(scenes).unwrap_or(Value::Null))
         }
         "active_scene_id" => {
-            let id = ctx.scenes_pb.lock().active_scene_id().map(|s| s.to_string());
+            let id = ctx
+                .scenes_pb
+                .lock()
+                .active_scene_id()
+                .map(|s| s.to_string());
             RpcResponse::ok(req.id, json!(id))
         }
         "active_scene_step" => {
@@ -276,7 +280,11 @@ pub struct InitialState {
 pub fn build_initial_state(ctx: &RpcContext) -> InitialState {
     let show = ctx.show.read().show.clone();
     let master = ctx.engine.read().master;
-    let active_scene_id = ctx.scenes_pb.lock().active_scene_id().map(|s| s.to_string());
+    let active_scene_id = ctx
+        .scenes_pb
+        .lock()
+        .active_scene_id()
+        .map(|s| s.to_string());
     let active_scene_step = ctx.scenes_pb.lock().current_step_index().map(|i| i as u32);
     InitialState {
         show: show.clone(),

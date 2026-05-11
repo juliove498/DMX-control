@@ -19,10 +19,10 @@
 //! 3. On shutdown, an `AtomicBool` flips and the loop exits, blanking
 //!    every key on its way out.
 //!
-//! Layout: see [`layout`].
+//! Layout: factory defaults live in [`crate::show::button_bindings`] —
+//! the operator can override every key from the UI.
 
 pub mod controller;
-pub mod layout;
 pub mod render;
 
 use serde::{Deserialize, Serialize};

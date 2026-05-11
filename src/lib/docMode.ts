@@ -10,9 +10,9 @@
 // early when the flag is absent, so the production Tauri build is
 // unaffected and the bundle cost is just the dead-code-eliminable shim.
 
-import type { ShowFileV1 } from "@bindings/ShowFileV1";
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { PatchReport } from "@bindings/PatchReport";
+import type { ShowFileV1 } from "@bindings/ShowFileV1";
 import type { StreamDeckDeviceInfo } from "@bindings/StreamDeckDeviceInfo";
 import type { StreamDeckStatus } from "@bindings/StreamDeckStatus";
 import type { TouchedFixture } from "@bindings/TouchedFixture";
@@ -21,7 +21,14 @@ declare global {
   interface Window {
     __DOC__?: DocBridge;
     __TAURI_INTERNALS__?: unknown;
-    __TAURI_EVENT_PLUGIN_INTERNALS__?: unknown;
+    // `__TAURI_EVENT_PLUGIN_INTERNALS__` is also declared by
+    // `@tauri-apps/plugin-event`'s ambient types as required + same
+    // shape. tsc merges declarations only when modifiers AND type
+    // match exactly, so we mirror their non-optional declaration —
+    // we still installDocStubs() before anything reads it.
+    __TAURI_EVENT_PLUGIN_INTERNALS__: {
+      unregisterListener: (event: string, eventId: number) => void;
+    };
   }
 }
 
@@ -39,8 +46,7 @@ interface DocBridge {
 }
 
 export const isDocMode = (): boolean =>
-  typeof window !== "undefined" &&
-  new URLSearchParams(window.location.search).get("doc") === "1";
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).get("doc") === "1";
 
 export function installDocStubs(): void {
   if (!isDocMode()) return;
@@ -86,7 +92,8 @@ export function installDocStubs(): void {
         return doc.streamDeckStatus;
       // Setters and event-plugin commands: silently no-op.
       default:
-        if (cmd.startsWith("plugin:event|")) return cmd === "plugin:event|listen" ? ++nextCallbackId : null;
+        if (cmd.startsWith("plugin:event|"))
+          return cmd === "plugin:event|listen" ? ++nextCallbackId : null;
         if (!warned.has(cmd)) {
           warned.add(cmd);
           console.debug(`[doc] unmocked invoke: ${cmd}`);
@@ -113,7 +120,7 @@ export function installDocStubs(): void {
   };
 
   window.__TAURI_EVENT_PLUGIN_INTERNALS__ = {
-    unregisterListener: () => {},
+    unregisterListener: (_event: string, _eventId: number) => {},
   };
 
   const bridge: DocBridge = {

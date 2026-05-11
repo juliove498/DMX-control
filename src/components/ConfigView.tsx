@@ -69,9 +69,7 @@ const GROUPS: Array<{ id: string; items: TabMeta[] }> = [
   },
   {
     id: "app",
-    items: [
-      { id: "general", labelKey: "config.tabs.general", hintKey: "config.tabs.generalHint" },
-    ],
+    items: [{ id: "general", labelKey: "config.tabs.general", hintKey: "config.tabs.generalHint" }],
   },
   {
     id: "debug",

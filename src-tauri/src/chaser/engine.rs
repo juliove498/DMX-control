@@ -112,11 +112,7 @@ impl ChaserEngine {
     /// for every enabled chaser, and produce the merged overlay map keyed by
     /// universe. `overall_bpm`, when `Some`, replaces every chaser's
     /// `tempo` for the duration of this tick — see `advance_step`.
-    pub fn tick(
-        &mut self,
-        now: Instant,
-        overall_bpm: Option<f32>,
-    ) -> HashMap<u16, ChannelOverlay> {
+    pub fn tick(&mut self, now: Instant, overall_bpm: Option<f32>) -> HashMap<u16, ChannelOverlay> {
         let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
         for entry in &mut self.entries {
             if !entry.config.enabled {
@@ -144,7 +140,7 @@ fn advance_step(
     // Overall BPM, when active, wins over the chaser's own configured
     // tempo. The *configuration* isn't mutated — disabling the override
     // restores the chaser's previous tempo with no setup needed.
-    let bpm = overall_bpm.unwrap_or_else(|| match config.tempo {
+    let bpm = overall_bpm.unwrap_or(match config.tempo {
         TempoSource::Fixed { bpm } => bpm,
     });
     let step_ms = step_duration_ms(bpm, config.subdivision).max(1.0);
@@ -602,7 +598,7 @@ mod tests {
 
         let t0 = Instant::now();
         engine.tick(t0, None); // step 0 → 255 cached as last_emitted
-                         // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
+                               // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
         let ov_at_transition = engine.tick(t0 + Duration::from_millis(510), None);
         // At t=510 we are 0 ms into the fade → still ~255 (linear curve, t=0).
         assert!(
@@ -651,7 +647,7 @@ mod tests {
 
         let t0 = Instant::now();
         engine.tick(t0, None); // step 0
-                         // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
+                               // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
         let ov = engine.tick(t0 + Duration::from_millis(5_001), None);
         assert_eq!(ov.get(&0).unwrap()[0], Some(255));
     }

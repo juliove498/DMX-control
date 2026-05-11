@@ -143,11 +143,7 @@ export function Audience({ config }: { config: AudienceConfig }) {
           // position.
           localPos.set((sign * shoulderWidth) / 2, 0, armRestZ);
           localPos.applyQuaternion(qRoot);
-          armPivot.set(
-            px + localPos.x,
-            shoulderCY * sc,
-            pz + localPos.z,
-          );
+          armPivot.set(px + localPos.x, shoulderCY * sc, pz + localPos.z);
           // The arm capsule's centre is *armLength/2* below its
           // pivot when hanging. With our combined rotation, that
           // offset is along the rotated -Y axis — apply qFinal to
@@ -165,17 +161,7 @@ export function Audience({ config }: { config: AudienceConfig }) {
       if (armLRef.current) armLRef.current.instanceMatrix.needsUpdate = true;
       if (armRRef.current) armRRef.current.instanceMatrix.needsUpdate = true;
     };
-  }, [
-    count,
-    positions,
-    scales,
-    rotations,
-    phases,
-    armLength,
-    armRestZ,
-    shoulderCY,
-    shoulderWidth,
-  ]);
+  }, [count, positions, scales, rotations, phases, armLength, armRestZ, shoulderCY, shoulderWidth]);
 
   // Set up the static limb matrices (torso, head, legs) on mount and
   // whenever the crowd layout changes. `useEffect` runs after refs

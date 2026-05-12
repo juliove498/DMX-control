@@ -13,6 +13,7 @@ import { PatchView } from "./PatchView";
 import { RemoteBridgeView } from "./RemoteBridgeView";
 import { StreamDeckConfigView } from "./StreamDeckConfigView";
 import { SyncView } from "./SyncView";
+import { VdjConfigView } from "./VdjConfigView";
 
 type ConfigTab =
   | "library"
@@ -25,6 +26,7 @@ type ConfigTab =
   | "ai"
   | "remote"
   | "sync"
+  | "vdj"
   | "general"
   | "direct";
 
@@ -65,6 +67,7 @@ const GROUPS: Array<{ id: string; items: TabMeta[] }> = [
       { id: "ai", labelKey: "config.tabs.ai", hintKey: "config.tabs.aiHint" },
       { id: "remote", labelKey: "config.tabs.remote", hintKey: "config.tabs.remoteHint" },
       { id: "sync", labelKey: "config.tabs.sync", hintKey: "config.tabs.syncHint" },
+      { id: "vdj", labelKey: "config.tabs.vdj", hintKey: "config.tabs.vdjHint" },
     ],
   },
   {
@@ -113,6 +116,7 @@ export function ConfigView() {
         {sub === "ai" && <AiConfigView />}
         {sub === "remote" && <RemoteBridgeView />}
         {sub === "sync" && <SyncView />}
+        {sub === "vdj" && <VdjConfigView />}
         {sub === "general" && <GeneralView />}
         {sub === "direct" && <DirectOutput />}
       </div>

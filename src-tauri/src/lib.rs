@@ -11,6 +11,7 @@ pub mod programmer;
 pub mod show;
 pub mod streamdeck;
 pub mod sync;
+pub mod vdj;
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -225,6 +226,7 @@ pub fn run() {
     let loop_playback_handle = shared_loop_playback();
     let programmer_handle = shared_programmer();
     let bridge_state = crate::bridge::BridgeState::new();
+    let vdj_state = crate::vdj::VdjState::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -241,6 +243,7 @@ pub fn run() {
         .manage(loop_playback_handle.clone())
         .manage(programmer_handle.clone())
         .manage(bridge_state.clone())
+        .manage(vdj_state.clone())
         .setup(move |app| {
             let app_handle = app.handle().clone();
             let engine_state: tauri::State<'_, EngineState> = app.state();
@@ -357,6 +360,23 @@ pub fn run() {
                 }
             } else {
                 tracing::debug!("no streamdeck devices found at launch");
+            }
+
+            // VirtualDJ tempo bridge: if the saved show had the poller
+            // enabled at the last close, re-arm it now. Stays off
+            // until the operator turns it on via the VDJ tab,
+            // matching the bridge-server "manual start" UX.
+            let vdj_cfg_initial = show_state_st.read().show.vdj.clone();
+            if vdj_cfg_initial.enabled {
+                let vdj_st: tauri::State<'_, crate::vdj::VdjState> = app.state();
+                crate::vdj::start_poller(
+                    app_handle.clone(),
+                    show_state_st.inner().clone(),
+                    globals_st.inner().clone(),
+                    vdj_st.inner().clone(),
+                    vdj_cfg_initial,
+                );
+                tracing::info!("vdj poller auto-armed from persisted config");
             }
 
             // Background snapshot thread: every ~1.5 s we dump the live
@@ -588,6 +608,10 @@ pub fn run() {
             bridge::bridge_cancel_pairing,
             bridge::bridge_list_devices,
             bridge::bridge_revoke_device,
+            // VirtualDJ tempo bridge
+            vdj::vdj_get_config,
+            vdj::vdj_set_config,
+            vdj::vdj_get_status,
             // Cross-machine config sync (private GitHub Gist)
             sync::sync_status,
             sync::sync_save_settings,

@@ -8,6 +8,7 @@ import type { MovementGenerator } from "./MovementGenerator";
 import type { OutputsConfig } from "./OutputsConfig";
 import type { Scene } from "./Scene";
 import type { SceneLoopGroup } from "./SceneLoopGroup";
+import type { VdjConfig } from "./VdjConfig";
 
 export type ShowFileV1 = { 
 /**
@@ -66,4 +67,11 @@ button_bindings: ButtonBindings,
  * saved before this field existed — the loader falls back to the
  * installed library exactly as it always did.
  */
-library: Array<FixtureDefinition>, };
+library: Array<FixtureDefinition>, 
+/**
+ * VirtualDJ Network Control bridge config. Persisted with the
+ * show so the operator's preferred host/port/token come back the
+ * next time they open the same file, and so `enabled = true`
+ * re-arms the poller at boot.
+ */
+vdj: VdjConfig, };

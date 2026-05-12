@@ -13,6 +13,7 @@ use crate::chaser::AmbientChaser;
 use crate::globals::GlobalsConfig;
 use crate::movement::MovementGenerator;
 use crate::output::config::OutputsConfig;
+use crate::vdj::VdjConfig;
 
 pub const SHOW_FILE_VERSION: u32 = 1;
 
@@ -71,6 +72,12 @@ pub struct ShowFileV1 {
     /// installed library exactly as it always did.
     #[serde(default)]
     pub library: Vec<FixtureDefinition>,
+    /// VirtualDJ Network Control bridge config. Persisted with the
+    /// show so the operator's preferred host/port/token come back the
+    /// next time they open the same file, and so `enabled = true`
+    /// re-arms the poller at boot.
+    #[serde(default)]
+    pub vdj: VdjConfig,
 }
 
 impl Default for ShowFileV1 {
@@ -88,6 +95,7 @@ impl Default for ShowFileV1 {
             scene_loop_groups: Vec::new(),
             button_bindings: ButtonBindings::default(),
             library: Vec::new(),
+            vdj: VdjConfig::default(),
         }
     }
 }

@@ -65,10 +65,36 @@ export type Translation = {
   "config.tabs.remoteHint": string;
   "config.tabs.sync": string;
   "config.tabs.syncHint": string;
+  "config.tabs.vdj": string;
+  "config.tabs.vdjHint": string;
   "config.tabs.general": string;
   "config.tabs.generalHint": string;
   "config.tabs.direct": string;
   "config.tabs.directHint": string;
+
+  // ---- VirtualDJ poller -------------------------------------------------
+  "vdj.title": string;
+  "vdj.intro": string;
+  "vdj.host": string;
+  "vdj.hostHint": string;
+  "vdj.port": string;
+  "vdj.portHint": string;
+  "vdj.bearer": string;
+  "vdj.bearerHint": string;
+  "vdj.interval": string;
+  "vdj.intervalHint": string;
+  "vdj.enabled": string;
+  "vdj.enabledHint": string;
+  "vdj.save": string;
+  "vdj.statusSection": string;
+  "vdj.status.running": string;
+  "vdj.status.stopped": string;
+  "vdj.status.lastBpm": string;
+  "vdj.status.lastUpdate": string;
+  "vdj.status.never": string;
+  "vdj.status.error": string;
+  "vdj.status.secondsAgo": string;
+  "vdj.errSave": string;
 
   // ---- General (language picker) ----------------------------------------
   "general.title": string;
@@ -794,10 +820,36 @@ export const en: Translation = {
   "config.tabs.remoteHint": "LAN bridge for the iPhone companion app",
   "config.tabs.sync": "Sync",
   "config.tabs.syncHint": "Share config across machines via private GitHub Gist",
+  "config.tabs.vdj": "VirtualDJ",
+  "config.tabs.vdjHint": "Pull tempo from VirtualDJ's Network Control Plugin",
   "config.tabs.general": "General",
   "config.tabs.generalHint": "Language and other preferences",
   "config.tabs.direct": "Direct",
   "config.tabs.directHint": "Raw per-channel faders — debug tool",
+
+  "vdj.title": "VirtualDJ tempo bridge",
+  "vdj.intro":
+    "Polls the Network Control Plugin running inside VirtualDJ for the current track's BPM and drives the overall tempo override. Requires VDJ 2023+ with a Pro license.",
+  "vdj.host": "Host",
+  "vdj.hostHint": "Usually 127.0.0.1 — VirtualDJ on the same machine as this app.",
+  "vdj.port": "Port",
+  "vdj.portHint": "Whatever you set in the plugin's settings cogwheel (often 8080).",
+  "vdj.bearer": "Bearer token",
+  "vdj.bearerHint": "Optional. Leave empty if you didn't set an auth string in VDJ.",
+  "vdj.interval": "Polling interval (ms)",
+  "vdj.intervalHint": "How often to ask VDJ. 250 is a sensible default.",
+  "vdj.enabled": "Enabled",
+  "vdj.enabledHint": "When on, polls VDJ continuously and applies the BPM. Survives restart.",
+  "vdj.save": "Save",
+  "vdj.statusSection": "Status",
+  "vdj.status.running": "Running",
+  "vdj.status.stopped": "Stopped",
+  "vdj.status.lastBpm": "Last BPM",
+  "vdj.status.lastUpdate": "Last successful read",
+  "vdj.status.never": "Never",
+  "vdj.status.error": "Last error",
+  "vdj.status.secondsAgo": "{secs}s ago",
+  "vdj.errSave": "Save failed: {err}",
 
   "general.title": "General",
   "general.language": "Language",
@@ -1541,10 +1593,37 @@ export const es: Translation = {
   "config.tabs.remoteHint": "Bridge LAN para la app companion en iPhone",
   "config.tabs.sync": "Sync",
   "config.tabs.syncHint": "Compartir config entre máquinas via Gist privado de GitHub",
+  "config.tabs.vdj": "VirtualDJ",
+  "config.tabs.vdjHint": "Traer el BPM desde el Network Control Plugin de VirtualDJ",
   "config.tabs.general": "General",
   "config.tabs.generalHint": "Idioma y otras preferencias",
   "config.tabs.direct": "Direct",
   "config.tabs.directHint": "Faders crudos por canal — herramienta de debug",
+
+  "vdj.title": "Puente de tempo con VirtualDJ",
+  "vdj.intro":
+    "Pollea al Network Control Plugin de VirtualDJ por el BPM de la canción actual y lo aplica como tempo global. Requiere VDJ 2023+ con licencia Pro.",
+  "vdj.host": "Host",
+  "vdj.hostHint": "Normalmente 127.0.0.1 — VirtualDJ corriendo en la misma máquina.",
+  "vdj.port": "Puerto",
+  "vdj.portHint": "El que pusiste en el engranaje del plugin (típicamente 8080).",
+  "vdj.bearer": "Bearer token",
+  "vdj.bearerHint": "Opcional. Dejalo vacío si no configuraste auth en VDJ.",
+  "vdj.interval": "Intervalo de poll (ms)",
+  "vdj.intervalHint": "Cada cuánto preguntar a VDJ. 250 es un default razonable.",
+  "vdj.enabled": "Habilitado",
+  "vdj.enabledHint":
+    "Cuando está prendido, polea a VDJ continuamente y aplica el BPM. Persiste tras reiniciar.",
+  "vdj.save": "Guardar",
+  "vdj.statusSection": "Estado",
+  "vdj.status.running": "Corriendo",
+  "vdj.status.stopped": "Detenido",
+  "vdj.status.lastBpm": "Último BPM",
+  "vdj.status.lastUpdate": "Última lectura exitosa",
+  "vdj.status.never": "Nunca",
+  "vdj.status.error": "Último error",
+  "vdj.status.secondsAgo": "hace {secs}s",
+  "vdj.errSave": "Falló al guardar: {err}",
 
   "general.title": "General",
   "general.language": "Idioma",

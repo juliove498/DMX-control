@@ -93,6 +93,7 @@ pub async fn start(
     let app = Router::new()
         .route("/health", get(health))
         .route("/pair", post(pair))
+        .route("/vdj/bpm", post(vdj_bpm))
         .route("/ws", get(ws_upgrade))
         .with_state(state)
         .layer(CorsLayer::permissive());
@@ -203,6 +204,75 @@ async fn pair(
         token,
         device_id: device.id,
         device_name: device.name,
+    }))
+}
+
+/// Inbound BPM webhook. Anyone on the LAN (VirtualDJ via a small bridge
+/// script, a curl call, a future custom plugin, OBS, Resolume, etc.)
+/// can `POST /vdj/bpm` with `{ "bpm": 128.5 }` and we mirror the same
+/// path the header TAP button uses: enable the overall-BPM override
+/// and set the value. The desktop UI's BPM toggle flips to ON
+/// automatically — that's intentional, a webhook caller almost always
+/// wants the tempo to *take effect*, not just be stored.
+///
+/// `source` and `deck` are optional metadata fields we just log; they
+/// matter once we have multi-deck logic but for now the override is a
+/// single global tempo.
+#[derive(Deserialize)]
+struct VdjBpmRequest {
+    bpm: f32,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    deck: Option<u8>,
+}
+
+#[derive(Serialize)]
+struct VdjBpmResponse {
+    applied_bpm: f32,
+}
+
+async fn vdj_bpm(
+    State(state): State<AppState>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    Json(body): Json<VdjBpmRequest>,
+) -> Result<Json<VdjBpmResponse>, (StatusCode, String)> {
+    if !is_lan_peer(peer.ip()) {
+        tracing::warn!(%peer, "vdj_bpm rejected: peer is not on a private network");
+        return Err((
+            StatusCode::FORBIDDEN,
+            "peer must be on private network".into(),
+        ));
+    }
+    // Validate up front. The runtime clamps to [20, 300] anyway, but a
+    // 0/NaN/Inf input is more useful to bounce loudly than to silently
+    // snap — usually it means the caller is mis-formatting the payload.
+    if !body.bpm.is_finite() || body.bpm < 20.0 || body.bpm > 300.0 {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            format!("bpm out of range (expected 20..=300): {}", body.bpm),
+        ));
+    }
+    let ctx = &state.ctx;
+    if let Err(e) =
+        crate::commands::set_overall_bpm_enabled_impl(&ctx.app, &ctx.show, &ctx.globals, true)
+    {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+    if let Err(e) =
+        crate::commands::set_overall_bpm_impl(&ctx.app, &ctx.show, &ctx.globals, body.bpm)
+    {
+        return Err((StatusCode::INTERNAL_SERVER_ERROR, e.to_string()));
+    }
+    tracing::info!(
+        bpm = body.bpm,
+        source = body.source.as_deref().unwrap_or("unknown"),
+        deck = body.deck,
+        %peer,
+        "vdj_bpm applied"
+    );
+    Ok(Json(VdjBpmResponse {
+        applied_bpm: body.bpm.clamp(20.0, 300.0),
     }))
 }
 

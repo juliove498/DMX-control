@@ -150,6 +150,40 @@ pub struct GlobalsConfig {
     pub overall_bpm_enabled: bool,
     #[serde(default = "default_overall_bpm")]
     pub overall_bpm: f32,
+    /// Optional syncopated rhythm captured by the operator. When `Some`
+    /// AND `overall_bpm_enabled` is true, every chaser ignores its own
+    /// subdivision and advances one step per pattern hit instead — so a
+    /// clave / cha-cha / son rhythm drives the rig directly. `None`
+    /// leaves chasers on uniform subdivisions, which is the default.
+    #[serde(default)]
+    pub tempo_pattern: Option<TempoPattern>,
+}
+
+/// Quantised syncopated rhythm. `bars` × `steps_per_bar` defines a grid;
+/// each entry in `hits` is a grid position (0 ≤ pos < bars * steps_per_bar)
+/// where a "hit" should fire. The pattern loops every `bars * steps_per_bar`
+/// grid units, scaled by the global BPM.
+///
+/// Quantising on sixteenth notes (`steps_per_bar = 16`) is the standard for
+/// Afro-Cuban / Latin patterns: clave, son, rumba, cha-cha all sit on a 16-
+/// step grid in 4/4. The data model also supports two-bar patterns (clave
+/// 3-2 vs 2-3 is one bar, but two-bar phrases like clave-with-pickup show
+/// up in some folk styles).
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct TempoPattern {
+    /// Number of 4/4 bars the pattern spans. Capped at 2 in the
+    /// quantiser because longer phrases get hard to play by hand and the
+    /// 16-step grid loses resolution past two bars.
+    pub bars: u8,
+    /// Resolution of the grid, in steps per bar. Always 16 today
+    /// (sixteenth notes). Stored so the JSON is self-describing — a
+    /// future "32nd-note" mode wouldn't break old shows.
+    pub steps_per_bar: u8,
+    /// Grid positions where a hit fires, sorted ascending and unique.
+    /// Position 0 is always the first hit; subsequent positions are
+    /// offsets in sixteenth-notes from there.
+    pub hits: Vec<u8>,
 }
 
 impl Default for GlobalsConfig {
@@ -160,6 +194,7 @@ impl Default for GlobalsConfig {
             master: MasterConfig::default(),
             overall_bpm_enabled: false,
             overall_bpm: default_overall_bpm(),
+            tempo_pattern: None,
         }
     }
 }

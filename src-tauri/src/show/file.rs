@@ -9,6 +9,7 @@ use super::button_bindings::ButtonBindings;
 use super::fixture::{FixtureDefinition, FixtureInstance};
 use super::loop_group::SceneLoopGroup;
 use super::scene::Scene;
+use super::snapshot::Snapshot;
 use crate::chaser::AmbientChaser;
 use crate::globals::GlobalsConfig;
 use crate::movement::MovementGenerator;
@@ -56,6 +57,12 @@ pub struct ShowFileV1 {
     /// using each scene's own fade/hold (or a per-group hold override).
     #[serde(default)]
     pub scene_loop_groups: Vec<SceneLoopGroup>,
+    /// Whole-rig captures (base DMX + masters + FX + scene/loop +
+    /// globals) the operator can toggle on and off like a super-cue.
+    /// See `show::snapshot` for the shape and `crate::snapshot` for the
+    /// activate/restore runtime.
+    #[serde(default)]
+    pub snapshots: Vec<Snapshot>,
     /// User-customised Launchpad / Stream Deck button assignments.
     /// `custom_enabled = false` (default) means the surface
     /// controllers use the built-in factory layout; flipping it to
@@ -93,6 +100,7 @@ impl Default for ShowFileV1 {
             globals: GlobalsConfig::default(),
             scenes: Vec::new(),
             scene_loop_groups: Vec::new(),
+            snapshots: Vec::new(),
             button_bindings: ButtonBindings::default(),
             library: Vec::new(),
             vdj: VdjConfig::default(),

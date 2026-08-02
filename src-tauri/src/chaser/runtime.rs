@@ -37,4 +37,11 @@ pub struct ChaserRuntime {
     /// Snapshot of `last_emitted` taken at the moment of the last step
     /// transition. Lerp source during the fade-in.
     pub fade_from: Vec<SlotOutput>,
+    /// When a global tempo pattern drives this chaser, the *current
+    /// step's duration in ms* (distance to the next pattern hit). The
+    /// fade engine uses it instead of `step_duration_ms(bpm, subdiv)`
+    /// because pattern steps are non-uniform — a clave's "..X" gap is
+    /// longer than its "XX" pair. `None` means "free-run / subdivision
+    /// path is active", which is the default.
+    pub pattern_step_ms: Option<f32>,
 }

@@ -20,6 +20,7 @@ const SUBDIVISIONS: Array<{ value: Subdivision; labelKey: keyof Translation }> =
   { value: "one", labelKey: "movement.subdivLabel.1beat" },
   { value: "two", labelKey: "movement.subdivLabel.2beats" },
   { value: "four", labelKey: "movement.subdivLabel.4beats" },
+  { value: "eight", labelKey: "movement.subdivLabel.8beats" },
 ];
 
 const SHAPES: Array<{ value: Shape["type"]; labelKey: keyof Translation }> = [
@@ -92,34 +93,97 @@ function makeDefaultShape(type: Shape["type"]): Shape {
   }
 }
 
-const SINE_PRESETS: Array<{ labelKey: keyof Translation; pan: WaveFunction; tilt: WaveFunction }> =
-  [
-    {
-      labelKey: "movement.presetLabel.circle",
-      pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
-      tilt: { waveform: "cosine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
+const SINE_PRESETS: Array<{
+  labelKey: keyof Translation;
+  pan: WaveFunction;
+  tilt: WaveFunction;
+}> = [
+  {
+    labelKey: "movement.presetLabel.circle",
+    pan: {
+      waveform: "sine",
+      frequency: 1,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
     },
-    {
-      labelKey: "movement.presetLabel.figureEight",
-      pan: { waveform: "sine", frequency: 1, phase_shift: 0, amplitude: 1, offset: 0 },
-      tilt: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
+    tilt: {
+      waveform: "cosine",
+      frequency: 1,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
     },
-    {
-      labelKey: "movement.presetLabel.lissajous32",
-      pan: { waveform: "sine", frequency: 3, phase_shift: 0, amplitude: 1, offset: 0 },
-      tilt: { waveform: "sine", frequency: 2, phase_shift: 0.25, amplitude: 1, offset: 0 },
+  },
+  {
+    labelKey: "movement.presetLabel.figureEight",
+    pan: {
+      waveform: "sine",
+      frequency: 1,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
     },
-    {
-      labelKey: "movement.presetLabel.lissajous54",
-      pan: { waveform: "sine", frequency: 5, phase_shift: 0, amplitude: 1, offset: 0 },
-      tilt: { waveform: "sine", frequency: 4, phase_shift: 0.125, amplitude: 1, offset: 0 },
+    tilt: {
+      waveform: "sine",
+      frequency: 2,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
     },
-    {
-      labelKey: "movement.presetLabel.wavePan",
-      pan: { waveform: "sine", frequency: 2, phase_shift: 0, amplitude: 1, offset: 0 },
-      tilt: { waveform: "sine", frequency: 0, phase_shift: 0, amplitude: 0, offset: 0 },
+  },
+  {
+    labelKey: "movement.presetLabel.lissajous32",
+    pan: {
+      waveform: "sine",
+      frequency: 3,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
     },
-  ];
+    tilt: {
+      waveform: "sine",
+      frequency: 2,
+      phase_shift: 0.25,
+      amplitude: 1,
+      offset: 0,
+    },
+  },
+  {
+    labelKey: "movement.presetLabel.lissajous54",
+    pan: {
+      waveform: "sine",
+      frequency: 5,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
+    },
+    tilt: {
+      waveform: "sine",
+      frequency: 4,
+      phase_shift: 0.125,
+      amplitude: 1,
+      offset: 0,
+    },
+  },
+  {
+    labelKey: "movement.presetLabel.wavePan",
+    pan: {
+      waveform: "sine",
+      frequency: 2,
+      phase_shift: 0,
+      amplitude: 1,
+      offset: 0,
+    },
+    tilt: {
+      waveform: "sine",
+      frequency: 0,
+      phase_shift: 0,
+      amplitude: 0,
+      offset: 0,
+    },
+  },
+];
 
 const SUBDIVISION_BEATS: Record<Subdivision, number> = {
   quarter: 0.25,
@@ -127,6 +191,7 @@ const SUBDIVISION_BEATS: Record<Subdivision, number> = {
   one: 1,
   two: 2,
   four: 4,
+  eight: 8,
 };
 
 function bpmOf(t: TempoSource): number {
@@ -700,7 +765,10 @@ function Preview({
       </svg>
       <div className="movement-preview-meta">
         {gen.enabled
-          ? t("movement.previewMeta", { count: total, phase: (phase * 100).toFixed(0) })
+          ? t("movement.previewMeta", {
+              count: total,
+              phase: (phase * 100).toFixed(0),
+            })
           : t("movement.previewPaused", { count: total })}
         {drag ? ` · ${drag.kind}` : ""}
       </div>
@@ -817,7 +885,10 @@ export function MovementView() {
     });
   };
   const removeSlot = (idx: number) =>
-    updateMovement({ ...gen, fixtures: gen.fixtures.filter((_, i) => i !== idx) });
+    updateMovement({
+      ...gen,
+      fixtures: gen.fixtures.filter((_, i) => i !== idx),
+    });
   const setSlot = (idx: number, patch: Partial<MovementSlot>) =>
     updateMovement({
       ...gen,
@@ -895,7 +966,11 @@ export function MovementView() {
               onClick={() => toggleMovement(gen.id, !gen.enabled)}
               style={
                 gen.enabled
-                  ? { background: padColor, borderColor: padColor, color: "#0f0f10" }
+                  ? {
+                      background: padColor,
+                      borderColor: padColor,
+                      color: "#0f0f10",
+                    }
                   : { borderColor: padColor, color: padColor }
               }
             >
@@ -919,7 +994,11 @@ export function MovementView() {
           <div className="movement-grid">
             <section className="movement-column" data-doc="movement-params">
               <fieldset className="chaser-fieldset">
-                <legend>{t("movement.legend.fixtures", { count: gen.fixtures.length })}</legend>
+                <legend>
+                  {t("movement.legend.fixtures", {
+                    count: gen.fixtures.length,
+                  })}
+                </legend>
                 {gen.fixtures.length === 0 ? (
                   <p className="empty">{t("movement.fixtures.empty")}</p>
                 ) : (
@@ -933,7 +1012,11 @@ export function MovementView() {
                             <input
                               type="checkbox"
                               checked={slot.invert_pan}
-                              onChange={(e) => setSlot(i, { invert_pan: e.currentTarget.checked })}
+                              onChange={(e) =>
+                                setSlot(i, {
+                                  invert_pan: e.currentTarget.checked,
+                                })
+                              }
                             />
                             {t("movement.fixtures.invertPan")}
                           </label>
@@ -941,7 +1024,11 @@ export function MovementView() {
                             <input
                               type="checkbox"
                               checked={slot.invert_tilt}
-                              onChange={(e) => setSlot(i, { invert_tilt: e.currentTarget.checked })}
+                              onChange={(e) =>
+                                setSlot(i, {
+                                  invert_tilt: e.currentTarget.checked,
+                                })
+                              }
                             />
                             {t("movement.fixtures.invertTilt")}
                           </label>

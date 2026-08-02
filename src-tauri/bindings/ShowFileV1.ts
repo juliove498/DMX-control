@@ -8,6 +8,7 @@ import type { MovementGenerator } from "./MovementGenerator";
 import type { OutputsConfig } from "./OutputsConfig";
 import type { Scene } from "./Scene";
 import type { SceneLoopGroup } from "./SceneLoopGroup";
+import type { Snapshot } from "./Snapshot";
 import type { VdjConfig } from "./VdjConfig";
 
 export type ShowFileV1 = { 
@@ -50,6 +51,13 @@ scenes: Array<Scene>,
  * using each scene's own fade/hold (or a per-group hold override).
  */
 scene_loop_groups: Array<SceneLoopGroup>, 
+/**
+ * Whole-rig captures (base DMX + masters + FX + scene/loop +
+ * globals) the operator can toggle on and off like a super-cue.
+ * See `show::snapshot` for the shape and `crate::snapshot` for the
+ * activate/restore runtime.
+ */
+snapshots: Array<Snapshot>, 
 /**
  * User-customised Launchpad / Stream Deck button assignments.
  * `custom_enabled = false` (default) means the surface

@@ -37,6 +37,8 @@ pub const ALLOWED_METHODS: &[&str] = &[
     "set_blind",
     "set_chaser_enabled",
     "set_chaser_master",
+    "set_fixture_channels",
+    "programmer_clear",
     "get_show",
     "programmer_status",
     "get_engine_stats",
@@ -239,6 +241,41 @@ pub fn dispatch(ctx: &Arc<RpcContext>, req: RpcRequest) -> RpcResponse {
                 Ok(()) => RpcResponse::ok(req.id, json!(true)),
                 Err(e) => RpcResponse::err(req.id, -32000, e.to_string()),
             }
+        }
+        "set_fixture_channels" => {
+            // Manual programmer write from the Stage screen: a batch of
+            // {fixture_id, channel_offset, value}. The impl bounds-checks
+            // every write against the patched mode (the phone is an
+            // untrusted client) and emits a single programmer snapshot.
+            let writes = match req.params.get("writes") {
+                Some(v) => match serde_json::from_value::<
+                    Vec<crate::commands::FixtureChannelWrite>,
+                >(v.clone())
+                {
+                    Ok(w) => w,
+                    Err(e) => {
+                        return RpcResponse::err(req.id, -32602, format!("invalid 'writes': {e}"));
+                    }
+                },
+                None => return RpcResponse::err(req.id, -32602, "missing param 'writes'"),
+            };
+            if writes.is_empty() {
+                return RpcResponse::err(req.id, -32602, "'writes' must be non-empty");
+            }
+            match crate::commands::set_fixture_channels_impl(
+                &ctx.app,
+                &ctx.engine,
+                &ctx.show,
+                &ctx.programmer,
+                &writes,
+            ) {
+                Ok(()) => RpcResponse::ok(req.id, json!(true)),
+                Err(e) => RpcResponse::err(req.id, -32000, e.to_string()),
+            }
+        }
+        "programmer_clear" => {
+            crate::commands::programmer_clear_impl(&ctx.app, &ctx.programmer);
+            RpcResponse::ok(req.id, json!(true))
         }
         "get_show" => {
             let show = ctx.show.read().show.clone();

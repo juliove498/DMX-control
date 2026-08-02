@@ -2,6 +2,7 @@
 import type { BlackoutConfig } from "./BlackoutConfig";
 import type { BlindConfig } from "./BlindConfig";
 import type { MasterConfig } from "./MasterConfig";
+import type { TempoPattern } from "./TempoPattern";
 
 export type GlobalsConfig = { blackout: BlackoutConfig, blind: BlindConfig, 
 /**
@@ -20,4 +21,12 @@ master: MasterConfig,
  * value is preserved across toggles so disabling and re-enabling
  * snaps back to the same tempo.
  */
-overall_bpm_enabled: boolean, overall_bpm: number, };
+overall_bpm_enabled: boolean, overall_bpm: number, 
+/**
+ * Optional syncopated rhythm captured by the operator. When `Some`
+ * AND `overall_bpm_enabled` is true, every chaser ignores its own
+ * subdivision and advances one step per pattern hit instead — so a
+ * clave / cha-cha / son rhythm drives the rig directly. `None`
+ * leaves chasers on uniform subdivisions, which is the default.
+ */
+tempo_pattern: TempoPattern | null, };

@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 use crate::engine::{empty_mask, empty_overlay, ChannelMask, ChannelOverlay, DMX_CHANNELS};
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance};
 
-use super::{BlackoutConfig, BlindConfig, GlobalsConfig, MasterConfig};
+use super::{BlackoutConfig, BlindConfig, GlobalsConfig, MasterConfig, TempoPattern};
 
 /// If two TAP presses are spaced wider than this, the operator is
 /// almost certainly starting a new measurement — drop the previous
@@ -29,6 +29,19 @@ const TAP_HISTORY_MAX: usize = 8;
 /// nudge clamp ([20, 300]).
 const TAP_BPM_MIN: f32 = 20.0;
 const TAP_BPM_MAX: f32 = 300.0;
+
+/// Grid resolution for the pattern recorder. Sixteenth notes is the
+/// minimum the human ear cares about for Latin / Afro-Cuban syncopation.
+const PATTERN_STEPS_PER_BAR: u8 = 16;
+/// Max number of bars a single pattern can span. Two bars covers
+/// clave-with-pickup and most folk phrases; longer is hard to play in
+/// front of a live audience.
+const PATTERN_MAX_BARS: u8 = 2;
+/// If two pattern taps are spaced wider than this, the operator
+/// stalled / drifted — drop everything so the next press is treated as
+/// a fresh start. Wider than the BPM tap timeout because pattern
+/// rests can be long (think the gap inside a clave).
+const PATTERN_TAP_RESET_GAP: Duration = Duration::from_secs(3);
 
 /// Halogen "cold" tip — what blinders look like just as they wake.
 const HALOGEN_AMBER: (f32, f32, f32) = (255.0, 80.0, 0.0);
@@ -50,6 +63,18 @@ pub struct GlobalsRuntime {
     /// a tempo measured at the start of a song is meaningless across
     /// app restarts. Each entry is a wall-clock `Instant` of one tap.
     tap_history: Vec<Instant>,
+    /// True while the operator is capturing a rhythmic pattern. Set by
+    /// `start_pattern_recording`; cleared by `stop_pattern_recording`
+    /// (which also commits the quantised pattern to `config`).
+    pattern_recording: bool,
+    /// Taps captured during the current recording window. Wall-clock
+    /// `Instant`s; converted into grid positions only when the
+    /// recording is committed.
+    pattern_record_taps: Vec<Instant>,
+    /// Wall-clock anchor for pattern playback: the moment grid
+    /// position 0 fires. Always equal to the first recorded tap of the
+    /// currently-active pattern; `None` when no pattern is active.
+    pattern_anchor: Option<Instant>,
 }
 
 impl Default for GlobalsRuntime {
@@ -64,6 +89,9 @@ impl Default for GlobalsRuntime {
             fixtures: Vec::new(),
             library: HashMap::new(),
             tap_history: Vec::new(),
+            pattern_recording: false,
+            pattern_record_taps: Vec::new(),
+            pattern_anchor: None,
         }
     }
 }
@@ -85,6 +113,17 @@ impl GlobalsRuntime {
     /// fades to the new target naturally.
     pub fn replace_config(&mut self, config: GlobalsConfig) {
         self.blackout_target = if config.blackout.active { 1.0 } else { 0.0 };
+        // If a pattern is being installed via config (e.g. show load),
+        // we have no recorded anchor — install one at "now" so playback
+        // starts on the next frame. The anchor is in-memory only so a
+        // restart re-anchors here too, which is what we want (a pattern
+        // from yesterday's set has no meaningful phase against today's
+        // wall clock).
+        if config.tempo_pattern.is_some() && self.pattern_anchor.is_none() {
+            self.pattern_anchor = Some(Instant::now());
+        } else if config.tempo_pattern.is_none() {
+            self.pattern_anchor = None;
+        }
         self.config = config;
     }
 
@@ -170,6 +209,77 @@ impl GlobalsRuntime {
         } else {
             None
         }
+    }
+
+    /// The active pattern + its wall-clock anchor, or `None` when no
+    /// pattern is in effect. Returns a reference rather than cloning
+    /// because the engine reads it once per frame and never mutates.
+    /// `pattern_anchor` is the wall time at which grid position 0
+    /// fires; the engine derives the current step from it.
+    pub fn current_tempo_pattern(&self) -> Option<(&TempoPattern, Instant)> {
+        let pattern = self.config.tempo_pattern.as_ref()?;
+        let anchor = self.pattern_anchor?;
+        Some((pattern, anchor))
+    }
+
+    pub fn pattern_is_recording(&self) -> bool {
+        self.pattern_recording
+    }
+
+    /// Begin a fresh pattern-recording window. Any previously captured
+    /// taps are dropped; the previously committed pattern stays in
+    /// `config` until the new one is committed (so the engine doesn't
+    /// blank out mid-recording — the rig keeps playing the old rhythm
+    /// while the operator demos the new one).
+    pub fn start_pattern_recording(&mut self) {
+        self.pattern_recording = true;
+        self.pattern_record_taps.clear();
+    }
+
+    /// Register a tap during a pattern-recording window. No-op if
+    /// recording is off — surfaces that route taps unconditionally
+    /// (e.g. Launchpad pad held in record mode) don't need a separate
+    /// guard. Long gaps reset the buffer: a 3 s rest is too long to be
+    /// part of a single phrase by hand, so we treat it as a re-start.
+    pub fn tap_pattern_record(&mut self, now: Instant) {
+        if !self.pattern_recording {
+            return;
+        }
+        if let Some(last) = self.pattern_record_taps.last() {
+            if now.saturating_duration_since(*last) > PATTERN_TAP_RESET_GAP {
+                self.pattern_record_taps.clear();
+            }
+        }
+        self.pattern_record_taps.push(now);
+    }
+
+    /// Finish the recording window. Returns the freshly committed
+    /// pattern when at least two taps were captured (a single tap can't
+    /// describe a rhythm); on failure the existing pattern is left
+    /// untouched so the operator's previous capture isn't destroyed by
+    /// a fat-fingered re-record. The caller is responsible for
+    /// persisting the resulting `tempo_pattern` to the show file.
+    pub fn stop_pattern_recording(&mut self) -> Option<TempoPattern> {
+        self.pattern_recording = false;
+        let taps = std::mem::take(&mut self.pattern_record_taps);
+        let bpm = self.config.overall_bpm;
+        let (pattern, anchor) = quantise_pattern(&taps, bpm)?;
+        self.config.tempo_pattern = Some(pattern.clone());
+        // Anchor playback to the first recorded tap so the chasers
+        // start firing exactly when the operator played beat 1 — no
+        // surprise re-phasing on the next frame.
+        self.pattern_anchor = Some(anchor);
+        Some(pattern)
+    }
+
+    /// Discard the captured pattern. Used by the "X" / clear control
+    /// in the UI. Also bails out of any in-progress recording so the
+    /// operator can revert to plain BPM mode with one click.
+    pub fn clear_tempo_pattern(&mut self) {
+        self.config.tempo_pattern = None;
+        self.pattern_anchor = None;
+        self.pattern_recording = false;
+        self.pattern_record_taps.clear();
     }
 
     /// Per-frame update. Returns the blind + blackout overlays so the
@@ -587,6 +697,72 @@ where
     iter.enumerate().find_map(|(i, r)| (r == role).then_some(i))
 }
 
+/// Snap a series of recorded tap `Instant`s onto a 16ths grid scaled
+/// by `bpm`. Returns the quantised pattern plus the wall-clock anchor
+/// the engine should use to lock playback to the operator's downbeat
+/// (== the first recorded tap).
+///
+/// Rules:
+/// - Fewer than two taps → `None`. One tap can't describe a rhythm.
+/// - Span < half a beat → `None`. The operator probably mis-clicked
+///   twice in quick succession; refusing to commit keeps the previous
+///   pattern alive.
+/// - Bar count = round(span_in_quarters / 4), clamped to [1, 2]. Two
+///   bars is the ceiling — see `PATTERN_MAX_BARS`.
+/// - Hits are de-duplicated after quantisation: two taps that round
+///   to the same grid position collapse into one, so a slightly-late
+///   double-tap doesn't produce a phantom 1-grid-unit gap.
+fn quantise_pattern(taps: &[Instant], bpm: f32) -> Option<(TempoPattern, Instant)> {
+    if taps.len() < 2 {
+        return None;
+    }
+    let bpm_safe = bpm.max(TAP_BPM_MIN) as f64;
+    let first = *taps.first()?;
+    let last = *taps.last()?;
+    let span_secs = last.saturating_duration_since(first).as_secs_f64();
+    let span_quarters = span_secs * bpm_safe / 60.0;
+    if span_quarters < 0.5 {
+        // Too short to be a real phrase — almost certainly a double-tap.
+        return None;
+    }
+    // `ceil` not `round`: when the last tap sits past beat 4 (span > 4
+    // quarters), the operator almost certainly meant a 2-bar phrase, not
+    // a 1-bar phrase that overflows and wraps. Rounding the borderline
+    // case down would silently shift the last hit onto the bar-1
+    // downbeat, which sounds wrong.
+    let bars_raw = (span_quarters / 4.0).ceil() as i32;
+    let bars = bars_raw.clamp(1, PATTERN_MAX_BARS as i32) as u8;
+    let total_steps = (bars as u32) * (PATTERN_STEPS_PER_BAR as u32);
+    let steps_per_quarter = PATTERN_STEPS_PER_BAR as f64 / 4.0;
+
+    let mut hits: Vec<u8> = taps
+        .iter()
+        .map(|t| {
+            let dur = t.saturating_duration_since(first).as_secs_f64();
+            let quarters = dur * bpm_safe / 60.0;
+            let raw = (quarters * steps_per_quarter).round() as i64;
+            raw.rem_euclid(total_steps as i64) as u8
+        })
+        .collect();
+    hits.sort_unstable();
+    hits.dedup();
+    // First tap *always* lands at position 0 after subtraction, so
+    // hits[0] == 0 is an invariant the engine can rely on. Belt-and-
+    // braces: if floating-point shenanigans landed it elsewhere,
+    // prepend 0 so playback still aligns to the operator's downbeat.
+    if hits.first().copied() != Some(0) {
+        hits.insert(0, 0);
+    }
+    Some((
+        TempoPattern {
+            bars,
+            steps_per_bar: PATTERN_STEPS_PER_BAR,
+            hits,
+        },
+        first,
+    ))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -646,6 +822,129 @@ mod tests {
         r.set_blind(true);
         let ov = r.tick(Instant::now() + Duration::from_millis(60));
         assert!(ov.blind.is_empty());
+    }
+
+    #[test]
+    fn quantise_clave_3_2_at_120_bpm() {
+        // Clave 3-2 over 1 bar (at 120 BPM, 1 bar = 2 s):
+        // 16ths grid positions: 0, 3, 6, 10, 12.
+        // In seconds from the downbeat: 0, 0.375, 0.75, 1.25, 1.5.
+        let bpm = 120.0;
+        let t0 = Instant::now();
+        let taps: Vec<Instant> = [0.0, 0.375, 0.75, 1.25, 1.5]
+            .iter()
+            .map(|s| t0 + Duration::from_secs_f64(*s))
+            .collect();
+        let (p, anchor) = quantise_pattern(&taps, bpm).expect("quantises");
+        assert_eq!(p.bars, 1);
+        assert_eq!(p.steps_per_bar, 16);
+        assert_eq!(p.hits, vec![0, 3, 6, 10, 12]);
+        assert_eq!(anchor, taps[0], "anchor = first tap");
+    }
+
+    #[test]
+    fn quantise_cha_cha_at_120_bpm() {
+        // Cha-cha basic: 1, 2, 3, 4-and (with the "and" landing on the
+        // 8th between beats 4 and the next downbeat). On a 16ths grid:
+        // 0, 4, 8, 12, 14 — i.e. four downbeats plus the cha-cha syncope.
+        let bpm = 120.0;
+        let t0 = Instant::now();
+        // At 120 BPM: one quarter = 0.5 s; one 16th = 0.125 s.
+        let offsets = [0.0, 0.5, 1.0, 1.5, 1.75];
+        let taps: Vec<Instant> = offsets
+            .iter()
+            .map(|s| t0 + Duration::from_secs_f64(*s))
+            .collect();
+        let (p, _) = quantise_pattern(&taps, bpm).unwrap();
+        assert_eq!(p.bars, 1);
+        assert_eq!(p.hits, vec![0, 4, 8, 12, 14]);
+    }
+
+    #[test]
+    fn quantise_two_bar_pattern() {
+        // Hits at quarters 0, 4, 5 — second bar starts at quarter 4, so
+        // the result should span two bars (32 sixteenths) and the third
+        // hit lands at position 20 (= 5 quarters * 4 sixteenths).
+        let bpm = 120.0;
+        let t0 = Instant::now();
+        let taps: Vec<Instant> = [0.0, 2.0, 2.5]
+            .iter()
+            .map(|s| t0 + Duration::from_secs_f64(*s))
+            .collect();
+        let (p, _) = quantise_pattern(&taps, bpm).unwrap();
+        assert_eq!(p.bars, 2);
+        assert_eq!(p.hits, vec![0, 16, 20]);
+    }
+
+    #[test]
+    fn quantise_rejects_single_tap() {
+        let bpm = 120.0;
+        let taps = vec![Instant::now()];
+        assert!(quantise_pattern(&taps, bpm).is_none());
+    }
+
+    #[test]
+    fn quantise_rejects_too_short_span() {
+        // < half a beat ⇒ likely double-click, not a rhythm.
+        let bpm = 120.0;
+        let t0 = Instant::now();
+        let taps = vec![t0, t0 + Duration::from_millis(50)];
+        assert!(quantise_pattern(&taps, bpm).is_none());
+    }
+
+    #[test]
+    fn quantise_collapses_double_taps_on_same_grid_position() {
+        // Two taps a few ms apart fall on the same 16th → one hit only.
+        let bpm = 120.0;
+        let t0 = Instant::now();
+        let taps = vec![
+            t0,
+            t0 + Duration::from_millis(10),
+            t0 + Duration::from_millis(500), // a real beat 2 later
+        ];
+        let (p, _) = quantise_pattern(&taps, bpm).unwrap();
+        assert_eq!(p.hits, vec![0, 4]);
+    }
+
+    #[test]
+    fn pattern_recording_lifecycle() {
+        let mut r = GlobalsRuntime::default();
+        r.config.overall_bpm = 120.0;
+        assert!(!r.pattern_is_recording());
+        assert!(r.current_tempo_pattern().is_none());
+
+        r.start_pattern_recording();
+        let t0 = Instant::now();
+        r.tap_pattern_record(t0);
+        r.tap_pattern_record(t0 + Duration::from_millis(500));
+        r.tap_pattern_record(t0 + Duration::from_millis(1000));
+
+        let p = r.stop_pattern_recording().expect("commits a pattern");
+        assert!(!r.pattern_is_recording());
+        assert!(r.current_tempo_pattern().is_some());
+        // 0.5 s + 1.0 s at 120 BPM = quarters 1, 2 → grid positions 4, 8.
+        assert_eq!(p.hits, vec![0, 4, 8]);
+
+        r.clear_tempo_pattern();
+        assert!(r.current_tempo_pattern().is_none());
+    }
+
+    #[test]
+    fn tap_pattern_record_ignored_when_not_recording() {
+        let mut r = GlobalsRuntime::default();
+        r.tap_pattern_record(Instant::now());
+        assert!(r.pattern_record_taps.is_empty());
+    }
+
+    #[test]
+    fn pattern_record_resets_after_long_gap() {
+        let mut r = GlobalsRuntime::default();
+        r.start_pattern_recording();
+        let t0 = Instant::now();
+        r.tap_pattern_record(t0);
+        // Gap > 3 s should wipe the buffer.
+        r.tap_pattern_record(t0 + Duration::from_secs(4));
+        assert_eq!(r.pattern_record_taps.len(), 1);
     }
 
     #[test]

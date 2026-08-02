@@ -7,8 +7,10 @@ pub mod globals;
 pub mod midi;
 pub mod movement;
 pub mod output;
+pub mod power;
 pub mod programmer;
 pub mod show;
+pub mod snapshot;
 pub mod streamdeck;
 pub mod sync;
 pub mod vdj;
@@ -31,6 +33,7 @@ use crate::show::session::{
     read_autosave, read_engine_autosave, write_engine_autosave, EngineAutosave, UniverseAutosave,
 };
 use crate::show::{ShowFileV1, ShowState, ShowStateInner};
+use crate::snapshot::shared_snapshot_runtime;
 use crate::streamdeck::controller::{shared_streamdeck, SharedStreamDeck};
 
 /// Catch any panic before `panic = "abort"` calls `abort()`, dump the
@@ -225,14 +228,23 @@ pub fn run() {
     let scene_playback_handle = shared_scene_playback();
     let loop_playback_handle = shared_loop_playback();
     let programmer_handle = shared_programmer();
+    let snapshot_runtime_handle = shared_snapshot_runtime();
     let bridge_state = crate::bridge::BridgeState::new();
     let vdj_state = crate::vdj::VdjState::new();
+
+    // Inhibit system idle sleep for the lifetime of the app — a live
+    // show should keep streaming DMX even if the operator stops
+    // touching the laptop. Display sleep is *not* blocked, so the
+    // screen can still dim during a quiet moment. Released
+    // automatically when the managed state is dropped at shutdown.
+    let sleep_inhibitor = crate::power::SleepInhibitor::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(engine.clone())
         .manage(show_state.clone())
         .manage(OutputThreadState(Mutex::new(None)))
+        .manage(sleep_inhibitor)
         .manage(chasers_handle.clone())
         .manage(movement_handle.clone())
         .manage(globals_handle.clone())
@@ -242,6 +254,7 @@ pub fn run() {
         .manage(scene_playback_handle.clone())
         .manage(loop_playback_handle.clone())
         .manage(programmer_handle.clone())
+        .manage(snapshot_runtime_handle.clone())
         .manage(bridge_state.clone())
         .manage(vdj_state.clone())
         .setup(move |app| {
@@ -257,7 +270,14 @@ pub fn run() {
                 app.state();
             let scenes_st: tauri::State<'_, SharedScenePlayback> = app.state();
 
-            let outputs = show_state_st.read().show.outputs.clone();
+            let (outputs, fixture_universes) = {
+                let s = show_state_st.read();
+                let outputs = s.show.outputs.clone();
+                let mut us: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
+                us.sort_unstable();
+                us.dedup();
+                (outputs, us)
+            };
             if let Err(err) = apply_outputs(
                 &app_handle,
                 &engine_state,
@@ -267,6 +287,7 @@ pub fn run() {
                 &globals_st,
                 &scenes_st,
                 &outputs,
+                &fixture_universes,
             ) {
                 tracing::warn!(?err, "failed to apply initial outputs");
             }
@@ -327,6 +348,7 @@ pub fn run() {
                             loop_playback_handle.clone(),
                             engine_state.inner().clone(),
                             show_state_st.inner().clone(),
+                            snapshot_runtime_handle.clone(),
                         );
                         *lp_st.lock() = Some(controller);
                         tracing::info!(%name, "auto-connected MIDI surface at launch");
@@ -351,6 +373,7 @@ pub fn run() {
                     loop_playback_handle.clone(),
                     engine_state.inner().clone(),
                     show_state_st.inner().clone(),
+                    snapshot_runtime_handle.clone(),
                 ) {
                     Ok(controller) => {
                         *sd_st.lock() = Some(controller);
@@ -373,6 +396,8 @@ pub fn run() {
                     app_handle.clone(),
                     show_state_st.inner().clone(),
                     globals_st.inner().clone(),
+                    chasers_st.inner().clone(),
+                    movement_st.inner().clone(),
                     vdj_st.inner().clone(),
                     vdj_cfg_initial,
                 );
@@ -561,6 +586,14 @@ pub fn run() {
             commands::programmer_status,
             commands::programmer_clear,
             commands::programmer_untouch,
+            // Snapshots (whole-rig capture / toggle)
+            commands::capture_snapshot,
+            commands::update_snapshot_from_state,
+            commands::rename_snapshot,
+            commands::delete_snapshot,
+            commands::activate_snapshot,
+            commands::deactivate_snapshot,
+            commands::active_snapshot_id,
             // Sequence loop groups
             commands::list_loop_groups,
             commands::create_loop_group,
@@ -589,6 +622,10 @@ pub fn run() {
             commands::set_overall_bpm,
             commands::set_overall_bpm_enabled,
             commands::tap_overall_bpm,
+            commands::start_pattern_recording,
+            commands::tap_pattern_record,
+            commands::stop_pattern_recording,
+            commands::clear_tempo_pattern,
             // MIDI
             commands::list_midi_devices,
             commands::connect_midi_device,

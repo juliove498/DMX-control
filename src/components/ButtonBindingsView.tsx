@@ -112,6 +112,7 @@ type ActionKind =
   | "toggle_movement"
   | "recall_scene"
   | "start_loop_group"
+  | "toggle_snapshot"
   | "blackout"
   | "blind"
   | "tap"
@@ -125,6 +126,7 @@ const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   toggle_movement: "Toggle movimiento",
   recall_scene: "Llamar secuencia",
   start_loop_group: "Iniciar lista loop",
+  toggle_snapshot: "Toggle snapshot",
   blackout: "Blackout",
   blind: "Blind (momentáneo)",
   tap: "TAP tempo",
@@ -149,6 +151,9 @@ function actionToKind(a: ButtonAction): ActionKind {
     case "start_loop_group":
     case "start_loop_group_by_index":
       return "start_loop_group";
+    case "toggle_snapshot":
+    case "toggle_snapshot_by_index":
+      return "toggle_snapshot";
     case "blackout":
       return "blackout";
     case "blind":
@@ -169,7 +174,8 @@ function actionParamId(a: ButtonAction): string | null {
     a.type === "toggle_chaser" ||
     a.type === "toggle_movement" ||
     a.type === "recall_scene" ||
-    a.type === "start_loop_group"
+    a.type === "start_loop_group" ||
+    a.type === "toggle_snapshot"
   ) {
     return a.id;
   }
@@ -181,7 +187,8 @@ function actionParamIndex(a: ButtonAction): number | null {
     a.type === "toggle_chaser_by_index" ||
     a.type === "toggle_movement_by_index" ||
     a.type === "recall_scene_by_index" ||
-    a.type === "start_loop_group_by_index"
+    a.type === "start_loop_group_by_index" ||
+    a.type === "toggle_snapshot_by_index"
   ) {
     return a.index;
   }
@@ -212,6 +219,10 @@ function buildAction(
       return modeByIndex
         ? { type: "start_loop_group_by_index", index }
         : { type: "start_loop_group", id };
+    case "toggle_snapshot":
+      return modeByIndex
+        ? { type: "toggle_snapshot_by_index", index }
+        : { type: "toggle_snapshot", id };
     case "blackout":
       return { type: "blackout" };
     case "blind":
@@ -234,6 +245,7 @@ function summariseAction(
     movements: { id: string; name: string }[];
     scenes: { id: string; name: string }[];
     loops: { id: string; name: string }[];
+    snapshots: { id: string; name: string }[];
   },
 ): string {
   const nameFor = (list: { id: string; name: string }[], id: string): string =>
@@ -257,6 +269,10 @@ function summariseAction(
       return `Loop → ${nameFor(refs.loops, a.id)}`;
     case "start_loop_group_by_index":
       return `Loop #${a.index + 1}`;
+    case "toggle_snapshot":
+      return `Snap → ${nameFor(refs.snapshots, a.id)}`;
+    case "toggle_snapshot_by_index":
+      return `Snap #${a.index + 1}`;
     case "blackout":
       return "Blackout";
     case "blind":
@@ -328,6 +344,7 @@ export function ButtonBindingsView() {
       id: g.id,
       name: g.name,
     })),
+    snapshots: (show.snapshots ?? []).map((s) => ({ id: s.id, name: s.name })),
   };
 
   const commit = async (next: ButtonBindings) => {
@@ -701,6 +718,7 @@ type BindingRefs = {
   movements: { id: string; name: string }[];
   scenes: { id: string; name: string }[];
   loops: { id: string; name: string }[];
+  snapshots: { id: string; name: string }[];
 };
 
 function LpBindingModal({
@@ -995,13 +1013,16 @@ function ActionEditor({
           ? refs.scenes
           : kind === "start_loop_group"
             ? refs.loops
-            : [];
+            : kind === "toggle_snapshot"
+              ? refs.snapshots
+              : [];
 
   const needsTarget =
     kind === "toggle_chaser" ||
     kind === "toggle_movement" ||
     kind === "recall_scene" ||
-    kind === "start_loop_group";
+    kind === "start_loop_group" ||
+    kind === "toggle_snapshot";
 
   return (
     <div className="action-editor">

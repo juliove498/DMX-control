@@ -189,6 +189,7 @@ pub enum Subdivision {
     One,
     Two,
     Four,
+    Eight,
 }
 
 impl Subdivision {
@@ -200,6 +201,7 @@ impl Subdivision {
             Subdivision::One => 1.0,
             Subdivision::Two => 2.0,
             Subdivision::Four => 4.0,
+            Subdivision::Eight => 8.0,
         }
     }
 }

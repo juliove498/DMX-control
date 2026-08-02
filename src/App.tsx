@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import { ChaserView } from "./components/ChaserView";
 import { ConfigView } from "./components/ConfigView";
+import { LoopsView } from "./components/LoopsView";
 import { MovementView } from "./components/MovementView";
 import { OverallBpmControl } from "./components/OverallBpmControl";
 import { Preview3D } from "./components/Preview3D";
@@ -26,6 +27,7 @@ type Tab = PopoutView;
 const TABS: { id: Tab; labelKey: keyof Translation }[] = [
   { id: "stage", labelKey: "app.tab.stage" },
   { id: "scenes", labelKey: "app.tab.scenes" },
+  { id: "loops", labelKey: "app.tab.loops" },
   { id: "chaser", labelKey: "app.tab.chaser" },
   { id: "movement", labelKey: "app.tab.movement" },
   { id: "preview3d", labelKey: "app.tab.preview3d" },
@@ -38,6 +40,8 @@ function renderTab(tab: Tab) {
       return <StageView />;
     case "scenes":
       return <ScenesView />;
+    case "loops":
+      return <LoopsView />;
     case "chaser":
       return <ChaserView />;
     case "movement":

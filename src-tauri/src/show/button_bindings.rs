@@ -79,6 +79,14 @@ pub enum ButtonAction {
         index: u8,
     },
     StopLoopGroup,
+    /// Activate a whole-rig snapshot; pressing the active snapshot's
+    /// button deactivates it and restores the pre-activation state.
+    ToggleSnapshot {
+        id: String,
+    },
+    ToggleSnapshotByIndex {
+        index: u8,
+    },
 }
 
 /// How the LED / tile should reflect the action's "is it running" state.
@@ -219,6 +227,9 @@ pub const DEFAULT_LP_CHASER_NOTES: [u8; 8] = [11, 12, 13, 14, 15, 16, 17, 18];
 pub const DEFAULT_LP_MOVEMENT_NOTES: [u8; 8] = [21, 22, 23, 24, 25, 26, 27, 28];
 /// MK2 row-3 pad notes (scenes).
 pub const DEFAULT_LP_SCENE_NOTES: [u8; 8] = [31, 32, 33, 34, 35, 36, 37, 38];
+/// MK2 row-4 pad notes (whole-rig snapshots). Row was unused before the
+/// snapshot feature, so claiming it keeps every older binding intact.
+pub const DEFAULT_LP_SNAPSHOT_NOTES: [u8; 8] = [41, 42, 43, 44, 45, 46, 47, 48];
 /// MK2 right-side column (blackout, blind, tap, BPM toggle).
 pub const DEFAULT_LP_BLACKOUT_NOTE: u8 = 19;
 pub const DEFAULT_LP_BLIND_NOTE: u8 = 29;
@@ -255,6 +266,10 @@ const LP_SCENE_PALETTE: [(u8, u8); 8] = [
     (113, 114),
     (60, 61),
 ];
+/// One uniform warm-yellow pair for the whole snapshot row — the row
+/// reads as a block ("these are my saved looks"), and the flash state
+/// matches the dorado halo the desktop UI paints on the active snapshot.
+const LP_SNAPSHOT_PALETTE: (u8, u8) = (15, 13);
 const LP_BLACKOUT_PALETTE: (u8, u8) = (7, 5);
 const LP_BLIND_PALETTE: (u8, u8) = (1, 3);
 const LP_TAP_PALETTE: (u8, u8) = (37, 33);
@@ -335,6 +350,17 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
             label: format!("Scene {}", i + 1),
             color_dim: dim,
             color_bright: bright,
+            active_mode: ButtonActiveMode::Auto,
+        });
+    }
+    for i in 0..8 {
+        out.push(LaunchpadBinding {
+            note: DEFAULT_LP_SNAPSHOT_NOTES[i],
+            is_cc: false,
+            action: ButtonAction::ToggleSnapshotByIndex { index: i as u8 },
+            label: format!("Snapshot {}", i + 1),
+            color_dim: LP_SNAPSHOT_PALETTE.0,
+            color_bright: LP_SNAPSHOT_PALETTE.1,
             active_mode: ButtonActiveMode::Auto,
         });
     }

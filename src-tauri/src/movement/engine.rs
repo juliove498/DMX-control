@@ -10,6 +10,7 @@
 use std::collections::HashMap;
 use std::time::Instant;
 
+use crate::engine::beatgrid::BeatAnchor;
 use crate::engine::{empty_overlay, ChannelOverlay, DMX_CHANNELS};
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance, PanTiltRange};
 
@@ -68,6 +69,12 @@ pub struct MovementEngine {
     entries: Vec<MovementEntry>,
     fixtures: Vec<FixtureInstance>,
     library: HashMap<String, FixtureDefinition>,
+    /// External phase anchor. Same role as the chaser engine's: when
+    /// `Some`, advance_phase derives the cycle position from VDJ's
+    /// beat grid; when `None`, free-runs on the generator's own
+    /// tempo. The poller writes both engines in lockstep so they stay
+    /// coherent with each other.
+    beat_anchor: Option<BeatAnchor>,
 }
 
 impl MovementEngine {
@@ -110,6 +117,14 @@ impl MovementEngine {
         self.entries.iter().map(|e| e.config.clone()).collect()
     }
 
+    /// Install or clear the external phase anchor. Mirrors
+    /// `ChaserEngine::set_beat_anchor` — the VDJ poller calls both
+    /// engines so chases and movement stay locked to the same beat
+    /// grid as the music.
+    pub fn set_beat_anchor(&mut self, anchor: Option<BeatAnchor>) {
+        self.beat_anchor = anchor;
+    }
+
     fn resolve_all(&mut self) {
         for entry in &mut self.entries {
             entry.resolved = resolve_slots(&entry.config, &self.fixtures, &self.library);
@@ -123,11 +138,14 @@ impl MovementEngine {
     /// would simply overwrite the earlier one's pan/tilt cells.
     pub fn tick(&mut self, now: Instant, overall_bpm: Option<f32>) -> HashMap<u16, ChannelOverlay> {
         let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
+        // Same single-derivation pattern as ChaserEngine: one anchor
+        // read per frame, shared across every enabled generator.
+        let current_beat = self.beat_anchor.as_ref().map(|a| a.beat_at(now));
         for entry in &mut self.entries {
             if !entry.config.enabled || entry.resolved.is_empty() {
                 continue;
             }
-            advance_phase(&mut entry.runtime, &entry.config, now, overall_bpm);
+            advance_phase(&mut entry.runtime, &entry.config, now, overall_bpm, current_beat);
             for r in &entry.resolved {
                 let (x, y) = evaluate_slot(
                     entry.runtime.global_phase,
@@ -187,15 +205,53 @@ fn advance_phase(
     cfg: &MovementGenerator,
     now: Instant,
     overall_bpm: Option<f32>,
+    current_beat: Option<f64>,
 ) {
     // Same override semantics as the chaser side — keep both effects
     // locked to one tempo when the operator is driving the rig from
     // the header's overall BPM.
-    let bpm = overall_bpm.unwrap_or(match cfg.tempo {
+    let _bpm = overall_bpm.unwrap_or(match cfg.tempo {
         TempoSource::Fixed { bpm } => bpm,
     });
     let beats_per_loop = beats_per_loop(cfg.subdivision);
-    let beats_per_sec = (bpm.max(1.0) as f64) / 60.0;
+
+    // Phase-sync path: when VDJ tells us "right now you are at beat
+    // B", derive the cycle position deterministically. Forward and
+    // Reverse get a clean modulo of the beats-per-loop; PingPong
+    // unwraps into a triangle wave that the eval pipeline reads the
+    // same way as the free-run version.
+    if let Some(beat) = current_beat {
+        runtime.last_update = Some(now);
+        let beat_safe = beat.max(0.0);
+        let cycles = beat_safe / beats_per_loop;
+        match cfg.direction {
+            Direction::Forward => {
+                runtime.direction_sign = 1.0;
+                runtime.global_phase = cycles.rem_euclid(1.0);
+            }
+            Direction::Reverse => {
+                runtime.direction_sign = -1.0;
+                runtime.global_phase = (-cycles).rem_euclid(1.0);
+            }
+            Direction::PingPong => {
+                // Triangle wave: cycles mod 2 in [0..1) means going up,
+                // in [1..2) means coming back. Reflect the second half
+                // so global_phase tracks 0 → 1 → 0 → 1, never wrapping.
+                let tri = cycles.rem_euclid(2.0);
+                if tri < 1.0 {
+                    runtime.global_phase = tri;
+                    runtime.direction_sign = 1.0;
+                } else {
+                    runtime.global_phase = 2.0 - tri;
+                    runtime.direction_sign = -1.0;
+                }
+            }
+        }
+        return;
+    }
+
+    // Free-run path (no anchor): existing behaviour, unchanged.
+    let beats_per_sec = (_bpm.max(1.0) as f64) / 60.0;
     let cycles_per_sec = beats_per_sec / beats_per_loop;
 
     let delta = match runtime.last_update {
@@ -240,6 +296,7 @@ fn beats_per_loop(s: Subdivision) -> f64 {
         Subdivision::One => 1.0,
         Subdivision::Two => 2.0,
         Subdivision::Four => 4.0,
+        Subdivision::Eight => 8.0,
     }
 }
 
@@ -455,5 +512,105 @@ mod tests {
         e.replace_generators(vec![g]);
         let ov = e.tick(Instant::now(), None);
         assert!(ov.is_empty());
+    }
+
+    #[test]
+    fn beat_anchor_snaps_global_phase() {
+        // Anchor at (now, beat=2.0, bpm=120) with Subdivision::One
+        // (1 beat per loop) → cycles = 2.0 → phase = 0.0 (mod 1).
+        // Same setup with beat=2.5 → phase = 0.5.
+        let mut e = MovementEngine::new();
+        e.update_show_context(vec![mover_instance("m1", 1)], lib_with_mover());
+        let mut g = MovementGenerator::default_disabled();
+        g.enabled = true;
+        g.fixtures = vec![slot("m1")];
+        g.tempo = TempoSource::Fixed { bpm: 120.0 };
+        g.subdivision = Subdivision::One;
+        e.replace_generators(vec![g]);
+
+        let t0 = Instant::now();
+        e.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 2.0,
+            bpm: 120.0,
+        }));
+        e.tick(t0, None);
+        let p0 = e.entries[0].runtime.global_phase;
+        assert!((p0 - 0.0).abs() < 1e-6, "beat 2.0 → phase 0.0, got {p0}");
+
+        e.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 2.5,
+            bpm: 120.0,
+        }));
+        e.tick(t0, None);
+        let p1 = e.entries[0].runtime.global_phase;
+        assert!((p1 - 0.5).abs() < 1e-6, "beat 2.5 → phase 0.5, got {p1}");
+    }
+
+    #[test]
+    fn beat_anchor_pingpong_triangle_wave() {
+        // PingPong: cycles % 2 in [0,1) → going up, in [1,2) → going down.
+        let mut e = MovementEngine::new();
+        e.update_show_context(vec![mover_instance("m1", 1)], lib_with_mover());
+        let mut g = MovementGenerator::default_disabled();
+        g.enabled = true;
+        g.fixtures = vec![slot("m1")];
+        g.tempo = TempoSource::Fixed { bpm: 120.0 };
+        g.subdivision = Subdivision::One;
+        g.direction = Direction::PingPong;
+        e.replace_generators(vec![g]);
+
+        let t0 = Instant::now();
+        // beat 0.5 (in cycle 0, half-way up) → phase 0.5, going forward
+        e.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 0.5,
+            bpm: 120.0,
+        }));
+        e.tick(t0, None);
+        let p_up = e.entries[0].runtime.global_phase;
+        let dir_up = e.entries[0].runtime.direction_sign;
+        assert!((p_up - 0.5).abs() < 1e-6, "got {p_up}");
+        assert_eq!(dir_up, 1.0);
+
+        // beat 1.5 (in cycle 1, half-way back) → phase 0.5, going reverse
+        e.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 1.5,
+            bpm: 120.0,
+        }));
+        e.tick(t0, None);
+        let p_down = e.entries[0].runtime.global_phase;
+        let dir_down = e.entries[0].runtime.direction_sign;
+        assert!((p_down - 0.5).abs() < 1e-6, "got {p_down}");
+        assert_eq!(dir_down, -1.0);
+    }
+
+    #[test]
+    fn beat_anchor_cleared_falls_back_to_free_run() {
+        let mut e = MovementEngine::new();
+        e.update_show_context(vec![mover_instance("m1", 1)], lib_with_mover());
+        let mut g = MovementGenerator::default_disabled();
+        g.enabled = true;
+        g.fixtures = vec![slot("m1")];
+        g.tempo = TempoSource::Fixed { bpm: 60.0 };
+        g.subdivision = Subdivision::One;
+        e.replace_generators(vec![g]);
+
+        let t0 = Instant::now();
+        e.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 0.5,
+            bpm: 60.0,
+        }));
+        e.tick(t0, None); // snap to 0.5
+        e.set_beat_anchor(None);
+        e.tick(t0, None); // free-run init last_update
+        // 250 ms at 60 BPM × Subdivision::One = 1 cps → +0.25 phase
+        e.tick(t0 + Duration::from_millis(250), None);
+        let p = e.entries[0].runtime.global_phase;
+        // Free-run advanced 0.25 from previous 0.5 → 0.75
+        assert!((p - 0.75).abs() < 0.01, "got {p}");
     }
 }

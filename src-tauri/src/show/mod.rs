@@ -5,6 +5,7 @@ pub mod library;
 pub mod loop_group;
 pub mod scene;
 pub mod session;
+pub mod snapshot;
 pub mod state;
 
 pub use file::{load, save, ShowError, ShowFileV1, SHOW_FILE_VERSION};

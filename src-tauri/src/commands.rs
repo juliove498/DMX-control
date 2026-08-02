@@ -30,7 +30,9 @@ use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, P
 use crate::show::library::{ensure_seeded, library_dir, load_all, save_def};
 use crate::show::loop_group::SceneLoopGroup;
 use crate::show::scene::{Scene, SceneChannel, SceneFixture, SceneFxState, SceneStep};
+use crate::show::snapshot::{Snapshot, SnapshotUniverse};
 use crate::show::ShowState;
+use crate::snapshot::SharedSnapshotRuntime;
 
 pub const STATS_EVENT: &str = "engine:stats";
 pub const SHOW_EVENT: &str = "show:updated";
@@ -42,6 +44,7 @@ pub const SCENE_ACTIVE_EVENT: &str = "scene:active_changed";
 pub const LOOP_GROUP_EVENT: &str = "loop_group:active_changed";
 pub const MASTER_EVENT: &str = "engine:master_changed";
 pub const BLIND_EVENT: &str = "engine:blind_changed";
+pub const SNAPSHOT_EVENT: &str = "snapshot:active_changed";
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../bindings/")]
@@ -60,6 +63,12 @@ pub struct MasterChange {
 #[ts(export, export_to = "../bindings/")]
 pub struct BlindChange {
     pub pressed: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct SnapshotActiveChange {
+    pub active_snapshot_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -298,6 +307,91 @@ pub fn tap_overall_bpm(
     tap_overall_bpm_impl(&app, &show, &globals)
 }
 
+// Tempo-pattern recording. The flow is:
+//   start_pattern_recording → ...tap_pattern_record × N... → stop_pattern_recording
+// Stop returns the freshly committed pattern; the show file is updated
+// in the same call so a Cmd-S right after a successful capture persists
+// the new rhythm without an extra round trip.
+//
+// `clear_tempo_pattern` is the escape hatch — drops the active pattern
+// and leaves the rig running on plain overall_bpm.
+
+pub fn start_pattern_recording_impl(globals: &SharedGlobals) -> Result<(), CommandError> {
+    globals.lock().start_pattern_recording();
+    Ok(())
+}
+
+#[tauri::command]
+pub fn start_pattern_recording(
+    globals: State<'_, SharedGlobals>,
+) -> Result<(), CommandError> {
+    start_pattern_recording_impl(&globals)
+}
+
+pub fn tap_pattern_record_impl(globals: &SharedGlobals) -> Result<(), CommandError> {
+    globals
+        .lock()
+        .tap_pattern_record(std::time::Instant::now());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn tap_pattern_record(globals: State<'_, SharedGlobals>) -> Result<(), CommandError> {
+    tap_pattern_record_impl(&globals)
+}
+
+pub fn stop_pattern_recording_impl(
+    app: &AppHandle,
+    show: &ShowState,
+    globals: &SharedGlobals,
+) -> Result<Option<crate::globals::TempoPattern>, CommandError> {
+    let committed = globals.lock().stop_pattern_recording();
+    if let Some(p) = committed.clone() {
+        let mut s = show.write();
+        s.show.globals.tempo_pattern = Some(p);
+        s.dirty = true;
+    }
+    if committed.is_some() {
+        persist_show(show, app)?;
+        let _ = app.emit(SHOW_EVENT, ());
+    }
+    Ok(committed)
+}
+
+#[tauri::command]
+pub fn stop_pattern_recording(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    globals: State<'_, SharedGlobals>,
+) -> Result<Option<crate::globals::TempoPattern>, CommandError> {
+    stop_pattern_recording_impl(&app, &show, &globals)
+}
+
+pub fn clear_tempo_pattern_impl(
+    app: &AppHandle,
+    show: &ShowState,
+    globals: &SharedGlobals,
+) -> Result<(), CommandError> {
+    globals.lock().clear_tempo_pattern();
+    {
+        let mut s = show.write();
+        s.show.globals.tempo_pattern = None;
+        s.dirty = true;
+    }
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn clear_tempo_pattern(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    globals: State<'_, SharedGlobals>,
+) -> Result<(), CommandError> {
+    clear_tempo_pattern_impl(&app, &show, &globals)
+}
+
 #[tauri::command]
 pub fn clear_universe(engine: State<'_, EngineState>, universe: u16) -> Result<(), EngineError> {
     let mut g = engine.write();
@@ -388,11 +482,15 @@ pub fn set_outputs(
     scenes: State<'_, SharedScenePlayback>,
     outputs: OutputsConfig,
 ) -> Result<(), CommandError> {
-    {
+    let fixture_universes = {
         let mut s = show.write();
         s.show.outputs = outputs.clone();
         s.dirty = true;
-    }
+        let mut us: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
+        us.sort_unstable();
+        us.dedup();
+        us
+    };
     apply_outputs(
         &app,
         &engine,
@@ -402,6 +500,7 @@ pub fn set_outputs(
         &globals,
         &scenes,
         &outputs,
+        &fixture_universes,
     )?;
     persist_show(&show, &app)?;
     let _ = app.emit(SHOW_EVENT, ());
@@ -500,6 +599,8 @@ pub fn new_show(
         s.show.outputs.clone()
     };
     scenes.lock().release(std::time::Instant::now());
+    // Fresh show → no fixtures yet, so the fixture-universes set is
+    // empty; the apply_outputs fallback keeps universe 0 alive.
     apply_outputs(
         &app,
         &engine,
@@ -509,6 +610,7 @@ pub fn new_show(
         &globals,
         &scenes,
         &outputs,
+        &[],
     )?;
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
@@ -535,6 +637,12 @@ pub fn open_show(
     let loaded = load_show_file(&p).map_err(CommandError::from)?;
     let outputs = loaded.outputs.clone();
     let bundled_defs = loaded.library.clone();
+    let fixture_universes: Vec<u16> = {
+        let mut us: Vec<u16> = loaded.fixtures.iter().map(|f| f.universe).collect();
+        us.sort_unstable();
+        us.dedup();
+        us
+    };
     {
         let mut s = show.write();
         s.show = loaded;
@@ -582,6 +690,7 @@ pub fn open_show(
         &globals,
         &scenes,
         &outputs,
+        &fixture_universes,
     )?;
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
@@ -666,6 +775,7 @@ pub fn add_fixture(
         s.show.fixtures.push(fixture);
         s.dirty = true;
     }
+    ensure_engine_universes(&engine, &show);
     apply_channel_defaults(&engine, &show, &new_ids);
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
@@ -709,6 +819,7 @@ pub fn add_fixtures(
         s.show.fixtures.extend(fixtures);
         s.dirty = true;
     }
+    ensure_engine_universes(&engine, &show);
     apply_channel_defaults(&engine, &show, &new_ids);
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
@@ -723,6 +834,41 @@ pub fn add_fixtures(
 /// pan/tilt 127 = centre) instead of at DMX 0 — saves the operator from
 /// having to "unpark" every new fixture by hand. Silently skips fixtures
 /// that don't resolve (unknown definition / mode / out-of-range address).
+/// Make sure every universe referenced by a patched fixture exists in
+/// the engine's universe list. Cheap (snapshot read + write, no driver
+/// reload) so callers can fire it after any fixture mutation without
+/// going through the full `apply_outputs` pipeline. Preserves existing
+/// data on universes that survive the reconcile.
+fn ensure_engine_universes(engine: &EngineState, show: &ShowState) {
+    let (fixture_universes, output_universes) = {
+        let s = show.read();
+        let mut fus: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
+        fus.sort_unstable();
+        fus.dedup();
+        (fus, s.show.outputs.universes())
+    };
+    let mut wanted: Vec<u16> = output_universes;
+    for u in fixture_universes {
+        if !wanted.contains(&u) {
+            wanted.push(u);
+        }
+    }
+    wanted.sort_unstable();
+    wanted.dedup();
+    if wanted.is_empty() {
+        wanted.push(0);
+    }
+    // Skip the write lock if nothing would change. Hot in big shows
+    // where every fixture move re-runs this.
+    {
+        let current: Vec<u16> = engine.read().universes.iter().map(|u| u.id).collect();
+        if current == wanted {
+            return;
+        }
+    }
+    engine.write().reconcile_universes(&wanted);
+}
+
 fn apply_channel_defaults(engine: &EngineState, show: &ShowState, ids: &[String]) {
     let s = show.read();
     let mut g = engine.write();
@@ -804,8 +950,10 @@ pub fn remove_fixture(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn update_fixture(
     app: AppHandle,
+    engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
     chasers: State<'_, SharedChasers>,
     movement: State<'_, SharedMovement>,
@@ -823,6 +971,9 @@ pub fn update_fixture(
         *f = fixture;
         s.dirty = true;
     }
+    // Re-patching to a new universe needs the engine to know about it,
+    // same logic as `add_fixture`.
+    ensure_engine_universes(&engine, &show);
     sync_chasers(&show, &chasers);
     sync_movements(&show, &movement);
     sync_globals(&show, &globals);
@@ -899,6 +1050,18 @@ pub fn get_fixture_values(
     Ok(snap[start..start + len].to_vec())
 }
 
+/// A single manual fixture-channel write. The mobile remote sends these
+/// in batches (`set_fixture_channels`) so an RGB color or a multi-fixture
+/// selection lands as one atomic update with a single `PROGRAMMER_EVENT`
+/// instead of N round-trips that would flicker as the snapshots race.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../bindings/")]
+pub struct FixtureChannelWrite {
+    pub fixture_id: String,
+    pub channel_offset: u16,
+    pub value: u8,
+}
+
 #[tauri::command]
 pub fn set_fixture_channel(
     app: AppHandle,
@@ -909,6 +1072,36 @@ pub fn set_fixture_channel(
     channel_offset: u16,
     value: u8,
 ) -> Result<(), CommandError> {
+    set_fixture_channels_impl(
+        &app,
+        &engine,
+        &show,
+        &programmer,
+        &[FixtureChannelWrite {
+            fixture_id,
+            channel_offset,
+            value,
+        }],
+    )
+}
+
+/// Resolve one fixture-channel write to its absolute (universe, channel),
+/// push it into the engine, and mark the channel touched in the
+/// programmer. Does NOT emit `PROGRAMMER_EVENT` — the batch entry point
+/// emits once after applying every write. Bounds-checks the offset
+/// against the fixture's mode: the mobile remote is an untrusted client,
+/// so we never index past the patched channel count.
+fn apply_fixture_channel(
+    engine: &EngineState,
+    show: &ShowState,
+    programmer: &SharedProgrammer,
+    write: &FixtureChannelWrite,
+) -> Result<(), CommandError> {
+    let FixtureChannelWrite {
+        fixture_id,
+        channel_offset,
+        value,
+    } = write;
     tracing::trace!(
         target: "dmx::input",
         fixture = %fixture_id,
@@ -922,7 +1115,7 @@ pub fn set_fixture_channel(
             .show
             .fixtures
             .iter()
-            .find(|f| f.id == fixture_id)
+            .find(|f| &f.id == fixture_id)
             .ok_or_else(|| CommandError::Other(format!("fixture {fixture_id} not found")))?;
         let def = s.library.get(&inst.definition_id).ok_or_else(|| {
             CommandError::Other(format!("unknown definition {}", inst.definition_id))
@@ -930,7 +1123,7 @@ pub fn set_fixture_channel(
         let mode = def.mode(inst.mode_index as usize).ok_or_else(|| {
             CommandError::Other(format!("unknown mode index {}", inst.mode_index))
         })?;
-        if (channel_offset as usize) >= mode.channels.len() {
+        if (*channel_offset as usize) >= mode.channels.len() {
             return Err(CommandError::Other(format!(
                 "channel offset {channel_offset} out of bounds for mode with {} channels",
                 mode.channels.len()
@@ -938,25 +1131,49 @@ pub fn set_fixture_channel(
         }
         let ch = inst
             .address
-            .saturating_add(channel_offset)
+            .saturating_add(*channel_offset)
             .saturating_sub(1);
         (inst.universe, ch)
     };
     engine
         .write()
-        .set_channel(universe, channel, value)
+        .set_channel(universe, channel, *value)
         .map_err(|e| CommandError::Other(e.to_string()))?;
+    programmer.lock().touch(fixture_id.clone(), *channel_offset);
+    Ok(())
+}
+
+/// Apply a batch of manual fixture-channel writes and emit a single
+/// `PROGRAMMER_EVENT`. Free function so both the Tauri command and the
+/// mobile bridge can drive the programmer without going through IPC.
+/// Invalid writes (unknown fixture, out-of-range offset) are skipped and
+/// the first such error is returned *after* the valid writes land, so a
+/// single bad item in a batch can't silently drop the rest.
+pub fn set_fixture_channels_impl(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    programmer: &SharedProgrammer,
+    writes: &[FixtureChannelWrite],
+) -> Result<(), CommandError> {
+    let mut first_err = None;
+    for w in writes {
+        if let Err(e) = apply_fixture_channel(engine, show, programmer, w) {
+            if first_err.is_none() {
+                first_err = Some(e);
+            }
+        }
+    }
     // Mark this fixture *and the specific channel* as touched. The
     // recording flows still capture at fixture granularity (Update / Add
     // step / Solo touched), but the per-channel detail powers the
     // "what did I touch on this fixture" UI on the stage canvas.
-    let snap = {
-        let mut p = programmer.lock();
-        p.touch(fixture_id, channel_offset);
-        p.snapshot()
-    };
+    let snap = programmer.lock().snapshot();
     let _ = app.emit(PROGRAMMER_EVENT, snap);
-    Ok(())
+    match first_err {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
 }
 
 /// Returns the absolute path of the fixture library directory so the frontend
@@ -1608,6 +1825,16 @@ pub fn programmer_status(programmer: State<'_, SharedProgrammer>) -> ProgrammerS
 
 #[tauri::command]
 pub fn programmer_clear(app: AppHandle, programmer: State<'_, SharedProgrammer>) {
+    programmer_clear_impl(&app, &programmer);
+}
+
+/// Clear every touched marker and emit `PROGRAMMER_EVENT`. Free function
+/// so the mobile bridge can drive Clear without going through IPC. This
+/// only resets the programmer's marker set — the manual DMX values
+/// already written to the universe stay live until a scene recall /
+/// blackout overwrites them, matching the desktop's current programmer
+/// semantics (the full LTP/HTP override layer is still parked).
+pub fn programmer_clear_impl(app: &AppHandle, programmer: &SharedProgrammer) {
     let snap = {
         let mut p = programmer.lock();
         p.clear();
@@ -2342,6 +2569,7 @@ pub fn connect_midi_device(
     loops: State<'_, SharedLoopPlayback>,
     engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
+    snapshots_rt: State<'_, SharedSnapshotRuntime>,
     name: String,
 ) -> Result<(), CommandError> {
     // Tear down any previous Launchpad controller before opening a new
@@ -2366,6 +2594,7 @@ pub fn connect_midi_device(
             loops.inner().clone(),
             engine.inner().clone(),
             show.inner().clone(),
+            snapshots_rt.inner().clone(),
         );
         *launchpad_state.lock() = Some(controller);
     }
@@ -2412,6 +2641,7 @@ pub fn connect_streamdeck_device(
     loops: State<'_, SharedLoopPlayback>,
     engine: State<'_, EngineState>,
     show: State<'_, ShowState>,
+    snapshots_rt: State<'_, SharedSnapshotRuntime>,
     serial: Option<String>,
 ) -> Result<(), CommandError> {
     // Tear down any previous controller — same reasoning as the MIDI
@@ -2429,6 +2659,7 @@ pub fn connect_streamdeck_device(
         loops.inner().clone(),
         engine.inner().clone(),
         show.inner().clone(),
+        snapshots_rt.inner().clone(),
     )
     .map_err(CommandError::Other)?;
     *streamdeck_state.lock() = Some(controller);
@@ -2479,13 +2710,30 @@ pub fn apply_outputs(
     globals: &SharedGlobals,
     scenes: &SharedScenePlayback,
     outputs: &OutputsConfig,
+    fixture_universes: &[u16],
 ) -> Result<(), CommandError> {
-    let universes = outputs.universes();
-    let universes = if universes.is_empty() {
-        vec![0]
-    } else {
-        universes
-    };
+    // Universes the engine needs to keep alive = union of output-bound
+    // universes + universes any patched fixture lives on. The fixture
+    // side matters even with zero outputs configured: the Stage colour
+    // bar polls `get_universe_output(universe)` for every fixture, so
+    // a universe with no driver but with fixtures still needs an entry
+    // (it'll just hold zeros that the post-merge snapshot can read).
+    // Without this, a show moved between machines where the output
+    // binding doesn't cover the same universes shows up blank on
+    // Stage even though everything else loaded fine.
+    let mut universes: Vec<u16> = outputs.universes();
+    for &u in fixture_universes {
+        if !universes.contains(&u) {
+            universes.push(u);
+        }
+    }
+    universes.sort_unstable();
+    universes.dedup();
+    if universes.is_empty() {
+        // Empty patch + no outputs: keep universe 0 around so Direct
+        // Output and an empty Stage still have something to talk to.
+        universes.push(0);
+    }
     engine.write().reconcile_universes(&universes);
 
     let new_bindings = instantiate(outputs);
@@ -3083,6 +3331,448 @@ pub fn tick_loop_groups(
             current_scene_id: Some(next_scene_id),
         },
     );
+}
+
+// ---- Snapshots (whole-rig capture / toggle) -------------------------------
+//
+// A snapshot freezes *everything the operator can hear in the lights*:
+// base DMX values, grand master, running chaser (+ its level), running
+// movement, active scene / loop group, blackout and Overall BPM.
+// Activating one re-applies all of it; the runtime captures the same
+// shape from the live rig first, so deactivating restores the exact
+// pre-activation state.
+
+/// Capture the live rig into a `Snapshot` payload. Shared by the
+/// user-facing capture commands and by activation (which uses it to
+/// build the restore point).
+fn capture_live_state(
+    engine: &EngineState,
+    show: &ShowState,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+    id: String,
+    name: String,
+) -> Snapshot {
+    let (universes, master) = {
+        let g = engine.read();
+        let universes = g
+            .universes
+            .iter()
+            .map(|u| SnapshotUniverse {
+                id: u.id,
+                data: u.data.to_vec(),
+            })
+            .collect();
+        (universes, g.master)
+    };
+    let (chaser_state, movement_state) = current_fx_state(show);
+    let (chaser_master, blackout, overall_bpm_enabled, overall_bpm) = {
+        let s = show.read();
+        (
+            s.show.chasers.iter().find(|c| c.enabled).map(|c| c.master),
+            s.show.globals.blackout.active,
+            s.show.globals.overall_bpm_enabled,
+            s.show.globals.overall_bpm,
+        )
+    };
+    let active_scene_id = scenes_pb.lock().active_scene_id().map(str::to_string);
+    let active_loop_group_id = loops_pb.lock().active_group_id().map(str::to_string);
+    Snapshot {
+        id,
+        name,
+        universes,
+        master,
+        chaser_state,
+        movement_state,
+        chaser_master,
+        active_scene_id,
+        active_loop_group_id,
+        blackout,
+        overall_bpm_enabled,
+        overall_bpm,
+    }
+}
+
+/// Re-apply a captured rig state wholesale. Used both to activate a
+/// snapshot and to restore the pre-activation state on deactivate.
+///
+/// Order matters:
+/// 1. Stop the loop driver and hard-clear scene playback (no release
+///    fade — its fade-out would fight the values we're about to set).
+/// 2. Overwrite base DMX + master.
+/// 3. Re-apply the FX layers (chaser / movement / chaser level).
+/// 4. Re-apply globals (blackout, Overall BPM).
+/// 5. Re-arm the loop group or scene that was running, via the normal
+///    recall path so step animation and FX-per-step behave as usual.
+#[allow(clippy::too_many_arguments)]
+fn apply_snapshot_state(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    globals: &SharedGlobals,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+    snap: &Snapshot,
+) -> Result<(), CommandError> {
+    loops_pb.lock().stop();
+    scenes_pb.lock().clear_hard();
+    let _ = app.emit(
+        SCENE_ACTIVE_EVENT,
+        SceneActiveChange {
+            active_scene_id: None,
+            step_index: None,
+        },
+    );
+    let _ = app.emit(
+        LOOP_GROUP_EVENT,
+        LoopGroupActiveChange {
+            active_group_id: None,
+            current_index: None,
+            current_scene_id: None,
+        },
+    );
+
+    {
+        let mut e = engine.write();
+        e.master = snap.master;
+        for su in &snap.universes {
+            // Universes that no longer exist (output re-config since the
+            // capture) are skipped; new universes keep their current data.
+            if let Some(u) = e.universes.iter_mut().find(|u| u.id == su.id) {
+                for (i, v) in su.data.iter().take(DMX_CHANNELS).enumerate() {
+                    u.data[i] = *v;
+                }
+            }
+        }
+    }
+    let _ = app.emit(
+        MASTER_EVENT,
+        MasterChange {
+            master: snap.master,
+        },
+    );
+
+    // FX layers. Failures (deleted chaser/movement) are logged, not
+    // fatal — the rest of the snapshot still applies.
+    if let Err(err) = apply_fx_state_chaser(app, show, chasers, &snap.chaser_state) {
+        tracing::warn!(?err, "snapshot apply: chaser state failed");
+    }
+    if let Err(err) = apply_fx_state_movement(app, show, movement, &snap.movement_state) {
+        tracing::warn!(?err, "snapshot apply: movement state failed");
+    }
+    if let (Some(level), SceneFxState::Enabled { id }) = (snap.chaser_master, &snap.chaser_state) {
+        if let Err(err) = set_chaser_master_impl(app, show, chasers, id, level) {
+            tracing::warn!(?err, "snapshot apply: chaser master failed");
+        }
+    }
+
+    {
+        let mut s = show.write();
+        s.show.globals.blackout.active = snap.blackout;
+        s.show.globals.overall_bpm_enabled = snap.overall_bpm_enabled;
+        s.show.globals.overall_bpm = snap.overall_bpm.clamp(20.0, 300.0);
+        s.dirty = true;
+    }
+    {
+        let mut g = globals.lock();
+        g.set_blackout(snap.blackout);
+        g.set_overall_bpm_enabled(snap.overall_bpm_enabled);
+        g.set_overall_bpm(snap.overall_bpm);
+    }
+
+    if let Some(gid) = &snap.active_loop_group_id {
+        if let Err(err) = start_loop_group_impl(
+            app, engine, show, chasers, movement, scenes_pb, loops_pb, gid,
+        ) {
+            tracing::warn!(?err, %gid, "snapshot apply: loop group restart failed");
+        }
+    } else if let Some(sid) = &snap.active_scene_id {
+        let exists = show.read().show.scenes.iter().any(|sc| &sc.id == sid);
+        if exists {
+            if let Err(err) =
+                recall_scene_impl(app, engine, show, chasers, movement, scenes_pb, sid)
+            {
+                tracing::warn!(?err, %sid, "snapshot apply: scene recall failed");
+            }
+        } else {
+            tracing::warn!(%sid, "snapshot references a scene that no longer exists; skipping");
+        }
+    }
+
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn capture_snapshot(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    scenes_pb: State<'_, SharedScenePlayback>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+    name: Option<String>,
+) -> Result<Snapshot, CommandError> {
+    let snap_name = match name.map(|n| n.trim().to_string()) {
+        Some(n) if !n.is_empty() => n,
+        _ => format!("Snapshot {}", show.read().show.snapshots.len() + 1),
+    };
+    let snap = capture_live_state(
+        engine.inner(),
+        &show,
+        scenes_pb.inner(),
+        loops_pb.inner(),
+        uuid::Uuid::new_v4().to_string(),
+        snap_name,
+    );
+    {
+        let mut s = show.write();
+        s.show.snapshots.push(snap.clone());
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(snap)
+}
+
+/// Re-capture the live rig into an existing snapshot (keeps id + name).
+#[tauri::command]
+pub fn update_snapshot_from_state(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    scenes_pb: State<'_, SharedScenePlayback>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+    id: String,
+) -> Result<Snapshot, CommandError> {
+    let name = show
+        .read()
+        .show
+        .snapshots
+        .iter()
+        .find(|s| s.id == id)
+        .map(|s| s.name.clone())
+        .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
+    let snap = capture_live_state(
+        engine.inner(),
+        &show,
+        scenes_pb.inner(),
+        loops_pb.inner(),
+        id.clone(),
+        name,
+    );
+    {
+        let mut s = show.write();
+        if let Some(entry) = s.show.snapshots.iter_mut().find(|s| s.id == id) {
+            *entry = snap.clone();
+        }
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(snap)
+}
+
+#[tauri::command]
+pub fn rename_snapshot(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    id: String,
+    name: String,
+) -> Result<(), CommandError> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err(CommandError::Other("snapshot name cannot be empty".into()));
+    }
+    {
+        let mut s = show.write();
+        let entry = s
+            .show
+            .snapshots
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
+        entry.name = name;
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn delete_snapshot(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    snapshots_rt: State<'_, SharedSnapshotRuntime>,
+    id: String,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        let before = s.show.snapshots.len();
+        s.show.snapshots.retain(|snap| snap.id != id);
+        if s.show.snapshots.len() == before {
+            return Err(CommandError::Other(format!("snapshot {id} not found")));
+        }
+        s.dirty = true;
+    }
+    {
+        // Deleting the snapshot that's currently applied keeps the rig
+        // exactly as it looks right now — we just stop tracking it (and
+        // drop the restore point, which no longer has an owner).
+        let mut rt = snapshots_rt.lock();
+        if rt.active_id() == Some(id.as_str()) {
+            rt.clear();
+            let _ = app.emit(
+                SNAPSHOT_EVENT,
+                SnapshotActiveChange {
+                    active_snapshot_id: None,
+                },
+            );
+        }
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Activate a snapshot: capture the live rig as the restore point (only
+/// when none is active yet — A→B switches keep A's restore point), then
+/// apply the stored state.
+#[allow(clippy::too_many_arguments)]
+pub fn activate_snapshot_impl(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    globals: &SharedGlobals,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+    snapshots_rt: &SharedSnapshotRuntime,
+    id: &str,
+) -> Result<(), CommandError> {
+    let snap = show
+        .read()
+        .show
+        .snapshots
+        .iter()
+        .find(|s| s.id == id)
+        .cloned()
+        .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
+    let pre = if snapshots_rt.lock().is_active() {
+        None
+    } else {
+        Some(capture_live_state(
+            engine,
+            show,
+            scenes_pb,
+            loops_pb,
+            String::new(),
+            String::new(),
+        ))
+    };
+    apply_snapshot_state(
+        app, engine, show, chasers, movement, globals, scenes_pb, loops_pb, &snap,
+    )?;
+    snapshots_rt.lock().set_active(id.to_string(), pre);
+    let _ = app.emit(
+        SNAPSHOT_EVENT,
+        SnapshotActiveChange {
+            active_snapshot_id: Some(id.to_string()),
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn activate_snapshot(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes_pb: State<'_, SharedScenePlayback>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+    snapshots_rt: State<'_, SharedSnapshotRuntime>,
+    id: String,
+) -> Result<(), CommandError> {
+    activate_snapshot_impl(
+        &app,
+        engine.inner(),
+        &show,
+        chasers.inner(),
+        movement.inner(),
+        globals.inner(),
+        scenes_pb.inner(),
+        loops_pb.inner(),
+        snapshots_rt.inner(),
+        &id,
+    )
+}
+
+/// Deactivate the current snapshot and restore the state captured when
+/// it was first activated — the "as if nothing happened" path.
+#[allow(clippy::too_many_arguments)]
+pub fn deactivate_snapshot_impl(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    globals: &SharedGlobals,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+    snapshots_rt: &SharedSnapshotRuntime,
+) -> Result<(), CommandError> {
+    let saved = snapshots_rt.lock().take_saved();
+    if let Some(saved) = saved {
+        apply_snapshot_state(
+            app, engine, show, chasers, movement, globals, scenes_pb, loops_pb, &saved,
+        )?;
+    }
+    let _ = app.emit(
+        SNAPSHOT_EVENT,
+        SnapshotActiveChange {
+            active_snapshot_id: None,
+        },
+    );
+    Ok(())
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn deactivate_snapshot(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes_pb: State<'_, SharedScenePlayback>,
+    loops_pb: State<'_, SharedLoopPlayback>,
+    snapshots_rt: State<'_, SharedSnapshotRuntime>,
+) -> Result<(), CommandError> {
+    deactivate_snapshot_impl(
+        &app,
+        engine.inner(),
+        &show,
+        chasers.inner(),
+        movement.inner(),
+        globals.inner(),
+        scenes_pb.inner(),
+        loops_pb.inner(),
+        snapshots_rt.inner(),
+    )
+}
+
+#[tauri::command]
+pub fn active_snapshot_id(snapshots_rt: State<'_, SharedSnapshotRuntime>) -> Option<String> {
+    snapshots_rt.lock().active_id().map(str::to_string)
 }
 
 // ---- Button bindings -----------------------------------------------------

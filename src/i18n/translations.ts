@@ -13,6 +13,7 @@ export type Translation = {
   "app.brand": string;
   "app.tab.stage": string;
   "app.tab.scenes": string;
+  "app.tab.loops": string;
   "app.tab.chaser": string;
   "app.tab.movement": string;
   "app.tab.preview3d": string;
@@ -34,6 +35,13 @@ export type Translation = {
   "app.global.bpm.off": string;
   "app.global.bpm.toggleHint": string;
   "app.global.bpm.editHint": string;
+  "app.global.bpm.recordPattern": string;
+  "app.global.bpm.recordPatternHint": string;
+  "app.global.bpm.recordingPattern": string;
+  "app.global.bpm.recordingHint": string;
+  "app.global.bpm.clearPattern": string;
+  "app.global.bpm.clearPatternHint": string;
+  "app.global.bpm.patternActive": string;
   "app.show.untitled": string;
   "app.show.unsaved": string;
   "app.show.renameHint": string;
@@ -75,6 +83,8 @@ export type Translation = {
   // ---- VirtualDJ poller -------------------------------------------------
   "vdj.title": string;
   "vdj.intro": string;
+  "vdj.section.connection": string;
+  "vdj.section.behavior": string;
   "vdj.host": string;
   "vdj.hostHint": string;
   "vdj.port": string;
@@ -95,6 +105,33 @@ export type Translation = {
   "vdj.status.error": string;
   "vdj.status.secondsAgo": string;
   "vdj.errSave": string;
+  "vdj.halve.enabled": string;
+  "vdj.halve.enabledHint": string;
+  "vdj.halve.threshold": string;
+  "vdj.halve.thresholdHint": string;
+
+  // ---- Loops view -------------------------------------------------------
+  "loops.title": string;
+  "loops.meta": string;
+  "loops.intro": string;
+  "loops.new": string;
+  "loops.empty": string;
+  "loops.emptyScenes": string;
+  "loops.sceneCount": string;
+  "loops.startHint": string;
+  "loops.stopHint": string;
+  "loops.deleteTitle": string;
+  "loops.deleteBody": string;
+  "loops.hold": string;
+  "loops.holdHint": string;
+  "loops.missingScene": string;
+  "loops.moveUp": string;
+  "loops.moveDown": string;
+  "loops.removeFromList": string;
+  "loops.addPlaceholder": string;
+  "loops.repeatOption": string;
+  "scenes.list.activeLoopPrefix": string;
+  "scenes.list.activeLoopStop": string;
 
   // ---- General (language picker) ----------------------------------------
   "general.title": string;
@@ -426,6 +463,17 @@ export type Translation = {
   "scenes.editor.clearProg": string;
   "scenes.programmer.label": string;
   "scenes.programmer.clear": string;
+  "snapshots.heading": string;
+  "snapshots.capture": string;
+  "snapshots.captureHint": string;
+  "snapshots.empty": string;
+  "snapshots.activateHint": string;
+  "snapshots.deactivate": string;
+  "snapshots.deactivateHint": string;
+  "snapshots.recaptureHint": string;
+  "snapshots.deleteConfirm": string;
+  "snapshots.deleteHint": string;
+  "snapshots.activeBadge": string;
   "scenes.step.fade": string;
   "scenes.step.hold": string;
   "scenes.step.ms": string;
@@ -601,6 +649,7 @@ export type Translation = {
   "movement.subdivLabel.1beat": string;
   "movement.subdivLabel.2beats": string;
   "movement.subdivLabel.4beats": string;
+  "movement.subdivLabel.8beats": string;
   "movement.waveformLabel.sine": string;
   "movement.waveformLabel.cosine": string;
   "movement.waveformLabel.triangle": string;
@@ -638,6 +687,7 @@ export type Translation = {
   "stage.editor.section.color": string;
   "stage.editor.section.extras": string;
   "stage.fxbar.scenes": string;
+  "stage.fxbar.snapshots": string;
   "stage.fxbar.movements": string;
   "stage.fxbar.chasers": string;
   "stage.fxbar.releaseHint": string;
@@ -766,6 +816,7 @@ export const en: Translation = {
   "app.brand": "DMX Control",
   "app.tab.stage": "Stage",
   "app.tab.scenes": "Scenes",
+  "app.tab.loops": "Loops",
   "app.tab.chaser": "Chaser",
   "app.tab.movement": "Movement",
   "app.tab.preview3d": "Preview 3D",
@@ -789,6 +840,14 @@ export const en: Translation = {
   "app.global.bpm.toggleHint":
     "When ON, every chaser and movement runs at this BPM instead of its own configured tempo.",
   "app.global.bpm.editHint": "Type a BPM (20–300) and press Enter to set it.",
+  "app.global.bpm.recordPattern": "REC",
+  "app.global.bpm.recordPatternHint":
+    "Record a syncopated rhythm (clave, cha-cha…). Lock the BPM first, then click to start recording and tap the pattern. Click again to commit.",
+  "app.global.bpm.recordingPattern": "STOP",
+  "app.global.bpm.recordingHint": "Recording… tap the pattern, then click to commit.",
+  "app.global.bpm.clearPattern": "✕",
+  "app.global.bpm.clearPatternHint": "Clear the active pattern; chasers go back to plain BPM.",
+  "app.global.bpm.patternActive": "{count} hits / {bars} bar(s)",
   "app.show.untitled": "Untitled",
   "app.show.unsaved": "(unsaved) · click to rename",
   "app.show.renameHint": "{path} · click to rename",
@@ -830,6 +889,8 @@ export const en: Translation = {
   "vdj.title": "VirtualDJ tempo bridge",
   "vdj.intro":
     "Polls the Network Control Plugin running inside VirtualDJ for the current track's BPM and drives the overall tempo override. Requires VDJ 2023+ with a Pro license.",
+  "vdj.section.connection": "Connection",
+  "vdj.section.behavior": "Tempo behaviour",
   "vdj.host": "Host",
   "vdj.hostHint": "Usually 127.0.0.1 — VirtualDJ on the same machine as this app.",
   "vdj.port": "Port",
@@ -850,6 +911,35 @@ export const en: Translation = {
   "vdj.status.error": "Last error",
   "vdj.status.secondsAgo": "{secs}s ago",
   "vdj.errSave": "Save failed: {err}",
+  "vdj.halve.enabled": "Halve BPM above threshold",
+  "vdj.halve.enabledHint":
+    "When the music goes above the threshold, run the rig at BPM/2. Classic DJ trick — electronic music at 130 BPM is chaotic on chasers, half-rate stays musical.",
+  "vdj.halve.threshold": "Threshold (BPM)",
+  "vdj.halve.thresholdHint":
+    "Halving kicks in strictly above this value. 95 is a sensible default.",
+
+  "loops.title": "Loops",
+  "loops.meta": "{count} group(s)",
+  "loops.intro":
+    "Play chains of scenes that cycle automatically. Each group runs scene 1 → 2 → 3 → 1… while you focus on the show.",
+  "loops.new": "+ New loop",
+  "loops.empty": "No loop groups yet. Create one and drop scenes into it.",
+  "loops.emptyScenes": "No scenes in this loop yet.",
+  "loops.sceneCount": "{count} scene{plural}",
+  "loops.startHint": "Start loop",
+  "loops.stopHint": "Stop loop",
+  "loops.deleteTitle": "Delete loop",
+  "loops.deleteBody": 'Delete loop "{name}"?',
+  "loops.hold": "Hold per scene (ms)",
+  "loops.holdHint": "0 = use each scene's own fade + hold cycle.",
+  "loops.missingScene": "⚠ deleted scene",
+  "loops.moveUp": "Move up",
+  "loops.moveDown": "Move down",
+  "loops.removeFromList": "Remove from list",
+  "loops.addPlaceholder": "+ Add scene…",
+  "loops.repeatOption": "{name} (repeat)",
+  "scenes.list.activeLoopPrefix": "Loop: ",
+  "scenes.list.activeLoopStop": "Stop",
 
   "general.title": "General",
   "general.language": "Language",
@@ -1190,6 +1280,19 @@ export const en: Translation = {
   "scenes.editor.clearProg": "Clear programmer",
   "scenes.programmer.label": "PROG · {count} fixture{plural} touched",
   "scenes.programmer.clear": "Clear",
+  "snapshots.heading": "Snapshots",
+  "snapshots.capture": "● Record snapshot",
+  "snapshots.captureHint":
+    "Freeze the whole current look: DMX values, master, chaser, movement, active scene/loop, blackout and BPM",
+  "snapshots.empty": "No snapshots yet. Record one to freeze the current look.",
+  "snapshots.activateHint":
+    "Apply this snapshot. The current state is remembered — deactivating brings it back untouched.",
+  "snapshots.deactivate": "Deactivate",
+  "snapshots.deactivateHint": "Return to the state from before the snapshot was activated",
+  "snapshots.recaptureHint": "Overwrite this snapshot with the current rig state",
+  "snapshots.deleteConfirm": 'Delete snapshot "{name}"?',
+  "snapshots.deleteHint": "Delete snapshot",
+  "snapshots.activeBadge": "ACTIVE",
   "scenes.step.fade": "Fade",
   "scenes.step.hold": "Hold",
   "scenes.step.ms": "ms",
@@ -1370,6 +1473,7 @@ export const en: Translation = {
   "movement.subdivLabel.1beat": "1 beat",
   "movement.subdivLabel.2beats": "2 beats",
   "movement.subdivLabel.4beats": "4 beats",
+  "movement.subdivLabel.8beats": "8 beats",
   "movement.waveformLabel.sine": "Sine",
   "movement.waveformLabel.cosine": "Cosine",
   "movement.waveformLabel.triangle": "Triangle",
@@ -1407,6 +1511,7 @@ export const en: Translation = {
   "stage.editor.section.color": "Color",
   "stage.editor.section.extras": "Extras",
   "stage.fxbar.scenes": "Scenes",
+  "stage.fxbar.snapshots": "Snapshots",
   "stage.fxbar.movements": "Movements",
   "stage.fxbar.chasers": "Chasers",
   "stage.fxbar.releaseHint": "Release — the rig stays in its current state",
@@ -1538,6 +1643,7 @@ export const es: Translation = {
   "app.brand": "DMX Control",
   "app.tab.stage": "Stage",
   "app.tab.scenes": "Escenas",
+  "app.tab.loops": "Loops",
   "app.tab.chaser": "Chaser",
   "app.tab.movement": "Movimiento",
   "app.tab.preview3d": "Preview 3D",
@@ -1561,6 +1667,14 @@ export const es: Translation = {
   "app.global.bpm.toggleHint":
     "Cuando está en ON, todos los chasers y movimientos corren a este BPM en vez de al tempo propio que tengan configurado.",
   "app.global.bpm.editHint": "Escribí un BPM (20–300) y presioná Enter para fijarlo.",
+  "app.global.bpm.recordPattern": "REC",
+  "app.global.bpm.recordPatternHint":
+    "Grabá un ritmo sincopado (clave, chacha…). Fijá primero el BPM, después tocá REC y golpeá el patrón. Tocá de nuevo para confirmar.",
+  "app.global.bpm.recordingPattern": "STOP",
+  "app.global.bpm.recordingHint": "Grabando… tocá el patrón y presioná para confirmar.",
+  "app.global.bpm.clearPattern": "✕",
+  "app.global.bpm.clearPatternHint": "Borrá el patrón activo; los chasers vuelven al BPM normal.",
+  "app.global.bpm.patternActive": "{count} golpes / {bars} compás(es)",
   "app.show.untitled": "Sin título",
   "app.show.unsaved": "(sin guardar) · click para renombrar",
   "app.show.renameHint": "{path} · click para renombrar",
@@ -1603,6 +1717,8 @@ export const es: Translation = {
   "vdj.title": "Puente de tempo con VirtualDJ",
   "vdj.intro":
     "Pollea al Network Control Plugin de VirtualDJ por el BPM de la canción actual y lo aplica como tempo global. Requiere VDJ 2023+ con licencia Pro.",
+  "vdj.section.connection": "Conexión",
+  "vdj.section.behavior": "Comportamiento del tempo",
   "vdj.host": "Host",
   "vdj.hostHint": "Normalmente 127.0.0.1 — VirtualDJ corriendo en la misma máquina.",
   "vdj.port": "Puerto",
@@ -1624,6 +1740,35 @@ export const es: Translation = {
   "vdj.status.error": "Último error",
   "vdj.status.secondsAgo": "hace {secs}s",
   "vdj.errSave": "Falló al guardar: {err}",
+  "vdj.halve.enabled": "Dividir BPM al medio cuando supera el umbral",
+  "vdj.halve.enabledHint":
+    "Cuando la música supera el umbral, manda al rig BPM/2. Truco clásico de DJ — electrónica a 130 BPM hace que las luces parezcan strobe, a la mitad respiran con el compás.",
+  "vdj.halve.threshold": "Umbral (BPM)",
+  "vdj.halve.thresholdHint":
+    "El recorte se activa estrictamente por encima de este valor. 95 es un default razonable.",
+
+  "loops.title": "Loops",
+  "loops.meta": "{count} lista(s)",
+  "loops.intro":
+    "Reproducí cadenas de escenas que ciclan solas. Cada lista corre escena 1 → 2 → 3 → 1… mientras vos atendés el show.",
+  "loops.new": "+ Nueva lista",
+  "loops.empty": "Todavía no hay listas. Creá una y arrastrá escenas adentro.",
+  "loops.emptyScenes": "Sin escenas en esta lista todavía.",
+  "loops.sceneCount": "{count} escena{plural}",
+  "loops.startHint": "Iniciar loop",
+  "loops.stopHint": "Detener loop",
+  "loops.deleteTitle": "Eliminar lista",
+  "loops.deleteBody": "¿Eliminar la lista «{name}»?",
+  "loops.hold": "Tiempo por escena (ms)",
+  "loops.holdHint": "0 = usa el ciclo natural de cada escena (fade + hold).",
+  "loops.missingScene": "⚠ escena eliminada",
+  "loops.moveUp": "Mover arriba",
+  "loops.moveDown": "Mover abajo",
+  "loops.removeFromList": "Quitar de la lista",
+  "loops.addPlaceholder": "+ Agregar escena…",
+  "loops.repeatOption": "{name} (repetir)",
+  "scenes.list.activeLoopPrefix": "Loop: ",
+  "scenes.list.activeLoopStop": "Detener",
 
   "general.title": "General",
   "general.language": "Idioma",
@@ -1965,6 +2110,19 @@ export const es: Translation = {
   "scenes.editor.clearProg": "Clear programmer",
   "scenes.programmer.label": "PROG · {count} fixture{plural} tocado{plural}",
   "scenes.programmer.clear": "Clear",
+  "snapshots.heading": "Snapshots",
+  "snapshots.capture": "● Grabar snapshot",
+  "snapshots.captureHint":
+    "Congela todo el look actual: valores DMX, master, chaser, movement, escena/loop activos, blackout y BPM",
+  "snapshots.empty": "Sin snapshots todavía. Grabá uno para congelar el look actual.",
+  "snapshots.activateHint":
+    "Aplicar este snapshot. El estado actual se recuerda — al desactivar vuelve tal cual estaba.",
+  "snapshots.deactivate": "Desactivar",
+  "snapshots.deactivateHint": "Volver al estado previo a la activación del snapshot",
+  "snapshots.recaptureHint": "Sobrescribir este snapshot con el estado actual del rig",
+  "snapshots.deleteConfirm": '¿Eliminar el snapshot "{name}"?',
+  "snapshots.deleteHint": "Eliminar snapshot",
+  "snapshots.activeBadge": "ACTIVO",
   "scenes.step.fade": "Fade",
   "scenes.step.hold": "Hold",
   "scenes.step.ms": "ms",
@@ -2145,6 +2303,7 @@ export const es: Translation = {
   "movement.subdivLabel.1beat": "1 beat",
   "movement.subdivLabel.2beats": "2 beats",
   "movement.subdivLabel.4beats": "4 beats",
+  "movement.subdivLabel.8beats": "8 beats",
   "movement.waveformLabel.sine": "Sine",
   "movement.waveformLabel.cosine": "Cosine",
   "movement.waveformLabel.triangle": "Triangle",
@@ -2183,6 +2342,7 @@ export const es: Translation = {
   "stage.editor.section.color": "Color",
   "stage.editor.section.extras": "Extras",
   "stage.fxbar.scenes": "Escenas",
+  "stage.fxbar.snapshots": "Snapshots",
   "stage.fxbar.movements": "Movements",
   "stage.fxbar.chasers": "Chasers",
   "stage.fxbar.releaseHint": "Liberar — la rig queda en su estado actual",

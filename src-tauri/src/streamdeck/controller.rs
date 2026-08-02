@@ -26,6 +26,7 @@ use crate::engine::scene_playback::SharedScenePlayback;
 use crate::engine::EngineState;
 use crate::show::button_bindings::{ButtonAction, ButtonActiveMode, ButtonIcon, StreamDeckBinding};
 use crate::show::ShowState;
+use crate::snapshot::SharedSnapshotRuntime;
 use crate::streamdeck::render::{KeyVisual, RenderCache, TileKind};
 use crate::streamdeck::StreamDeckDeviceInfo;
 
@@ -96,6 +97,7 @@ struct SdHandles {
     loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
+    snapshots: SharedSnapshotRuntime,
     blind_held: Arc<AtomicBool>,
 }
 
@@ -168,6 +170,7 @@ pub fn start(
     loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
+    snapshots: SharedSnapshotRuntime,
 ) -> Result<StreamDeckController, String> {
     tracing::info!(?serial, "streamdeck::start: entering");
     let api_mutex = shared_hidapi()?;
@@ -219,6 +222,7 @@ pub fn start(
         loops,
         engine,
         show,
+        snapshots,
         blind_held: blind_held.clone(),
     };
 
@@ -354,6 +358,10 @@ fn resolve_indexed_action(handles: &SdHandles, action: &ButtonAction) -> Option<
             let id = s.show.scene_loop_groups.get(*index as usize)?.id.clone();
             ButtonAction::StartLoopGroup { id }
         }
+        ButtonAction::ToggleSnapshotByIndex { index } => {
+            let id = s.show.snapshots.get(*index as usize)?.id.clone();
+            ButtonAction::ToggleSnapshot { id }
+        }
         other => other.clone(),
     })
 }
@@ -393,6 +401,12 @@ fn is_action_active(action: &ButtonAction, handles: &SdHandles) -> bool {
             .map(|a| a == id)
             .unwrap_or(false),
         ButtonAction::StopLoopGroup => false,
+        ButtonAction::ToggleSnapshot { id } => handles
+            .snapshots
+            .lock()
+            .active_id()
+            .map(|a| a == id)
+            .unwrap_or(false),
         _ => false,
     }
 }
@@ -573,6 +587,38 @@ fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
         ButtonAction::StopLoopGroup => {
             crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops);
         }
+        ButtonAction::ToggleSnapshot { id } => {
+            let active = handles.snapshots.lock().active_id().map(|s| s.to_string());
+            let result = if active.as_deref() == Some(id.as_str()) {
+                crate::commands::deactivate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                )
+            } else {
+                crate::commands::activate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                    &id,
+                )
+            };
+            if let Err(err) = result {
+                tracing::warn!(?err, "streamdeck action toggle snapshot failed");
+            }
+        }
         _ => (),
     }
 }
@@ -651,22 +697,27 @@ fn tile_kind_for(icon: ButtonIcon, action: &ButtonAction) -> TileKind {
         ButtonIcon::Tap => TileKind::Tap,
         ButtonIcon::Metronome => TileKind::BpmToggle,
         ButtonIcon::Loop => TileKind::LoopGroup,
-        ButtonIcon::None => match action {
-            ButtonAction::Blackout => TileKind::Blackout,
-            ButtonAction::Blind => TileKind::Blind,
-            ButtonAction::Tap => TileKind::Tap,
-            ButtonAction::ToggleOverallBpm => TileKind::BpmToggle,
-            ButtonAction::ToggleMovement { .. } | ButtonAction::ToggleMovementByIndex { .. } => {
-                TileKind::Movement
+        ButtonIcon::None => {
+            match action {
+                ButtonAction::Blackout => TileKind::Blackout,
+                ButtonAction::Blind => TileKind::Blind,
+                ButtonAction::Tap => TileKind::Tap,
+                ButtonAction::ToggleOverallBpm => TileKind::BpmToggle,
+                ButtonAction::ToggleMovement { .. }
+                | ButtonAction::ToggleMovementByIndex { .. } => TileKind::Movement,
+                ButtonAction::RecallScene { .. } | ButtonAction::RecallSceneByIndex { .. } => {
+                    TileKind::Scene
+                }
+                ButtonAction::StartLoopGroup { .. }
+                | ButtonAction::StartLoopGroupByIndex { .. }
+                | ButtonAction::StopLoopGroup => TileKind::LoopGroup,
+                // Snapshots reuse the theatre-curtain glyph — a snapshot is
+                // conceptually a one-step super-scene.
+                ButtonAction::ToggleSnapshot { .. }
+                | ButtonAction::ToggleSnapshotByIndex { .. } => TileKind::Scene,
+                _ => TileKind::Chaser,
             }
-            ButtonAction::RecallScene { .. } | ButtonAction::RecallSceneByIndex { .. } => {
-                TileKind::Scene
-            }
-            ButtonAction::StartLoopGroup { .. }
-            | ButtonAction::StartLoopGroupByIndex { .. }
-            | ButtonAction::StopLoopGroup => TileKind::LoopGroup,
-            _ => TileKind::Chaser,
-        },
+        }
     }
 }
 

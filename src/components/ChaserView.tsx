@@ -118,6 +118,7 @@ const SUBDIVISION_BEATS: Record<Subdivision, number> = {
   one: 1.0,
   two: 2.0,
   four: 4.0,
+  eight: 8.0,
 };
 
 function stepDurationMs(bpm: number, sub: Subdivision): number {

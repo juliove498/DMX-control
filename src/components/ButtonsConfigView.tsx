@@ -16,6 +16,7 @@ const DEFAULT_GLOBALS: GlobalsConfig = {
   master: { fixtures: [] },
   overall_bpm_enabled: false,
   overall_bpm: 120,
+  tempo_pattern: null,
 };
 
 /// Mirror of `ChannelRole::label()` — returns the snake-case role name,

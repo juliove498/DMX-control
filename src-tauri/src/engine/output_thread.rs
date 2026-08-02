@@ -172,7 +172,18 @@ where
                 // every clock-driven module (scene playback, chaser,
                 // movement) shares one consistent view of the tempo and
                 // doesn't drift across the same frame.
-                let overall_bpm = globals_thread.lock().current_overall_bpm();
+                // Snapshot the global tempo state under one lock so the
+                // chaser engine sees a consistent (bpm, pattern, anchor)
+                // tuple even if the operator commits a new pattern mid-
+                // frame.
+                let (overall_bpm, pattern_snapshot) = {
+                    let g = globals_thread.lock();
+                    let bpm = g.current_overall_bpm();
+                    let pat = g
+                        .current_tempo_pattern()
+                        .map(|(p, a)| (p.clone(), a));
+                    (bpm, pat)
+                };
                 {
                     let updates = scenes_thread.lock().tick(frame_start, overall_bpm);
                     if !updates.is_empty() {
@@ -187,7 +198,10 @@ where
                 // tick is a few arithmetic ops per slot so locks are
                 // released quickly.
                 {
-                    let chaser_ov = chasers_thread.lock().tick(frame_start, overall_bpm);
+                    let pattern_ref = pattern_snapshot.as_ref().map(|(p, a)| (p, *a));
+                    let chaser_ov = chasers_thread
+                        .lock()
+                        .tick(frame_start, overall_bpm, pattern_ref);
                     let movement_ov = movement_thread.lock().tick(frame_start, overall_bpm);
                     let merged = merge_overlays(chaser_ov, movement_ov);
                     let (blind_overlay, blackout_overlay, master_mask, blackout_factor, blind_factor) = {

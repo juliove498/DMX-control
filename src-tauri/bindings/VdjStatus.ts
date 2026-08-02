@@ -2,9 +2,10 @@
 
 export type VdjStatus = { running: boolean, 
 /**
- * Last BPM we successfully read from VDJ, regardless of whether
- * we wrote it to the show (epsilon-suppressed writes still
- * update this so the UI can show "yes, we're reading 128.0").
+ * Last BPM we successfully read from VDJ. Fractional —
+ * `Some(120.55)` not `Some(121)`. The UI displays this with 2
+ * decimal places so the operator can see *exactly* what's flowing
+ * through the pipeline.
  */
 last_bpm: number | null, 
 /**

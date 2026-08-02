@@ -93,26 +93,35 @@ function StageFixture({
       {...attributes}
       {...listeners}
     >
-      {barColor ? (
-        <span className="color-bar" style={{ background: barColor }} aria-hidden="true" />
-      ) : null}
-      {imageUrl ? <img className="fixture-thumb" src={imageUrl} alt="" /> : null}
-      <div className="label">{labelText}</div>
-      <div className="meta">
-        U{fixture.universe} · {fixture.address}
-      </div>
-      {effects.length > 0 ? (
-        <div className="fixture-fx-strip" aria-hidden="true">
-          {effects.map((e) => (
-            <span
-              key={`${e.kind}-${e.index}`}
-              className={`fixture-fx-dot ${e.kind}`}
-              style={{ background: e.color }}
-              title={`${e.kind === "chaser" ? "Chaser" : "Movement"}: ${e.name}`}
-            />
-          ))}
+      {/* Inner wrapper: WebKit ≤ Safari 15 (Monterey) ignores
+          `display: flex` declared directly on a <button>, which made
+          the first child (the color bar) collapse / mis-position on
+          Intel Monterey while the other children rendered ok-ish.
+          Moving the flex container to a plain <span> sidesteps the
+          whole class of button-display bugs and behaves identically
+          on Safari 16+ / Chrome / Firefox. */}
+      <span className="stage-fixture-inner">
+        {barColor ? (
+          <span className="color-bar" style={{ background: barColor }} aria-hidden="true" />
+        ) : null}
+        {imageUrl ? <img className="fixture-thumb" src={imageUrl} alt="" /> : null}
+        <div className="label">{labelText}</div>
+        <div className="meta">
+          U{fixture.universe} · {fixture.address}
         </div>
-      ) : null}
+        {effects.length > 0 ? (
+          <div className="fixture-fx-strip" aria-hidden="true">
+            {effects.map((e) => (
+              <span
+                key={`${e.kind}-${e.index}`}
+                className={`fixture-fx-dot ${e.kind}`}
+                style={{ background: e.color }}
+                title={`${e.kind === "chaser" ? "Chaser" : "Movement"}: ${e.name}`}
+              />
+            ))}
+          </div>
+        ) : null}
+      </span>
       {isTouched ? (
         // Re-keying on flashStamp restarts the CSS keyframe each time
         // the operator presses Localizar — even on already-touched
@@ -909,9 +918,33 @@ function StageFxBar({
   const toggleMovement = useShowStore((s) => s.toggleMovement);
   const recallScene = useShowStore((s) => s.recallScene);
   const releaseScene = useShowStore((s) => s.releaseScene);
+  const activateSnapshot = useShowStore((s) => s.activateSnapshot);
+  const deactivateSnapshot = useShowStore((s) => s.deactivateSnapshot);
+  const activeSnapshotIdQuery = useShowStore((s) => s.activeSnapshotId);
+  // Which snapshot is applied right now. Polled (like the scene state
+  // the parent hands down) so Launchpad/Stream Deck toggles reflect
+  // here without a dedicated event listener.
+  const [activeSnapshot, setActiveSnapshot] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = () => {
+      activeSnapshotIdQuery()
+        .then((id) => {
+          if (!cancelled) setActiveSnapshot(id ?? null);
+        })
+        .catch(() => {});
+    };
+    tick();
+    const interval = window.setInterval(tick, 300);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [activeSnapshotIdQuery]);
   const chasers = show?.chasers ?? [];
   const movements = show?.movements ?? [];
   const scenes = show?.scenes ?? [];
+  const snapshots = show?.snapshots ?? [];
   const activeScene = scenes.find((s) => s.id === activeSceneId) ?? null;
   const activeStepLabel = (() => {
     if (!activeScene || activeStepIdx === null) return null;
@@ -929,7 +962,13 @@ function StageFxBar({
         });
   })();
 
-  if (chasers.length === 0 && movements.length === 0 && scenes.length === 0) return null;
+  if (
+    chasers.length === 0 &&
+    movements.length === 0 &&
+    scenes.length === 0 &&
+    snapshots.length === 0
+  )
+    return null;
 
   return (
     <footer className="stage-fx-bar" aria-label="Active effects">
@@ -978,6 +1017,35 @@ function StageFxBar({
               {t("stage.fxbar.morePill", { n: scenes.length - 6 })}
             </span>
           ) : null}
+        </div>
+      ) : null}
+      {snapshots.length > 0 ? (
+        <div className="stage-fx-section">
+          <span className="stage-fx-label">{t("stage.fxbar.snapshots")}</span>
+          {snapshots.map((s) => {
+            const isOn = s.id === activeSnapshot;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                className={`stage-fx-toggle${isOn ? " on" : ""}`}
+                onClick={() => (isOn ? deactivateSnapshot() : activateSnapshot(s.id))}
+                title={isOn ? t("snapshots.deactivateHint") : t("snapshots.activateHint")}
+                style={
+                  isOn
+                    ? { background: "#f5d896", borderColor: "#f5d896", color: "#0f0f10" }
+                    : { borderColor: "#f5d896" }
+                }
+              >
+                <span
+                  className="stage-fx-led"
+                  aria-hidden="true"
+                  style={{ background: "#f5d896" }}
+                />
+                <span className="stage-fx-name">{s.name}</span>
+              </button>
+            );
+          })}
         </div>
       ) : null}
       {movements.length > 0 ? (

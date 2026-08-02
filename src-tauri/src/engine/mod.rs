@@ -1,3 +1,4 @@
+pub mod beatgrid;
 pub mod loop_playback;
 pub mod output_thread;
 pub mod scene_playback;

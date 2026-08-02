@@ -9,9 +9,9 @@
 //!
 //! Behaviour notes:
 //! - Only writes through to the show when the BPM crosses a small
-//!   epsilon (0.05 BPM). VDJ updates the value tens of times a second
-//!   while tracking the beat grid; persisting on every poll would
-//!   thrash the show file.
+//!   epsilon (0.01 BPM). VDJ ships fractional BPMs (e.g. 120.55) and
+//!   we preserve them through the pipeline — the chaser engine and
+//!   movement engine will drift over a song if we round to integers.
 //! - Backs off geometrically on HTTP / parse errors up to 5 s, then
 //!   stays there. The poller never gives up unless the operator stops
 //!   it — that's the "Retry silent" answer from the design pass.
@@ -19,7 +19,7 @@
 //!   app closed, the setup hook restarts the poller.
 
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -27,7 +27,8 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::oneshot;
 use ts_rs::TS;
 
-use crate::engine::output_thread::SharedGlobals;
+use crate::engine::beatgrid::BeatAnchor;
+use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
 use crate::show::ShowState;
 
 /// Event the frontend listens to so the VDJ tab can refresh status
@@ -47,33 +48,38 @@ fn default_port() -> u16 {
 fn default_interval_ms() -> u32 {
     250
 }
+fn default_halve_above_threshold() -> f32 {
+    95.0
+}
+fn default_halve_above_enabled() -> bool {
+    true
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
 #[ts(export, export_to = "../bindings/")]
 pub struct VdjConfig {
-    /// VirtualDJ host. Almost always `127.0.0.1` because the plugin
-    /// runs inside the DJ machine, but exposed in case someone runs
-    /// VDJ on a separate box and our app on another.
     #[serde(default = "default_host")]
     pub host: String,
-    /// Network Control Plugin port. The plugin's "default" varies by
-    /// install — we default to 8080 because port 80 conflicts with
-    /// anything serving HTTP on the same machine (NGINX, etc.).
     #[serde(default = "default_port")]
     pub port: u16,
-    /// Bearer token configured in the plugin's settings cogwheel.
-    /// `None` or empty string ⇒ no Authorization header sent.
     #[serde(default)]
     pub bearer: Option<String>,
-    /// How often to poll. 250 ms is a sensible default: fast enough
-    /// to catch a track change within a beat, slow enough that 4 HTTP
-    /// calls/second don't show up on any profiler.
     #[serde(default = "default_interval_ms")]
     pub interval_ms: u32,
     /// Persisted across restarts. When true, the setup hook auto-
     /// restarts the poller at boot.
     #[serde(default)]
     pub enabled: bool,
+    /// "Halve above" guard: when the VDJ BPM exceeds the threshold,
+    /// apply BPM/2 to the rig instead. Classic DJ-lighting trick —
+    /// electronic music at 130 BPM looks like a strobe attack if you
+    /// drive chasers at 130, but at 65 (half-rate) the rig stays
+    /// musical and breathes with the bar. Default ON because that's
+    /// the behaviour the operator wanted out of the box.
+    #[serde(default = "default_halve_above_enabled")]
+    pub halve_above_enabled: bool,
+    #[serde(default = "default_halve_above_threshold")]
+    pub halve_above_threshold: f32,
 }
 
 impl Default for VdjConfig {
@@ -84,7 +90,26 @@ impl Default for VdjConfig {
             bearer: None,
             interval_ms: default_interval_ms(),
             enabled: false,
+            halve_above_enabled: default_halve_above_enabled(),
+            halve_above_threshold: default_halve_above_threshold(),
         }
+    }
+}
+
+/// Apply the "halve above threshold" rule to a raw (bpm, beat_pos)
+/// pair from VDJ. Both get scaled together so the chaser's notion of
+/// "where we are in the beat grid" and "how fast time flows" stay
+/// consistent: doubling time-scale would otherwise rip the anchor's
+/// extrapolation off the music.
+///
+/// Pure for unit testing — the poller calls this with whatever the
+/// active config says and uses the returned values without further
+/// transformation.
+fn apply_halve_rule(cfg: &VdjConfig, raw_bpm: f32, raw_beat: Option<f64>) -> (f32, Option<f64>) {
+    if cfg.halve_above_enabled && raw_bpm > cfg.halve_above_threshold {
+        (raw_bpm * 0.5, raw_beat.map(|b| b * 0.5))
+    } else {
+        (raw_bpm, raw_beat)
     }
 }
 
@@ -92,9 +117,10 @@ impl Default for VdjConfig {
 #[ts(export, export_to = "../bindings/")]
 pub struct VdjStatus {
     pub running: bool,
-    /// Last BPM we successfully read from VDJ, regardless of whether
-    /// we wrote it to the show (epsilon-suppressed writes still
-    /// update this so the UI can show "yes, we're reading 128.0").
+    /// Last BPM we successfully read from VDJ. Fractional —
+    /// `Some(120.55)` not `Some(121)`. The UI displays this with 2
+    /// decimal places so the operator can see *exactly* what's flowing
+    /// through the pipeline.
     pub last_bpm: Option<f32>,
     /// Last error string from the polling loop. Cleared on the next
     /// successful poll.
@@ -216,9 +242,11 @@ fn parse_vdj_bool(raw: &str) -> bool {
     matches!(t.as_str(), "1" | "true" | "on" | "yes")
 }
 
-/// Parse a BPM reply (e.g. "128.5\n") into a positive finite float.
+/// Parse a BPM reply (e.g. "128.55\n") into a positive finite float.
 /// Returns `None` for empty, zero, or NaN — VDJ uses zero to mean
-/// "no track / unknown".
+/// "no track / unknown". Preserves the original decimal precision —
+/// we don't round to integers, since a 0.5 BPM error compounds into a
+/// 1-beat drift in ~120 beats (about a minute at 120 BPM).
 fn parse_vdj_bpm(raw: &str) -> Option<f32> {
     let t = raw.trim();
     if t.is_empty() {
@@ -231,35 +259,77 @@ fn parse_vdj_bpm(raw: &str) -> Option<f32> {
     Some(n)
 }
 
-/// Walk the decks in order and return the BPM of the first one that
-/// is actually *playing*. Solves the "operator loaded the next track
-/// on deck B; deck A is still playing" gotcha — VDJ's plain
-/// `get_bpm` returns the focused deck's BPM, which jumps the rig to
-/// the unplayed track's tempo. We want the *currently audible*
-/// deck's BPM instead.
+/// Per-cycle reading from VDJ. Holds both the BPM and the beat-grid
+/// position of the active deck, plus the wall-clock at which the BPM
+/// fetch *completed* (used as the anchor reference).
+#[derive(Debug, Clone, Copy)]
+struct DeckReading {
+    bpm: f32,
+    /// VDJ's `get_beatpos` — fractional beat number from the start of
+    /// the track (e.g. 27.5 = halfway through beat 27). `None` when
+    /// the verb wasn't understood or the deck has no analysed grid.
+    beat_pos: Option<f64>,
+    /// `Instant::now()` captured *after* the HTTP request completed.
+    /// Used as the anchor timestamp. Not perfectly synchronised with
+    /// VDJ's clock (there's an unmeasured ~RTT/2 of latency), but the
+    /// anchor refreshes every poll so drift doesn't accumulate.
+    sampled_at: Instant,
+}
+
+/// Parse `get_beatpos` reply (e.g. "27.5\n"). Returns `None` for
+/// empty/NaN/negative — VDJ uses 0 for "no analysed grid" which we
+/// treat as "skip phase sync this cycle".
+fn parse_vdj_beatpos(raw: &str) -> Option<f64> {
+    let t = raw.trim();
+    if t.is_empty() {
+        return None;
+    }
+    let n: f64 = t.parse().ok()?;
+    if !n.is_finite() || n < 0.0 {
+        return None;
+    }
+    Some(n)
+}
+
+/// Walk the decks in order, find the first one that's *playing*, and
+/// pull both its BPM and its beat-grid position. Solves the "operator
+/// loaded the next track on deck B; deck A is still playing" gotcha
+/// and bundles the beat anchor data in one round-trip pattern.
 ///
-/// Cost: 1 HTTP call to probe play state per deck, plus 1 more to
-/// fetch the BPM of the first playing deck (best case: 2 round trips
-/// when deck 1 is playing; worst case: 5 when no deck is playing —
-/// 4 probes + nothing else).
-async fn fetch_active_bpm(
+/// HTTP cost per cycle when deck 1 is playing: 3 calls (play probe,
+/// bpm, beatpos). Cheap enough on localhost that we don't gate the
+/// beat fetch behind a "sync enabled" flag — the engines simply
+/// ignore the anchor when no phase sync is wanted.
+async fn fetch_active_reading(
     client: &reqwest::Client,
     cfg: &VdjConfig,
-) -> Result<Option<f32>, String> {
+) -> Result<Option<DeckReading>, String> {
     for deck in 1..=MAX_DECKS_TO_PROBE {
         let play_reply = fetch_script(client, cfg, &format!("deck {deck} play")).await?;
         if !parse_vdj_bool(&play_reply) {
             continue;
         }
         let bpm_reply = fetch_script(client, cfg, &format!("deck {deck} get_bpm")).await?;
-        if let Some(bpm) = parse_vdj_bpm(&bpm_reply) {
-            return Ok(Some(bpm));
-        }
-        // Deck reported playing but BPM came back zero/empty — VDJ
-        // probably hasn't analysed the track yet. Don't fall through
-        // to the next deck; an unanalysed live deck is still the
-        // truth, just unknown. Return None.
-        return Ok(None);
+        let Some(bpm) = parse_vdj_bpm(&bpm_reply) else {
+            // Deck plays but BPM unknown (unanalysed track). Don't
+            // fall through — return None so the caller knows "active
+            // deck exists but its tempo can't be trusted yet".
+            return Ok(None);
+        };
+        // Best-effort beatpos: if the verb fails or parses badly,
+        // we still apply the BPM but skip the anchor update. Phase
+        // sync remains degraded but the rig isn't broken.
+        let beat_pos = fetch_script(client, cfg, &format!("deck {deck} get_beatpos"))
+            .await
+            .ok()
+            .as_deref()
+            .and_then(parse_vdj_beatpos);
+        let sampled_at = Instant::now();
+        return Ok(Some(DeckReading {
+            bpm,
+            beat_pos,
+            sampled_at,
+        }));
     }
     Ok(None)
 }
@@ -277,10 +347,13 @@ fn backoff_next(base_ms: u32, current_ms: u32) -> u32 {
 
 /// Internal entrypoint: spawns the poller task. Caller must hold the
 /// VdjState lock briefly to install the JoinHandle + shutdown sender.
+#[allow(clippy::too_many_arguments)]
 fn spawn_poller_task(
     app: AppHandle,
     show: ShowState,
     globals: SharedGlobals,
+    chasers: SharedChasers,
+    movement: SharedMovement,
     vdj_state: VdjState,
     cfg: VdjConfig,
     shutdown_rx: oneshot::Receiver<()>,
@@ -299,7 +372,12 @@ fn spawn_poller_task(
         let mut last_applied: Option<f32> = None;
         let mut shutdown_rx = shutdown_rx;
 
-        tracing::info!(host = %cfg.host, port = cfg.port, interval_ms = base_ms, "vdj poller started");
+        tracing::info!(
+            host = %cfg.host,
+            port = cfg.port,
+            interval_ms = base_ms,
+            "vdj poller started"
+        );
 
         loop {
             let sleep_dur = Duration::from_millis(sleep_ms as u64);
@@ -311,11 +389,22 @@ fn spawn_poller_task(
                 _ = tokio::time::sleep(sleep_dur) => {}
             }
 
-            match fetch_active_bpm(&client, &cfg).await {
-                Ok(Some(bpm)) => {
+            match fetch_active_reading(&client, &cfg).await {
+                Ok(Some(reading)) => {
                     sleep_ms = base_ms;
+                    // Apply the "halve above" rule before anything else
+                    // downstream sees the BPM/beat. Both scale together
+                    // so the anchor's interpolation stays internally
+                    // consistent: at 140 BPM in VDJ with halving on,
+                    // our rig sees 70 BPM AND beat positions read out
+                    // of "ours" beat grid (which advances at half rate).
+                    let (bpm, beat_pos) = apply_halve_rule(&cfg, reading.bpm, reading.beat_pos);
+                    // Tight epsilon (0.01 BPM): we want to preserve the
+                    // fractional BPM that VDJ reports. Larger epsilons
+                    // would round 120.55 → 120.50 and reintroduce the
+                    // drift the operator is trying to avoid.
                     let changed = match last_applied {
-                        Some(prev) => (prev - bpm).abs() >= 0.05,
+                        Some(prev) => (prev - bpm).abs() >= 0.01,
                         None => true,
                     };
                     {
@@ -337,13 +426,32 @@ fn spawn_poller_task(
                             tracing::warn!(error = ?e, bpm, "vdj poller: failed to apply bpm");
                         }
                     }
+                    // Phase-sync anchor: refresh on every successful
+                    // poll. The next chaser/movement tick will snap to
+                    // VDJ's beat grid. If beat_pos is None (verb
+                    // failed or unanalysed track) we skip the anchor
+                    // update — chasers keep their previous anchor or
+                    // fall back to free-run.
+                    if let Some(bp) = beat_pos {
+                        let anchor = BeatAnchor {
+                            set_at: reading.sampled_at,
+                            beat_at_set: bp,
+                            bpm,
+                        };
+                        chasers.lock().set_beat_anchor(Some(anchor));
+                        movement.lock().set_beat_anchor(Some(anchor));
+                    }
                     let _ = app.emit(VDJ_STATUS_EVENT, vdj_state.snapshot());
                 }
                 Ok(None) => {
                     // Empty / zero / NaN reply — VDJ is up but nothing
-                    // is playing. Reset backoff, don't write anything,
-                    // don't surface as an error.
+                    // is playing. Reset backoff + drop the beat anchor
+                    // (no point keeping it locked to a stale beat
+                    // position — when playback resumes we'll snap to
+                    // wherever VDJ says we are then).
                     sleep_ms = base_ms;
+                    chasers.lock().set_beat_anchor(None);
+                    movement.lock().set_beat_anchor(None);
                     let mut inner = vdj_state.0.lock();
                     if inner.last_error.is_some() {
                         inner.last_error = None;
@@ -359,9 +467,12 @@ fn spawn_poller_task(
                     inner.last_error = Some(reason.clone());
                     drop(inner);
                     if changed {
-                        // Only log on the first error of a run to
-                        // avoid spamming when VDJ is down for minutes.
-                        tracing::warn!(error = %reason, next_sleep_ms = sleep_ms, prev_sleep_ms = prev_sleep, "vdj poller error");
+                        tracing::warn!(
+                            error = %reason,
+                            next_sleep_ms = sleep_ms,
+                            prev_sleep_ms = prev_sleep,
+                            "vdj poller error"
+                        );
                         let _ = app.emit(VDJ_STATUS_EVENT, vdj_state.snapshot());
                     }
                 }
@@ -369,7 +480,12 @@ fn spawn_poller_task(
         }
 
         // Clear running flag so a stop() race doesn't leave the UI
-        // showing "running" forever.
+        // showing "running" forever. Also drop the beat anchor: when
+        // the poller stops the engines should fall back to free-run
+        // immediately, otherwise their last known anchor would keep
+        // pulling them along with stale beats forever.
+        chasers.lock().set_beat_anchor(None);
+        movement.lock().set_beat_anchor(None);
         {
             let mut inner = vdj_state.0.lock();
             inner.task = None;
@@ -388,13 +504,14 @@ fn spawn_poller_task(
     })
 }
 
-/// Public start. Idempotent: calling while already running is a no-op
-/// (returns Ok). Callers that want to "restart with new config"
-/// should `stop` then `start`.
+/// Public start. Idempotent: calling while already running is a no-op.
+#[allow(clippy::too_many_arguments)]
 pub fn start_poller(
     app: AppHandle,
     show: ShowState,
     globals: SharedGlobals,
+    chasers: SharedChasers,
+    movement: SharedMovement,
     vdj_state: VdjState,
     cfg: VdjConfig,
 ) {
@@ -409,6 +526,8 @@ pub fn start_poller(
         app.clone(),
         show,
         globals,
+        chasers,
+        movement,
         vdj_state.clone(),
         cfg,
         rx,
@@ -456,10 +575,13 @@ pub fn vdj_get_status(vdj: State<'_, VdjState>) -> VdjStatus {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn vdj_set_config(
     app: AppHandle,
     show: State<'_, ShowState>,
     globals: State<'_, SharedGlobals>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
     vdj: State<'_, VdjState>,
     config: VdjConfig,
 ) -> Result<VdjStatus, String> {
@@ -485,6 +607,8 @@ pub fn vdj_set_config(
             app.clone(),
             show.inner().clone(),
             globals.inner().clone(),
+            chasers.inner().clone(),
+            movement.inner().clone(),
             vdj.inner().clone(),
             config,
         );
@@ -546,12 +670,65 @@ mod tests {
     }
 
     #[test]
-    fn parse_vdj_bpm_rejects_zero_and_garbage() {
-        assert_eq!(parse_vdj_bpm("128.5"), Some(128.5));
-        assert_eq!(parse_vdj_bpm("  120 \n"), Some(120.0));
+    fn parse_vdj_bpm_preserves_decimals() {
+        // The whole point of fractional BPM: 120.55 stays 120.55,
+        // doesn't get rounded to anything else.
+        assert_eq!(parse_vdj_bpm("120.55"), Some(120.55));
+        assert_eq!(parse_vdj_bpm("128"), Some(128.0));
         assert_eq!(parse_vdj_bpm("0"), None);
-        assert_eq!(parse_vdj_bpm("0.0"), None);
-        assert_eq!(parse_vdj_bpm(""), None);
         assert_eq!(parse_vdj_bpm("nope"), None);
+    }
+
+    #[test]
+    fn halve_rule_skips_below_threshold() {
+        let mut cfg = VdjConfig::default();
+        cfg.halve_above_enabled = true;
+        cfg.halve_above_threshold = 95.0;
+        let (b, beat) = apply_halve_rule(&cfg, 80.0, Some(12.0));
+        assert_eq!(b, 80.0);
+        assert_eq!(beat, Some(12.0));
+    }
+
+    #[test]
+    fn halve_rule_applies_above_threshold() {
+        let mut cfg = VdjConfig::default();
+        cfg.halve_above_enabled = true;
+        cfg.halve_above_threshold = 95.0;
+        let (b, beat) = apply_halve_rule(&cfg, 140.0, Some(50.0));
+        assert_eq!(b, 70.0, "BPM halved");
+        assert_eq!(beat, Some(25.0), "beat position halved so anchor stays consistent");
+    }
+
+    #[test]
+    fn halve_rule_boundary_is_strict_greater_than() {
+        // BPM == threshold should NOT halve. Otherwise toggling the
+        // threshold to "match the song's BPM exactly" would surprise
+        // the operator with a half-rate they didn't ask for.
+        let mut cfg = VdjConfig::default();
+        cfg.halve_above_enabled = true;
+        cfg.halve_above_threshold = 100.0;
+        let (b, _) = apply_halve_rule(&cfg, 100.0, None);
+        assert_eq!(b, 100.0);
+        let (b, _) = apply_halve_rule(&cfg, 100.01, None);
+        assert!((b - 50.005).abs() < 1e-3);
+    }
+
+    #[test]
+    fn halve_rule_off_passes_through() {
+        let mut cfg = VdjConfig::default();
+        cfg.halve_above_enabled = false;
+        cfg.halve_above_threshold = 95.0;
+        let (b, beat) = apply_halve_rule(&cfg, 140.0, Some(50.0));
+        assert_eq!(b, 140.0);
+        assert_eq!(beat, Some(50.0));
+    }
+
+    #[test]
+    fn halve_rule_none_beat_handled() {
+        let cfg = VdjConfig::default();
+        // Default config has halving ON above 95.
+        let (b, beat) = apply_halve_rule(&cfg, 130.0, None);
+        assert_eq!(b, 65.0);
+        assert_eq!(beat, None);
     }
 }

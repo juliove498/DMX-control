@@ -2,9 +2,8 @@ import type { DraftScene } from "@bindings/DraftScene";
 import type { LoopGroupActiveChange } from "@bindings/LoopGroupActiveChange";
 import type { Scene } from "@bindings/Scene";
 import type { SceneFxState } from "@bindings/SceneFxState";
-import type { SceneLoopGroup } from "@bindings/SceneLoopGroup";
 import type { SceneStep } from "@bindings/SceneStep";
-import { ask } from "@tauri-apps/plugin-dialog";
+import type { Snapshot } from "@bindings/Snapshot";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n";
 import type { Translation } from "../i18n/translations";
@@ -78,12 +77,23 @@ export function ScenesView() {
     current_index: null,
     current_scene_id: null,
   });
+  // Loop groups themselves are managed in the dedicated Loops tab now;
+  // here we only listen to the active one so the sidebar can show a
+  // "Running: X [Stop]" footer when one is playing.
   const activeLoopGroupQuery = useShowStore((s) => s.activeLoopGroup);
-  const createLoopGroup = useShowStore((s) => s.createLoopGroup);
-  const updateLoopGroup = useShowStore((s) => s.updateLoopGroup);
-  const deleteLoopGroup = useShowStore((s) => s.deleteLoopGroup);
-  const startLoopGroup = useShowStore((s) => s.startLoopGroup);
   const stopLoopGroup = useShowStore((s) => s.stopLoopGroup);
+
+  // Snapshots: whole-rig captures the operator can toggle like a
+  // super-cue. Activation remembers the pre-state; deactivation puts
+  // everything back.
+  const captureSnapshot = useShowStore((s) => s.captureSnapshot);
+  const updateSnapshotFromState = useShowStore((s) => s.updateSnapshotFromState);
+  const renameSnapshot = useShowStore((s) => s.renameSnapshot);
+  const deleteSnapshot = useShowStore((s) => s.deleteSnapshot);
+  const activateSnapshot = useShowStore((s) => s.activateSnapshot);
+  const deactivateSnapshot = useShowStore((s) => s.deactivateSnapshot);
+  const activeSnapshotIdQuery = useShowStore((s) => s.activeSnapshotId);
+  const [activeSnapshot, setActiveSnapshot] = useState<string | null>(null);
 
   // Auto-select first scene when the list isn't empty and nothing is
   // selected. Reset selection if the selected scene was deleted.
@@ -138,6 +148,11 @@ export function ScenesView() {
           if (!cancelled) setActiveLoop(s);
         })
         .catch(() => {});
+      activeSnapshotIdQuery()
+        .then((id) => {
+          if (!cancelled) setActiveSnapshot(id ?? null);
+        })
+        .catch(() => {});
     };
     tick();
     const interval = window.setInterval(tick, 300);
@@ -145,7 +160,7 @@ export function ScenesView() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [activeLoopGroupQuery]);
+  }, [activeLoopGroupQuery, activeSnapshotIdQuery]);
 
   if (!show) return <main className="page">{t("common.loading")}</main>;
   const fixtures = show.fixtures;
@@ -240,46 +255,111 @@ export function ScenesView() {
             </div>
           ) : null}
 
-          <LoopGroupsPanel
-            groups={show.scene_loop_groups ?? []}
-            scenes={scenes}
-            activeLoop={activeLoop}
-            onCreate={async () => {
-              try {
-                await createLoopGroup();
-              } catch (e) {
-                setError(stringifyError(e));
-              }
-            }}
-            onUpdate={async (g) => {
-              try {
-                await updateLoopGroup(g);
-              } catch (e) {
-                setError(stringifyError(e));
-              }
-            }}
-            onDelete={async (id) => {
-              try {
-                await deleteLoopGroup(id);
-              } catch (e) {
-                setError(stringifyError(e));
-              }
-            }}
-            onStart={async (id) => {
-              try {
-                await startLoopGroup(id);
-              } catch (e) {
-                setError(stringifyError(e));
-              }
-            }}
-            onStop={async () => {
-              try {
-                await stopLoopGroup();
-              } catch (e) {
-                setError(stringifyError(e));
-              }
-            }}
-          />
+          {activeLoop.active_group_id ? (
+            <div
+              className="scenes-list-footer scenes-list-loop-footer"
+              data-doc="active-loop-footer"
+            >
+              <span>
+                {t("scenes.list.activeLoopPrefix")}
+                <strong>
+                  {show.scene_loop_groups?.find((g) => g.id === activeLoop.active_group_id)?.name ??
+                    "—"}
+                </strong>
+                {activeLoop.current_index !== null ? (
+                  <span className="scene-active-step"> ({activeLoop.current_index + 1})</span>
+                ) : null}
+              </span>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await stopLoopGroup();
+                  } catch (e) {
+                    setError(stringifyError(e));
+                  }
+                }}
+              >
+                {t("scenes.list.activeLoopStop")}
+              </button>
+            </div>
+          ) : null}
+
+          {/* ---- Snapshots: whole-rig capture/toggle ---- */}
+          <div className="snapshots-section" data-doc="snapshots">
+            <div className="snapshots-head">
+              <h4>{t("snapshots.heading")}</h4>
+              <button
+                type="button"
+                className="snapshots-capture-btn"
+                data-doc="snapshot-capture"
+                title={t("snapshots.captureHint")}
+                onClick={async () => {
+                  setError(null);
+                  try {
+                    await captureSnapshot();
+                  } catch (e) {
+                    setError(stringifyError(e));
+                  }
+                }}
+              >
+                {t("snapshots.capture")}
+              </button>
+            </div>
+            {(show.snapshots ?? []).length === 0 ? (
+              <p className="empty">{t("snapshots.empty")}</p>
+            ) : (
+              <ul className="snapshots-list">
+                {(show.snapshots ?? []).map((snap) => (
+                  <SnapshotRow
+                    key={snap.id}
+                    snapshot={snap}
+                    isActive={snap.id === activeSnapshot}
+                    onActivate={async () => {
+                      setError(null);
+                      try {
+                        await activateSnapshot(snap.id);
+                        setActiveSnapshot(snap.id);
+                      } catch (e) {
+                        setError(stringifyError(e));
+                      }
+                    }}
+                    onDeactivate={async () => {
+                      setError(null);
+                      try {
+                        await deactivateSnapshot();
+                        setActiveSnapshot(null);
+                      } catch (e) {
+                        setError(stringifyError(e));
+                      }
+                    }}
+                    onRecapture={async () => {
+                      setError(null);
+                      try {
+                        await updateSnapshotFromState(snap.id);
+                      } catch (e) {
+                        setError(stringifyError(e));
+                      }
+                    }}
+                    onRename={async (name) => {
+                      try {
+                        await renameSnapshot(snap.id, name);
+                      } catch (e) {
+                        setError(stringifyError(e));
+                      }
+                    }}
+                    onDelete={async () => {
+                      try {
+                        await deleteSnapshot(snap.id);
+                      } catch (e) {
+                        setError(stringifyError(e));
+                      }
+                    }}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
         </aside>
 
         {/* ---- RIGHT: editor ---- */}
@@ -340,6 +420,85 @@ export function ScenesView() {
         />
       ) : null}
     </main>
+  );
+}
+
+function SnapshotRow({
+  snapshot,
+  isActive,
+  onActivate,
+  onDeactivate,
+  onRecapture,
+  onRename,
+  onDelete,
+}: {
+  snapshot: Snapshot;
+  isActive: boolean;
+  onActivate: () => void;
+  onDeactivate: () => void;
+  onRecapture: () => void;
+  onRename: (name: string) => void;
+  onDelete: () => void;
+}) {
+  const t = useT();
+  const [name, setName] = useState(snapshot.name);
+  useEffect(() => setName(snapshot.name), [snapshot.name]);
+
+  const commitName = () => {
+    const next = name.trim();
+    if (next === "" || next === snapshot.name) {
+      setName(snapshot.name);
+      return;
+    }
+    onRename(next);
+  };
+
+  return (
+    <li
+      className={`snapshot-item${isActive ? " active" : ""}`}
+      data-doc="snapshot-item"
+      data-doc-active={isActive ? "true" : undefined}
+    >
+      <button
+        type="button"
+        className="snapshot-toggle"
+        onClick={isActive ? onDeactivate : onActivate}
+        title={isActive ? t("snapshots.deactivateHint") : t("snapshots.activateHint")}
+      >
+        {isActive ? "■" : "▶"}
+      </button>
+      <input
+        className="snapshot-name"
+        value={name}
+        onChange={(e) => setName(e.currentTarget.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") commitName();
+          else if (e.key === "Escape") setName(snapshot.name);
+        }}
+      />
+      {isActive ? (
+        <span className="snapshot-active-badge">{t("snapshots.activeBadge")}</span>
+      ) : null}
+      <button
+        type="button"
+        className="snapshot-recapture"
+        onClick={onRecapture}
+        title={t("snapshots.recaptureHint")}
+      >
+        ↻
+      </button>
+      <button
+        type="button"
+        className="snapshot-del danger"
+        onClick={() => {
+          if (window.confirm(t("snapshots.deleteConfirm", { name: snapshot.name }))) onDelete();
+        }}
+        title={t("snapshots.deleteHint")}
+      >
+        ×
+      </button>
+    </li>
   );
 }
 
@@ -845,281 +1004,6 @@ function FxStateRow({
       </div>
     </div>
   );
-}
-
-/// Panel that lives under the scene list and lets the operator
-/// curate "loop groups" — ordered playlists of scenes that cycle on
-/// their own. Each group has a name, an ordered list of scenes, and
-/// an optional dwell-override that forces every scene in the group
-/// to hold for the same duration regardless of its own steps.
-///
-/// The panel intentionally stays compact: a one-line summary per
-/// group, with the editor inlined inside a `<details>` so a show
-/// with a dozen groups doesn't dominate the sidebar.
-function LoopGroupsPanel({
-  groups,
-  scenes,
-  activeLoop,
-  onCreate,
-  onUpdate,
-  onDelete,
-  onStart,
-  onStop,
-}: {
-  groups: SceneLoopGroup[];
-  scenes: Scene[];
-  activeLoop: LoopGroupActiveChange;
-  onCreate: () => void | Promise<void>;
-  onUpdate: (group: SceneLoopGroup) => void | Promise<void>;
-  onDelete: (id: string) => void | Promise<void>;
-  onStart: (id: string) => void | Promise<void>;
-  onStop: () => void | Promise<void>;
-}) {
-  return (
-    <section className="scenes-loop-panel" data-doc="loop-groups">
-      <header className="scenes-loop-head">
-        <h4>Listas en loop</h4>
-        <button type="button" className="scenes-loop-new" onClick={() => onCreate()}>
-          + Nueva
-        </button>
-      </header>
-      <p className="hint scenes-loop-hint">
-        Reproducí secuencias en cadena: secuencia 1 → 2 → 3 → 1…
-      </p>
-      {groups.length === 0 ? (
-        <p className="empty">Todavía no hay listas. Creá una y arrastrá secuencias adentro.</p>
-      ) : (
-        <ul className="scenes-loop-list">
-          {groups.map((g) => (
-            <LoopGroupCard
-              key={g.id}
-              group={g}
-              scenes={scenes}
-              isActive={activeLoop.active_group_id === g.id}
-              currentIndex={
-                activeLoop.active_group_id === g.id ? (activeLoop.current_index ?? null) : null
-              }
-              onUpdate={onUpdate}
-              onDelete={() => onDelete(g.id)}
-              onStart={() => onStart(g.id)}
-              onStop={() => onStop()}
-            />
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-function LoopGroupCard({
-  group,
-  scenes,
-  isActive,
-  currentIndex,
-  onUpdate,
-  onDelete,
-  onStart,
-  onStop,
-}: {
-  group: SceneLoopGroup;
-  scenes: Scene[];
-  isActive: boolean;
-  currentIndex: number | null;
-  onUpdate: (group: SceneLoopGroup) => void | Promise<void>;
-  onDelete: () => void | Promise<void>;
-  onStart: () => void | Promise<void>;
-  onStop: () => void | Promise<void>;
-}) {
-  const [name, setName] = useState(group.name);
-  const [hold, setHold] = useState(group.hold_ms_override);
-  useEffect(() => setName(group.name), [group.name]);
-  useEffect(() => setHold(group.hold_ms_override), [group.hold_ms_override]);
-
-  const sceneById = useMemo(() => {
-    const map: Record<string, Scene> = {};
-    for (const s of scenes) map[s.id] = s;
-    return map;
-  }, [scenes]);
-
-  const liveCount = group.scene_ids.filter((id) => !!sceneById[id]).length;
-  const unassignedScenes = scenes.filter((s) => !group.scene_ids.includes(s.id));
-
-  const commitName = () => {
-    const next = name.trim();
-    if (next === "" || next === group.name) {
-      setName(group.name);
-      return;
-    }
-    onUpdate({ ...group, name: next });
-  };
-
-  const commitHold = () => {
-    const next = Math.max(0, Math.floor(hold));
-    if (next === group.hold_ms_override) return;
-    onUpdate({ ...group, hold_ms_override: next });
-  };
-
-  const moveScene = (index: number, dir: -1 | 1) => {
-    const target = index + dir;
-    if (target < 0 || target >= group.scene_ids.length) return;
-    const next = [...group.scene_ids];
-    [next[index], next[target]] = [next[target], next[index]];
-    onUpdate({ ...group, scene_ids: next });
-  };
-  const removeAt = (index: number) => {
-    const next = group.scene_ids.filter((_, i) => i !== index);
-    onUpdate({ ...group, scene_ids: next });
-  };
-  const appendScene = (id: string) => {
-    if (!id) return;
-    onUpdate({ ...group, scene_ids: [...group.scene_ids, id] });
-  };
-
-  return (
-    <li className={`scenes-loop-card${isActive ? " active" : ""}`}>
-      <div className="scenes-loop-card-row">
-        <button
-          type="button"
-          className="scenes-loop-go"
-          title={isActive ? "Detener loop" : "Iniciar loop"}
-          onClick={() => (isActive ? onStop() : onStart())}
-          disabled={!isActive && liveCount === 0}
-        >
-          {isActive ? "■" : "▶"}
-        </button>
-        <input
-          className="scenes-loop-name"
-          value={name}
-          onChange={(e) => setName(e.currentTarget.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitName();
-            else if (e.key === "Escape") setName(group.name);
-          }}
-        />
-        <span className="scenes-loop-count">
-          {liveCount} {liveCount === 1 ? "secuencia" : "secuencias"}
-        </span>
-        <button
-          type="button"
-          className="danger scenes-loop-del"
-          title="Eliminar lista"
-          onClick={async () => {
-            const ok = await ask(`¿Eliminar la lista "${group.name}"?`, {
-              title: "Eliminar lista en loop",
-              kind: "warning",
-            });
-            if (ok) onDelete();
-          }}
-        >
-          ×
-        </button>
-      </div>
-      <details className="scenes-loop-details">
-        <summary>Editar</summary>
-        <div className="scenes-loop-edit">
-          <label className="scenes-loop-hold">
-            Tiempo por secuencia (ms)
-            <input
-              type="number"
-              min={0}
-              max={120000}
-              step={100}
-              value={hold}
-              onChange={(e) => setHold(Number(e.currentTarget.value))}
-              onBlur={commitHold}
-              title="0 = usar el ciclo natural de cada secuencia (fade + hold de cada paso)"
-            />
-            <span className="hint scenes-loop-hold-hint">
-              0 = usa el ciclo natural de cada secuencia.
-            </span>
-          </label>
-          {group.scene_ids.length === 0 ? (
-            <p className="empty">Sin secuencias todavía.</p>
-          ) : (
-            <ol className="scenes-loop-items">
-              {assignSlotKeys(group.scene_ids).map(({ key, sid, i }) => {
-                const scene = sceneById[sid];
-                const label = scene?.name ?? "⚠ secuencia eliminada";
-                const live = isActive && currentIndex !== null && currentIndex === i;
-                return (
-                  <li
-                    key={key}
-                    className={`scenes-loop-item${live ? " live" : ""}${scene ? "" : " missing"}`}
-                  >
-                    <span className="scenes-loop-item-idx">{i + 1}.</span>
-                    <span className="scenes-loop-item-name">{label}</span>
-                    <button
-                      type="button"
-                      onClick={() => moveScene(i, -1)}
-                      disabled={i === 0}
-                      title="Mover arriba"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => moveScene(i, 1)}
-                      disabled={i === group.scene_ids.length - 1}
-                      title="Mover abajo"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      className="danger"
-                      onClick={() => removeAt(i)}
-                      title="Quitar de la lista"
-                    >
-                      ×
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          )}
-          <div className="scenes-loop-add-row">
-            <select
-              value=""
-              onChange={(e) => {
-                appendScene(e.currentTarget.value);
-                e.currentTarget.value = "";
-              }}
-            >
-              <option value="">+ Agregar secuencia…</option>
-              {unassignedScenes.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-              {scenes
-                .filter((s) => group.scene_ids.includes(s.id))
-                .map((s) => (
-                  <option key={`dup-${s.id}`} value={s.id}>
-                    {s.name} (repetir)
-                  </option>
-                ))}
-            </select>
-          </div>
-        </div>
-      </details>
-    </li>
-  );
-}
-
-/// Build stable React keys for a list that may contain duplicate scene
-/// ids. The same scene id repeats once for each occurrence, so we
-/// append `#N` where N is how many times that id has been seen so far.
-/// Avoids using the bare array index as the key (which would break
-/// reorders) while still letting the operator add the same scene
-/// twice to a playlist.
-function assignSlotKeys(scene_ids: string[]): { key: string; sid: string; i: number }[] {
-  const seen: Record<string, number> = {};
-  return scene_ids.map((sid, i) => {
-    const count = (seen[sid] ?? 0) + 1;
-    seen[sid] = count;
-    return { key: `${sid}#${count}`, sid, i };
-  });
 }
 
 function stringifyError(e: unknown): string {

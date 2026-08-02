@@ -5,4 +5,4 @@
  * for BPM is always a quarter note, so `One` = quarter, `Half` = eighth,
  * `Quarter` = sixteenth, `Two` = half-note, `Four` = whole-note.
  */
-export type Subdivision = "quarter" | "half" | "one" | "two" | "four";
+export type Subdivision = "quarter" | "half" | "one" | "two" | "four" | "eight";

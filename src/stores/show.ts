@@ -16,6 +16,7 @@ import type { Scene } from "@bindings/Scene";
 import type { SceneLoopGroup } from "@bindings/SceneLoopGroup";
 import type { SerialPortInfo } from "@bindings/SerialPortInfo";
 import type { ShowFileV1 } from "@bindings/ShowFileV1";
+import type { Snapshot } from "@bindings/Snapshot";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { create } from "zustand";
@@ -97,6 +98,15 @@ interface ShowStoreState {
   activeSceneId: () => Promise<string | null>;
   activeSceneStep: () => Promise<number | null>;
 
+  // Snapshots (whole-rig capture / toggle)
+  captureSnapshot: (name?: string) => Promise<Snapshot>;
+  updateSnapshotFromState: (id: string) => Promise<Snapshot>;
+  renameSnapshot: (id: string, name: string) => Promise<void>;
+  deleteSnapshot: (id: string) => Promise<void>;
+  activateSnapshot: (id: string) => Promise<void>;
+  deactivateSnapshot: () => Promise<void>;
+  activeSnapshotId: () => Promise<string | null>;
+
   // Sequence loop groups (playlists of scenes)
   listLoopGroups: () => Promise<SceneLoopGroup[]>;
   createLoopGroup: (name?: string) => Promise<SceneLoopGroup>;
@@ -123,6 +133,17 @@ interface ShowStoreState {
   /// Resolves to the freshly-computed BPM (when 2+ taps in the rolling
   /// window) or `null` (first tap of a fresh window).
   tapOverallBpm: () => Promise<number | null>;
+  /// Begin a tempo-pattern recording window. Subsequent calls to
+  /// `tapPatternRecord` populate the buffer; `stopPatternRecording`
+  /// quantises and commits.
+  startPatternRecording: () => Promise<void>;
+  tapPatternRecord: () => Promise<void>;
+  /// Returns the freshly committed TempoPattern, or `null` if fewer
+  /// than 2 taps were recorded (the previous pattern, if any, stays
+  /// untouched in that case).
+  stopPatternRecording: () => Promise<import("@bindings/TempoPattern").TempoPattern | null>;
+  /// Drop the active pattern; chasers go back to plain overall_bpm.
+  clearTempoPattern: () => Promise<void>;
 
   listMidiDevices: () => Promise<{ name: string; has_input: boolean; has_output: boolean }[]>;
   connectMidiDevice: (name: string) => Promise<void>;
@@ -428,6 +449,37 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
     return invoke<number | null>("active_scene_step");
   },
 
+  // ---- Snapshots ----
+  async captureSnapshot(name) {
+    const snap = await invoke<Snapshot>("capture_snapshot", { name: name ?? null });
+    await get().refresh();
+    return snap;
+  },
+  async updateSnapshotFromState(id) {
+    const snap = await invoke<Snapshot>("update_snapshot_from_state", { id });
+    await get().refresh();
+    return snap;
+  },
+  async renameSnapshot(id, name) {
+    await invoke("rename_snapshot", { id, name });
+    await get().refresh();
+  },
+  async deleteSnapshot(id) {
+    await invoke("delete_snapshot", { id });
+    await get().refresh();
+  },
+  async activateSnapshot(id) {
+    await invoke("activate_snapshot", { id });
+    await get().refresh();
+  },
+  async deactivateSnapshot() {
+    await invoke("deactivate_snapshot");
+    await get().refresh();
+  },
+  async activeSnapshotId() {
+    return invoke<string | null>("active_snapshot_id");
+  },
+
   // ---- Sequence loop groups ----
   async listLoopGroups() {
     return invoke<SceneLoopGroup[]>("list_loop_groups");
@@ -498,6 +550,27 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
     const result = await invoke<number | null>("tap_overall_bpm");
     await get().refresh();
     return result;
+  },
+
+  async startPatternRecording() {
+    await invoke("start_pattern_recording");
+  },
+
+  async tapPatternRecord() {
+    await invoke("tap_pattern_record");
+  },
+
+  async stopPatternRecording() {
+    const result = await invoke<import("@bindings/TempoPattern").TempoPattern | null>(
+      "stop_pattern_recording",
+    );
+    await get().refresh();
+    return result;
+  },
+
+  async clearTempoPattern() {
+    await invoke("clear_tempo_pattern");
+    await get().refresh();
   },
 
   async listMidiDevices() {

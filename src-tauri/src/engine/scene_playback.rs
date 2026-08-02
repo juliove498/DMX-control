@@ -252,6 +252,16 @@ impl ScenePlayback {
         };
     }
 
+    /// Drop any active playback immediately — no release fade, no FX
+    /// restore request. Used by snapshot activation, which replaces the
+    /// whole rig state (base values *and* FX layers) wholesale right
+    /// after clearing; letting the normal release machinery run would
+    /// only have its fade-out fight the incoming snapshot values.
+    pub fn clear_hard(&mut self) {
+        self.pre_recall_fx = None;
+        self.clear_to_idle();
+    }
+
     fn clear_to_idle(&mut self) {
         self.active_scene_id = None;
         self.steps.clear();

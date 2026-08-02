@@ -43,6 +43,7 @@ use crate::midi::hub::SharedMidi;
 use crate::midi::MidiMessage;
 use crate::show::button_bindings::{ButtonAction, ButtonActiveMode, LaunchpadBinding};
 use crate::show::ShowState;
+use crate::snapshot::SharedSnapshotRuntime;
 
 /// MK2 row-1 pad notes, left-to-right. Each maps to a chaser slot.
 pub const CHASER_PAD_NOTES: [u8; 8] = [11, 12, 13, 14, 15, 16, 17, 18];
@@ -156,6 +157,7 @@ struct LpHandles {
     loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
+    snapshots: SharedSnapshotRuntime,
     blind_held: Arc<AtomicBool>,
 }
 
@@ -206,6 +208,7 @@ pub fn start(
     loops: SharedLoopPlayback,
     engine: EngineState,
     show: ShowState,
+    snapshots: SharedSnapshotRuntime,
 ) -> LaunchpadController {
     let blind_held = Arc::new(AtomicBool::new(false));
     let handles = LpHandles {
@@ -218,6 +221,7 @@ pub fn start(
         loops,
         engine,
         show,
+        snapshots,
         blind_held: blind_held.clone(),
     };
 
@@ -305,6 +309,10 @@ fn resolve_indexed_action(handles: &LpHandles, action: &ButtonAction) -> Option<
             let id = s.show.scene_loop_groups.get(*index as usize)?.id.clone();
             ButtonAction::StartLoopGroup { id }
         }
+        ButtonAction::ToggleSnapshotByIndex { index } => {
+            let id = s.show.snapshots.get(*index as usize)?.id.clone();
+            ButtonAction::ToggleSnapshot { id }
+        }
         // Already concrete: clone through.
         other => other.clone(),
     })
@@ -349,6 +357,12 @@ fn is_action_active(action: &ButtonAction, handles: &LpHandles) -> bool {
             .map(|a| a == id)
             .unwrap_or(false),
         ButtonAction::StopLoopGroup => false,
+        ButtonAction::ToggleSnapshot { id } => handles
+            .snapshots
+            .lock()
+            .active_id()
+            .map(|a| a == id)
+            .unwrap_or(false),
         // *ByIndex never gets here — resolved upstream.
         _ => false,
     }
@@ -543,6 +557,38 @@ fn dispatch_action(action: ButtonAction, vel: u8, handles: &LpHandles) {
         }
         ButtonAction::StopLoopGroup => {
             crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops);
+        }
+        ButtonAction::ToggleSnapshot { id } => {
+            let active = handles.snapshots.lock().active_id().map(|s| s.to_string());
+            let result = if active.as_deref() == Some(id.as_str()) {
+                crate::commands::deactivate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                )
+            } else {
+                crate::commands::activate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                    &id,
+                )
+            };
+            if let Err(err) = result {
+                tracing::warn!(?err, "launchpad action toggle snapshot failed");
+            }
         }
         // *ByIndex were resolved upstream.
         _ => (),

@@ -7,6 +7,7 @@ import {
 export const POPOUT_VIEWS = [
   "stage",
   "scenes",
+  "loops",
   "chaser",
   "movement",
   "preview3d",
@@ -17,6 +18,7 @@ export type PopoutView = (typeof POPOUT_VIEWS)[number];
 const TITLES: Record<PopoutView, string> = {
   stage: "DMX — Stage",
   scenes: "DMX — Scenes",
+  loops: "DMX — Loops",
   chaser: "DMX — Chaser",
   movement: "DMX — Movement",
   preview3d: "DMX — Preview 3D",

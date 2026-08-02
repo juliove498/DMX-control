@@ -8,9 +8,11 @@
 //! lands in B/C/D.
 
 use std::collections::HashMap;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use crate::engine::beatgrid::BeatAnchor;
 use crate::engine::{empty_overlay, ChannelOverlay, DMX_CHANNELS};
+use crate::globals::TempoPattern;
 use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance};
 
 use super::color::color_for_slot;
@@ -47,6 +49,12 @@ pub struct ChaserEngine {
     /// in every time.
     fixtures: Vec<FixtureInstance>,
     library: HashMap<String, FixtureDefinition>,
+    /// External phase anchor (currently set by the VDJ poller). When
+    /// `Some`, `advance_step` derives the current step deterministically
+    /// from VDJ's beat grid instead of free-running on wall-clock. When
+    /// `None`, behaviour is identical to pre-sync — used by every show
+    /// that isn't talking to a DAW.
+    beat_anchor: Option<BeatAnchor>,
 }
 
 impl ChaserEngine {
@@ -90,6 +98,14 @@ impl ChaserEngine {
         self.entries.iter().map(|e| e.config.clone()).collect()
     }
 
+    /// Install or clear the external phase anchor. `Some(anchor)` makes
+    /// the next `advance_step` snap to VDJ's beat grid; `None` falls
+    /// back to free-running on the chaser's own tempo. Called from
+    /// the VDJ poller and from `stop_poller`.
+    pub fn set_beat_anchor(&mut self, anchor: Option<BeatAnchor>) {
+        self.beat_anchor = anchor;
+    }
+
     /// Snapshot of the per-slot output (RGB + intensity) from the most
     /// recent tick of whichever chaser is currently enabled. Used by
     /// surfaces that mirror the chase visually, e.g. the Launchpad top
@@ -112,14 +128,46 @@ impl ChaserEngine {
     /// for every enabled chaser, and produce the merged overlay map keyed by
     /// universe. `overall_bpm`, when `Some`, replaces every chaser's
     /// `tempo` for the duration of this tick — see `advance_step`.
-    pub fn tick(&mut self, now: Instant, overall_bpm: Option<f32>) -> HashMap<u16, ChannelOverlay> {
+    ///
+    /// `tempo_pattern`, when `Some` together with an `overall_bpm`, turns
+    /// every chaser into a pattern-follower: instead of advancing at uniform
+    /// subdivisions, each chaser advances exactly one step per pattern hit.
+    /// This is what lets a recorded clave / cha-cha drive the rig
+    /// rhythmically. If `overall_bpm` is `None` the pattern is ignored —
+    /// the operator must arm the global tempo for the pattern to play.
+    pub fn tick(
+        &mut self,
+        now: Instant,
+        overall_bpm: Option<f32>,
+        tempo_pattern: Option<(&TempoPattern, Instant)>,
+    ) -> HashMap<u16, ChannelOverlay> {
         let mut overlay: HashMap<u16, ChannelOverlay> = HashMap::new();
+        // Derive the current beat-grid position once per frame. All
+        // enabled chasers in this tick share the same view of the
+        // beat, which keeps them locked to each other even if the
+        // anchor refreshes between calls.
+        let current_beat = self.beat_anchor.as_ref().map(|a| a.beat_at(now));
+        // Pattern only kicks in when the operator has armed the overall
+        // BPM — the pattern needs a tempo to ride. Without it, fall
+        // through to plain subdivision-driven behaviour so a stale
+        // pattern doesn't silently override a manually-set chaser tempo.
+        let pattern_active = match (overall_bpm, tempo_pattern) {
+            (Some(bpm), Some((p, anchor))) if !p.hits.is_empty() => Some((bpm, p, anchor)),
+            _ => None,
+        };
         for entry in &mut self.entries {
             if !entry.config.enabled {
                 continue;
             }
-            advance_step(&mut entry.runtime, &entry.config, now, overall_bpm);
-            apply_chaser(entry, &mut overlay, now);
+            advance_step(
+                &mut entry.runtime,
+                &entry.config,
+                now,
+                overall_bpm,
+                current_beat,
+                pattern_active,
+            );
+            apply_chaser(entry, &mut overlay, now, pattern_active);
         }
         overlay
     }
@@ -136,6 +184,8 @@ fn advance_step(
     config: &AmbientChaser,
     now: Instant,
     overall_bpm: Option<f32>,
+    current_beat: Option<f64>,
+    pattern: Option<(f32, &TempoPattern, Instant)>,
 ) {
     // Overall BPM, when active, wins over the chaser's own configured
     // tempo. The *configuration* isn't mutated — disabling the override
@@ -143,6 +193,79 @@ fn advance_step(
     let bpm = overall_bpm.unwrap_or(match config.tempo {
         TempoSource::Fixed { bpm } => bpm,
     });
+
+    // Pattern path: advance one step per pattern hit, ignoring the
+    // chaser's own subdivision. The pattern is global to every chaser
+    // that runs under the override, so a clave on the rig keeps every
+    // dimmer / blinder / par in lockstep. We compute the absolute step
+    // count from "beats since anchor", which is monotonic and resilient
+    // to frame stutters (a late frame just jumps several steps at once,
+    // same as the free-run path).
+    if let Some((pbpm, p, anchor)) = pattern {
+        let elapsed_secs = now.saturating_duration_since(anchor).as_secs_f64();
+        let beats = elapsed_secs * (pbpm.max(1.0) as f64) / 60.0;
+        let (abs_step, step_started_beat, step_dur_beats) = pattern_step_at(p, beats);
+        let step_started_secs = (step_started_beat * 60.0) / (pbpm.max(1.0) as f64);
+        let step_started_at = anchor
+            .checked_add(Duration::from_secs_f64(step_started_secs.max(0.0)))
+            .unwrap_or(now);
+        if runtime.current_step != abs_step {
+            runtime.fade_from = runtime.last_emitted.clone();
+            runtime.current_step = abs_step;
+        }
+        runtime.last_step_at = Some(step_started_at);
+        runtime.step_started_at = Some(step_started_at);
+        // Cache the upcoming step duration on the runtime so the fade
+        // code reads it cheaply. Stored as ms in `pattern_step_ms` (see
+        // `ChaserRuntime`).
+        let step_ms = (step_dur_beats * 60_000.0 / (pbpm.max(1.0) as f64)) as f32;
+        runtime.pattern_step_ms = Some(step_ms.max(1.0));
+        return;
+    } else {
+        runtime.pattern_step_ms = None;
+    }
+
+    // Phase-sync path: when an external clock (VDJ via beat anchor)
+    // tells us "right now you are at beat B", derive the step
+    // deterministically. This is the whole point of sync — no drift
+    // across long songs, downbeats line up with the music.
+    if let Some(beat) = current_beat {
+        let beats_per_step = config.subdivision.beats() as f64;
+        if beats_per_step > 0.0 {
+            // Negative beat (rare, can happen if anchor was set during
+            // a track-position seek) — clamp to 0 so we don't tip into
+            // exotic u64 wrap territory.
+            let beat_clamped = beat.max(0.0);
+            let abs_step = (beat_clamped / beats_per_step).floor() as u64;
+            // step_started_at = wall clock at which the current step
+            // began. Derived from "how far into the current step we
+            // are, in seconds" — needed by the fade logic which uses
+            // `now - step_started_at` to interpolate.
+            let beats_into_step = beat_clamped - (abs_step as f64) * beats_per_step;
+            let secs_into_step = beats_into_step * 60.0 / bpm.max(1.0) as f64;
+            let step_started_at = now
+                .checked_sub(Duration::from_secs_f64(secs_into_step.max(0.0)))
+                .unwrap_or(now);
+
+            if runtime.current_step != abs_step {
+                // Real step transition: snapshot the last emitted
+                // output so the fade interpolates from a real value,
+                // not from a recomputed ideal.
+                runtime.fade_from = runtime.last_emitted.clone();
+                runtime.current_step = abs_step;
+            }
+            // last_step_at + step_started_at converge on the same wall
+            // clock under sync mode (both = the moment we just entered
+            // this step). We re-derive them each frame so an anchor
+            // refresh that shifts the perceived beat snaps the chaser
+            // cleanly.
+            runtime.last_step_at = Some(step_started_at);
+            runtime.step_started_at = Some(step_started_at);
+            return;
+        }
+    }
+
+    // Free-run path (no anchor): existing behaviour, unchanged.
     let step_ms = step_duration_ms(bpm, config.subdivision).max(1.0);
     let step_dur = std::time::Duration::from_secs_f32(step_ms / 1000.0);
     match runtime.last_step_at {
@@ -165,7 +288,71 @@ fn advance_step(
     }
 }
 
-fn apply_chaser(entry: &mut ChaserEntry, overlay: &mut HashMap<u16, ChannelOverlay>, now: Instant) {
+/// Resolve where the playback head sits in a tempo pattern given
+/// `beats` since the pattern anchor. Returns:
+/// - `abs_step`: monotonically increasing 0-based step counter
+/// - `step_started_beat`: beat of the most-recent pattern hit (used
+///   to derive `step_started_at` for the fade engine)
+/// - `step_dur_beats`: distance in beats to the next hit (used for
+///   fade duration). Never zero.
+///
+/// `pattern.hits` is sorted ascending with `hits[0] == 0` (the
+/// quantiser guarantees this), so the first hit of each cycle always
+/// lands on the cycle's downbeat. Negative `beats` clamps to zero —
+/// can happen briefly if the anchor was set in the future by a clock
+/// hiccup.
+fn pattern_step_at(pattern: &TempoPattern, beats: f64) -> (u64, f64, f64) {
+    let len = pattern.hits.len() as u64;
+    let steps_per_quarter = pattern.steps_per_bar as f64 / 4.0;
+    let beats_per_cycle = pattern.bars as f64 * 4.0;
+    let beats_clamped = beats.max(0.0);
+    let cycle_idx = (beats_clamped / beats_per_cycle).floor() as u64;
+    let cycle_beat = beats_clamped - (cycle_idx as f64) * beats_per_cycle;
+    let pos_in_cycle = cycle_beat * steps_per_quarter;
+
+    // Find the index of the most-recent hit that has fired this cycle.
+    // `hits[0] == 0` (quantiser invariant) → there's always at least one
+    // hit consumed once `cycle_beat >= 0`.
+    let mut consumed = 0usize;
+    for (i, h) in pattern.hits.iter().enumerate() {
+        if (*h as f64) <= pos_in_cycle + 1e-9 {
+            consumed = i + 1;
+        } else {
+            break;
+        }
+    }
+    // Defensive: if somehow no hit was consumed (e.g. floating-point on
+    // a totally fresh pattern at beat 0 with hits[0] != 0), we stay on
+    // the *last* hit of the previous cycle to avoid an underflow.
+    let (cycle_idx_eff, consumed_eff) = if consumed == 0 {
+        (cycle_idx.saturating_sub(1), pattern.hits.len())
+    } else {
+        (cycle_idx, consumed)
+    };
+    let abs_step = cycle_idx_eff * len + (consumed_eff as u64) - 1;
+    let last_hit_grid = pattern.hits[consumed_eff - 1] as f64;
+    let step_started_beat = (cycle_idx_eff as f64) * beats_per_cycle + last_hit_grid / steps_per_quarter;
+
+    // Distance to the next hit (wraps into the next cycle when we're
+    // past the last hit of the current one).
+    let next_hit_beat = if consumed_eff < pattern.hits.len() {
+        let next_grid = pattern.hits[consumed_eff] as f64;
+        (cycle_idx_eff as f64) * beats_per_cycle + next_grid / steps_per_quarter
+    } else {
+        // Wrap: the next hit is hits[0] of the following cycle.
+        let next_grid = pattern.hits[0] as f64;
+        ((cycle_idx_eff + 1) as f64) * beats_per_cycle + next_grid / steps_per_quarter
+    };
+    let step_dur_beats = (next_hit_beat - step_started_beat).max(1e-3);
+    (abs_step, step_started_beat, step_dur_beats)
+}
+
+fn apply_chaser(
+    entry: &mut ChaserEntry,
+    overlay: &mut HashMap<u16, ChannelOverlay>,
+    now: Instant,
+    pattern: Option<(f32, &TempoPattern, Instant)>,
+) {
     let total = entry.resolved.len();
     if total == 0 {
         return;
@@ -242,10 +429,19 @@ fn apply_chaser(entry: &mut ChaserEntry, overlay: &mut HashMap<u16, ChannelOverl
         && !entry.runtime.fade_from.is_empty()
         && entry.runtime.fade_from.len() == raw_targets.len()
     {
-        let bpm = match entry.config.tempo {
-            TempoSource::Fixed { bpm } => bpm,
+        // Pattern mode: step durations are non-uniform, so reach for the
+        // value `advance_step` cached on the runtime. Subdivision mode:
+        // compute it from BPM × subdivision like before.
+        let step_ms = if let Some(p_step) = entry.runtime.pattern_step_ms {
+            p_step
+        } else {
+            let bpm = pattern
+                .map(|(b, _, _)| b)
+                .unwrap_or_else(|| match entry.config.tempo {
+                    TempoSource::Fixed { bpm } => bpm,
+                });
+            step_duration_ms(bpm, entry.config.subdivision).max(1.0)
         };
-        let step_ms = step_duration_ms(bpm, entry.config.subdivision).max(1.0);
         // Cap fade at 90% of the step so each step always settles before
         // the next transition, no matter how aggressive the user gets.
         let fade_ms = step_ms * entry.config.fade.amount.clamp(0.0, 0.9);
@@ -469,18 +665,18 @@ mod tests {
 
         let t0 = Instant::now();
         // Step 0 → On (255)
-        let ov0 = engine.tick(t0, None);
+        let ov0 = engine.tick(t0, None, None);
         let u0 = ov0.get(&0).unwrap();
         assert_eq!(u0[0], Some(255));
 
         // 120 BPM, subdivision One = 500 ms per step. Tick a tick later than
         // half a second → step 1 → Off.
-        let ov1 = engine.tick(t0 + Duration::from_millis(510), None);
+        let ov1 = engine.tick(t0 + Duration::from_millis(510), None, None);
         let u1 = ov1.get(&0).unwrap();
         assert_eq!(u1[0], Some(0));
 
         // Another half-second → step 2 → On.
-        let ov2 = engine.tick(t0 + Duration::from_millis(1010), None);
+        let ov2 = engine.tick(t0 + Duration::from_millis(1010), None, None);
         assert_eq!(ov2.get(&0).unwrap()[0], Some(255));
     }
 
@@ -496,7 +692,7 @@ mod tests {
         c.enabled = false;
         engine.replace_chasers(vec![c]);
 
-        let ov = engine.tick(Instant::now(), None);
+        let ov = engine.tick(Instant::now(), None, None);
         assert!(ov.is_empty());
     }
 
@@ -523,11 +719,11 @@ mod tests {
         engine.replace_chasers(vec![c]);
 
         let t0 = Instant::now();
-        let on = engine.tick(t0, None);
+        let on = engine.tick(t0, None, None);
         // Step 0 → on → full red.
         assert_eq!(on.get(&0).unwrap()[0], Some(255));
         // Step 1 → off, but background 64 → dim red.
-        let off = engine.tick(t0 + Duration::from_millis(510), None);
+        let off = engine.tick(t0 + Duration::from_millis(510), None, None);
         let u = off.get(&0).unwrap();
         assert!(
             u[0] == Some(64) || u[0] == Some(63),
@@ -558,7 +754,7 @@ mod tests {
         c.slots[0].use_intensity = false;
         engine.replace_chasers(vec![c]);
 
-        let ov = engine.tick(Instant::now(), None);
+        let ov = engine.tick(Instant::now(), None, None);
         let u = ov.get(&0).unwrap();
         assert_eq!(u[0], Some(255));
         assert_eq!(u[1], Some(0));
@@ -572,7 +768,7 @@ mod tests {
         let mut engine = ChaserEngine::new();
         engine.update_show_context(fixtures, lib);
         engine.replace_chasers(vec![chaser("c", vec!["nonexistent"])]);
-        let ov = engine.tick(Instant::now(), None);
+        let ov = engine.tick(Instant::now(), None, None);
         assert!(ov.is_empty());
     }
 
@@ -597,9 +793,9 @@ mod tests {
         engine.replace_chasers(vec![c]);
 
         let t0 = Instant::now();
-        engine.tick(t0, None); // step 0 → 255 cached as last_emitted
+        engine.tick(t0, None, None); // step 0 → 255 cached as last_emitted
                                // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
-        let ov_at_transition = engine.tick(t0 + Duration::from_millis(510), None);
+        let ov_at_transition = engine.tick(t0 + Duration::from_millis(510), None, None);
         // At t=510 we are 0 ms into the fade → still ~255 (linear curve, t=0).
         assert!(
             ov_at_transition.get(&0).unwrap()[0].unwrap() > 200,
@@ -607,11 +803,11 @@ mod tests {
             ov_at_transition.get(&0).unwrap()[0]
         );
         // Halfway through the 250 ms fade → ~127.
-        let ov_mid = engine.tick(t0 + Duration::from_millis(510 + 125), None);
+        let ov_mid = engine.tick(t0 + Duration::from_millis(510 + 125), None, None);
         let v = ov_mid.get(&0).unwrap()[0].unwrap();
         assert!((90..=160).contains(&(v as i32)), "expected ~127, got {v}");
         // Past the fade end → 0.
-        let ov_done = engine.tick(t0 + Duration::from_millis(510 + 260), None);
+        let ov_done = engine.tick(t0 + Duration::from_millis(510 + 260), None, None);
         assert_eq!(ov_done.get(&0).unwrap()[0], Some(0));
     }
 
@@ -627,9 +823,9 @@ mod tests {
         engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
 
         let t0 = Instant::now();
-        engine.tick(t0, None);
+        engine.tick(t0, None, None);
         // 1 ms into step 1 should already be the new value (Off = 0).
-        let ov = engine.tick(t0 + Duration::from_millis(501), None);
+        let ov = engine.tick(t0 + Duration::from_millis(501), None, None);
         assert_eq!(ov.get(&0).unwrap()[0], Some(0));
     }
 
@@ -646,9 +842,177 @@ mod tests {
         engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
 
         let t0 = Instant::now();
-        engine.tick(t0, None); // step 0
+        engine.tick(t0, None, None); // step 0
                                // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
-        let ov = engine.tick(t0 + Duration::from_millis(5_001), None);
+        let ov = engine.tick(t0 + Duration::from_millis(5_001), None, None);
         assert_eq!(ov.get(&0).unwrap()[0], Some(255));
+    }
+
+    #[test]
+    fn beat_anchor_snaps_current_step_to_beat_grid() {
+        // With anchor at (now, beat=4, bpm=120) the chaser using
+        // Subdivision::One (1 step per beat) and AllTogether pattern
+        // should land on step 4 → On. With beat=5 → step 5 → Off.
+        let mut lib = HashMap::new();
+        lib.insert("dimmer".into(), dimmer_def("dimmer"));
+        let fixtures = vec![fixture("d1", "dimmer", 1)];
+
+        let mut engine = ChaserEngine::new();
+        engine.update_show_context(fixtures, lib);
+        engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
+
+        let t0 = Instant::now();
+        engine.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 4.0,
+            bpm: 120.0,
+        }));
+        let ov = engine.tick(t0, None, None);
+        assert_eq!(ov.get(&0).unwrap()[0], Some(255), "beat 4 → step 4 → On");
+
+        engine.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 5.0,
+            bpm: 120.0,
+        }));
+        let ov = engine.tick(t0, None, None);
+        assert_eq!(ov.get(&0).unwrap()[0], Some(0), "beat 5 → step 5 → Off");
+    }
+
+    #[test]
+    fn beat_anchor_interpolates_forward() {
+        // Anchor set at (t0, beat=0). At t0+500ms with BPM=120 we
+        // expect the engine to have advanced to beat 1 (= step 1
+        // with Subdivision::One) → Off.
+        let mut lib = HashMap::new();
+        lib.insert("dimmer".into(), dimmer_def("dimmer"));
+        let fixtures = vec![fixture("d1", "dimmer", 1)];
+
+        let mut engine = ChaserEngine::new();
+        engine.update_show_context(fixtures, lib);
+        engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
+
+        let t0 = Instant::now();
+        engine.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 0.0,
+            bpm: 120.0,
+        }));
+        // 500ms at 120 BPM = exactly 1 beat
+        let ov = engine.tick(t0 + Duration::from_millis(500), None, None);
+        assert_eq!(ov.get(&0).unwrap()[0], Some(0));
+    }
+
+    #[test]
+    fn pattern_drives_chaser_step_per_hit() {
+        // 5-hit clave 3-2 at 120 BPM. Chaser pattern is AllTogether so
+        // even steps are On and odd steps are Off. Steps fire at grid
+        // positions 0, 3, 6, 10, 12 (16ths) → in seconds: 0, 0.375,
+        // 0.75, 1.25, 1.5.
+        let mut lib = HashMap::new();
+        lib.insert("dimmer".into(), dimmer_def("dimmer"));
+        let fixtures = vec![fixture("d1", "dimmer", 1)];
+
+        let mut engine = ChaserEngine::new();
+        engine.update_show_context(fixtures, lib);
+        engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
+
+        let pattern = crate::globals::TempoPattern {
+            bars: 1,
+            steps_per_bar: 16,
+            hits: vec![0, 3, 6, 10, 12],
+        };
+        let t0 = Instant::now();
+
+        // Hit 1 (step 0): On.
+        let ov = engine.tick(t0, Some(120.0), Some((&pattern, t0)));
+        assert_eq!(ov.get(&0).unwrap()[0], Some(255), "step 0 on");
+
+        // Between hit 1 and 2 (still step 0).
+        let ov = engine.tick(t0 + Duration::from_millis(200), Some(120.0), Some((&pattern, t0)));
+        assert_eq!(ov.get(&0).unwrap()[0], Some(255), "still step 0 mid-gap");
+
+        // Just past hit 2 (step 1): Off.
+        let ov = engine.tick(t0 + Duration::from_millis(380), Some(120.0), Some((&pattern, t0)));
+        assert_eq!(ov.get(&0).unwrap()[0], Some(0), "step 1 off after 2nd hit");
+
+        // Just past hit 5 (step 4): On (step 4 is even under AllTogether).
+        let ov = engine.tick(t0 + Duration::from_millis(1_510), Some(120.0), Some((&pattern, t0)));
+        assert_eq!(ov.get(&0).unwrap()[0], Some(255), "step 4 on");
+
+        // After the cycle wraps (>= 2 s) we're on step 5 = first hit of
+        // the next cycle → Off.
+        let ov = engine.tick(t0 + Duration::from_millis(2_010), Some(120.0), Some((&pattern, t0)));
+        assert_eq!(ov.get(&0).unwrap()[0], Some(0), "step 5 off (cycle wrap)");
+    }
+
+    #[test]
+    fn pattern_ignored_when_overall_bpm_disabled() {
+        // Even if a pattern is passed in, with overall_bpm = None the
+        // chaser must fall back to its own subdivision-driven timing.
+        let mut lib = HashMap::new();
+        lib.insert("dimmer".into(), dimmer_def("dimmer"));
+        let fixtures = vec![fixture("d1", "dimmer", 1)];
+        let mut engine = ChaserEngine::new();
+        engine.update_show_context(fixtures, lib);
+        engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
+
+        let pattern = crate::globals::TempoPattern {
+            bars: 1,
+            steps_per_bar: 16,
+            hits: vec![0, 3, 6, 10, 12],
+        };
+        let t0 = Instant::now();
+        engine.tick(t0, None, Some((&pattern, t0)));
+        // 510 ms later at the chaser's default 120 BPM × Subdivision::One
+        // (= 500 ms per step) we should be at step 1 → Off. If the
+        // pattern had taken effect we'd be at step 2 (after the 2nd hit
+        // at 375 ms) → On. So Off confirms the gating.
+        let ov = engine.tick(t0 + Duration::from_millis(510), None, Some((&pattern, t0)));
+        assert_eq!(ov.get(&0).unwrap()[0], Some(0));
+    }
+
+    #[test]
+    fn pattern_step_at_clave_positions() {
+        let p = crate::globals::TempoPattern {
+            bars: 1,
+            steps_per_bar: 16,
+            hits: vec![0, 3, 6, 10, 12],
+        };
+        let (s0, _, _) = pattern_step_at(&p, 0.0);
+        assert_eq!(s0, 0);
+        let (s1, _, _) = pattern_step_at(&p, 0.8);
+        assert_eq!(s1, 1);
+        let (s2, _, _) = pattern_step_at(&p, 4.0);
+        assert_eq!(s2, 5, "cycle wrap lands on step 5");
+    }
+
+    #[test]
+    fn dropping_anchor_falls_back_to_free_run() {
+        // After we install + clear the anchor, the chaser should
+        // resume free-running on its own tempo. We verify by ticking
+        // far enough that the absolute step count differs from the
+        // anchor's frozen value — if free-run is broken, the chaser
+        // would still be glued to "step 4" from the anchor.
+        let mut lib = HashMap::new();
+        lib.insert("dimmer".into(), dimmer_def("dimmer"));
+        let fixtures = vec![fixture("d1", "dimmer", 1)];
+
+        let mut engine = ChaserEngine::new();
+        engine.update_show_context(fixtures, lib);
+        engine.replace_chasers(vec![chaser("c", vec!["d1"])]);
+
+        let t0 = Instant::now();
+        engine.set_beat_anchor(Some(BeatAnchor {
+            set_at: t0,
+            beat_at_set: 4.0,
+            bpm: 120.0,
+        }));
+        engine.tick(t0, None, None); // snaps to step 4
+        engine.set_beat_anchor(None);
+        // 501ms at 120 BPM (500ms/step) → free-run advances by 1
+        let ov = engine.tick(t0 + Duration::from_millis(501), None, None);
+        // step 4 → step 5 → Off
+        assert_eq!(ov.get(&0).unwrap()[0], Some(0));
     }
 }

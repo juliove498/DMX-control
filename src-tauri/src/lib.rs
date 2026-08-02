@@ -471,6 +471,7 @@ pub fn run() {
             let show_for_loops = show_state_st.inner().clone();
             let chasers_for_loops = chasers_st.inner().clone();
             let movement_for_loops = movement_st.inner().clone();
+            let globals_for_loops = globals_st.inner().clone();
             let scenes_for_loops = scenes_st.inner().clone();
             let loops_for_loops = loop_playback_handle.clone();
             std::thread::Builder::new()
@@ -483,6 +484,7 @@ pub fn run() {
                         &show_for_loops,
                         &chasers_for_loops,
                         &movement_for_loops,
+                        &globals_for_loops,
                         &scenes_for_loops,
                         &loops_for_loops,
                     );

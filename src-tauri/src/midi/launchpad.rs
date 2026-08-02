@@ -548,6 +548,7 @@ fn dispatch_action(action: ButtonAction, vel: u8, handles: &LpHandles) {
                 &handles.show,
                 &handles.chasers,
                 &handles.movement,
+                &handles.globals,
                 &handles.scenes,
                 &handles.loops,
                 &id,

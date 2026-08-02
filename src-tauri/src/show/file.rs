@@ -117,6 +117,9 @@ impl ShowFileV1 {
         for scene in &mut self.scenes {
             scene.migrate_legacy();
         }
+        for group in &mut self.scene_loop_groups {
+            group.migrate_legacy();
+        }
     }
 
     /// Lift the legacy single `movement` field into `movements[0]` and

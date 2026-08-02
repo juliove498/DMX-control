@@ -6,7 +6,7 @@ use tauri::{AppHandle, Emitter, State};
 use ts_rs::TS;
 
 use crate::chaser::AmbientChaser;
-use crate::engine::loop_playback::{dwell_ms_for, SharedLoopPlayback};
+use crate::engine::loop_playback::{dwell_ms_for_entry, SharedLoopPlayback};
 use crate::engine::output_thread::{
     shared_bindings, OutputBinding, OutputThreadHandle, SharedChasers, SharedGlobals,
     SharedMovement,
@@ -28,7 +28,7 @@ use crate::show::button_bindings::{
 use crate::show::file::{load as load_show_file, save as save_show_file, ShowError, ShowFileV1};
 use crate::show::fixture::{validate_patch, FixtureDefinition, FixtureInstance, PatchReport};
 use crate::show::library::{ensure_seeded, library_dir, load_all, save_def};
-use crate::show::loop_group::SceneLoopGroup;
+use crate::show::loop_group::{LoopEntry, SceneLoopGroup};
 use crate::show::scene::{Scene, SceneChannel, SceneFixture, SceneFxState, SceneStep};
 use crate::show::snapshot::{Snapshot, SnapshotUniverse};
 use crate::show::ShowState;
@@ -3128,7 +3128,42 @@ pub fn delete_loop_group(
     Ok(())
 }
 
-/// Start a loop group: recall its first scene, schedule the next
+/// Apply one loop-group entry: scenes go through the normal recall
+/// path (fade + FX context); snapshots are applied values-only so the
+/// running playlist keeps driving. Missing targets are skipped with a
+/// warning — the next tick simply advances past them.
+#[allow(clippy::too_many_arguments)]
+fn apply_loop_entry(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    globals: &SharedGlobals,
+    scenes_pb: &SharedScenePlayback,
+    entry: &LoopEntry,
+) -> Result<(), CommandError> {
+    match entry {
+        LoopEntry::Scene { id } => {
+            recall_scene_impl(app, engine, show, chasers, movement, scenes_pb, id)
+        }
+        LoopEntry::Snapshot { id } => {
+            let snap = show
+                .read()
+                .show
+                .snapshots
+                .iter()
+                .find(|s| s.id == *id)
+                .cloned()
+                .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
+            apply_snapshot_values(
+                app, engine, show, chasers, movement, globals, scenes_pb, &snap,
+            )
+        }
+    }
+}
+
+/// Start a loop group: apply its first entry, schedule the next
 /// advance, and emit a status event. The background driver thread
 /// will keep advancing as each dwell expires.
 #[tauri::command]
@@ -3139,6 +3174,7 @@ pub fn start_loop_group(
     show: State<'_, ShowState>,
     chasers: State<'_, SharedChasers>,
     movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
     scenes_pb: State<'_, SharedScenePlayback>,
     loops_pb: State<'_, SharedLoopPlayback>,
     id: String,
@@ -3149,6 +3185,7 @@ pub fn start_loop_group(
         &show,
         chasers.inner(),
         movement.inner(),
+        globals.inner(),
         scenes_pb.inner(),
         loops_pb.inner(),
         &id,
@@ -3162,13 +3199,15 @@ pub fn start_loop_group_impl(
     show: &ShowState,
     chasers: &SharedChasers,
     movement: &SharedMovement,
+    globals: &SharedGlobals,
     scenes_pb: &SharedScenePlayback,
     loops_pb: &SharedLoopPlayback,
     id: &str,
 ) -> Result<(), CommandError> {
-    // Snapshot the group + resolve scene IDs. Filter out dead refs
-    // (deleted scenes) so the playlist plays only what still exists.
-    let (scene_ids, first_dwell, first_scene_id) = {
+    // Snapshot the group + resolve entries. Filter out dead refs
+    // (deleted scenes/snapshots) so the playlist plays only what still
+    // exists.
+    let (entries, first_dwell, first_entry) = {
         let s = show.read();
         let group = s
             .show
@@ -3177,40 +3216,53 @@ pub fn start_loop_group_impl(
             .find(|g| g.id == id)
             .cloned()
             .ok_or_else(|| CommandError::Other(format!("loop group {id} not found")))?;
-        let valid_ids: Vec<String> = group
-            .scene_ids
+        let valid: Vec<LoopEntry> = group
+            .entries
             .iter()
-            .filter(|sid| s.show.scenes.iter().any(|sc| &sc.id == *sid))
+            .filter(|e| match e {
+                LoopEntry::Scene { id } => s.show.scenes.iter().any(|sc| &sc.id == id),
+                LoopEntry::Snapshot { id } => s.show.snapshots.iter().any(|sn| &sn.id == id),
+            })
             .cloned()
             .collect();
-        if valid_ids.is_empty() {
+        if valid.is_empty() {
             return Err(CommandError::Other(
-                "loop group has no playable scenes".to_string(),
+                "loop group has no playable entries".to_string(),
             ));
         }
-        let first_id = valid_ids[0].clone();
-        let first_scene = s
-            .show
-            .scenes
-            .iter()
-            .find(|sc| sc.id == first_id)
-            .ok_or_else(|| CommandError::Other("first scene missing".to_string()))?;
-        let dwell = dwell_ms_for(&group, first_scene);
-        (valid_ids, dwell, first_id)
+        let first = valid[0].clone();
+        let natural = match &first {
+            LoopEntry::Scene { id } => s
+                .show
+                .scenes
+                .iter()
+                .find(|sc| &sc.id == id)
+                .map(crate::engine::loop_playback::scene_natural_ms),
+            LoopEntry::Snapshot { .. } => None,
+        };
+        let bpm = if s.show.globals.overall_bpm_enabled {
+            Some(s.show.globals.overall_bpm)
+        } else {
+            None
+        };
+        let dwell = dwell_ms_for_entry(&group, natural, bpm);
+        (valid, dwell, first)
     };
 
-    recall_scene_impl(
+    apply_loop_entry(
         app,
         engine,
         show,
         chasers,
         movement,
+        globals,
         scenes_pb,
-        &first_scene_id,
+        &first_entry,
     )?;
+    let first_entry_id = first_entry.id().to_string();
     loops_pb.lock().start(
         id.to_string(),
-        scene_ids,
+        entries,
         first_dwell,
         std::time::Instant::now(),
     );
@@ -3219,7 +3271,7 @@ pub fn start_loop_group_impl(
         LoopGroupActiveChange {
             active_group_id: Some(id.to_string()),
             current_index: Some(0),
-            current_scene_id: Some(first_scene_id),
+            current_scene_id: Some(first_entry_id),
         },
     );
     Ok(())
@@ -3264,13 +3316,15 @@ pub fn active_loop_group(loops_pb: State<'_, SharedLoopPlayback>) -> LoopGroupAc
     LoopGroupActiveChange {
         active_group_id: pb.active_group_id().map(|s| s.to_string()),
         current_index: pb.current_index(),
-        current_scene_id: pb.current_scene_id().map(|s| s.to_string()),
+        // Field name kept for protocol compat with the mobile bridge —
+        // it now carries the current entry's id (scene OR snapshot).
+        current_scene_id: pb.current_entry().map(|e| e.id().to_string()),
     }
 }
 
 /// Background tick: called periodically from the loop-group driver
-/// thread. If the active group's current scene has dwelled long enough,
-/// advance to the next scene by recalling it and re-arming the timer.
+/// thread. If the active group's current entry has dwelled long enough,
+/// advance to the next one by applying it and re-arming the timer.
 #[allow(clippy::too_many_arguments)]
 pub fn tick_loop_groups(
     app: &AppHandle,
@@ -3278,17 +3332,21 @@ pub fn tick_loop_groups(
     show: &ShowState,
     chasers: &SharedChasers,
     movement: &SharedMovement,
+    globals: &SharedGlobals,
     scenes_pb: &SharedScenePlayback,
     loops_pb: &SharedLoopPlayback,
 ) {
     let now = std::time::Instant::now();
-    let next_scene_id = match loops_pb.lock().pop_if_ready(now) {
-        Some(id) => id,
+    let next_entry = match loops_pb.lock().pop_if_ready(now) {
+        Some(e) => e,
         None => return,
     };
-    // Resolve dwell for the new scene before recalling so any failure
+    // Resolve dwell for the new entry before applying so any failure
     // here puts the driver into a safe state (no advance, no schedule).
+    // A missing target (deleted mid-loop) bails without re-arming; the
+    // next 50 ms tick advances straight past it.
     let (group_id, dwell_ms, new_idx) = {
+        // Lock order show → loops matches every other loop-group path.
         let s = show.read();
         let pb = loops_pb.lock();
         let Some(group_id) = pb.active_group_id().map(|s| s.to_string()) else {
@@ -3297,23 +3355,42 @@ pub fn tick_loop_groups(
         let Some(group) = s.show.scene_loop_groups.iter().find(|g| g.id == group_id) else {
             return;
         };
-        let Some(scene) = s.show.scenes.iter().find(|sc| sc.id == next_scene_id) else {
-            // Scene was deleted between recall and now — bail; the next
-            // tick will pick the next index in the cycle.
-            return;
+        let natural = match &next_entry {
+            LoopEntry::Scene { id } => {
+                let Some(scene) = s.show.scenes.iter().find(|sc| &sc.id == id) else {
+                    return;
+                };
+                Some(crate::engine::loop_playback::scene_natural_ms(scene))
+            }
+            LoopEntry::Snapshot { id } => {
+                if !s.show.snapshots.iter().any(|sn| &sn.id == id) {
+                    return;
+                }
+                None
+            }
         };
-        (group_id, dwell_ms_for(group, scene), pb.current_index())
+        let bpm = if s.show.globals.overall_bpm_enabled {
+            Some(s.show.globals.overall_bpm)
+        } else {
+            None
+        };
+        (
+            group_id,
+            dwell_ms_for_entry(group, natural, bpm),
+            pb.current_index(),
+        )
     };
-    if let Err(err) = recall_scene_impl(
+    if let Err(err) = apply_loop_entry(
         app,
         engine,
         show,
         chasers,
         movement,
+        globals,
         scenes_pb,
-        &next_scene_id,
+        &next_entry,
     ) {
-        tracing::warn!(?err, "loop group advance: recall failed");
+        tracing::warn!(?err, "loop group advance: entry apply failed");
         return;
     }
     loops_pb
@@ -3324,7 +3401,7 @@ pub fn tick_loop_groups(
         LoopGroupActiveChange {
             active_group_id: Some(group_id),
             current_index: new_idx,
-            current_scene_id: Some(next_scene_id),
+            current_scene_id: Some(next_entry.id().to_string()),
         },
     );
 }
@@ -3389,19 +3466,17 @@ fn capture_live_state(
     }
 }
 
-/// Re-apply a captured rig state wholesale. Used both to activate a
-/// snapshot and to restore the pre-activation state on deactivate.
+/// Values-only snapshot apply: base DMX + master + FX layers + globals.
+/// Deliberately does NOT touch the loop driver, does NOT re-arm the
+/// snapshot's recorded scene/loop, and does NOT touch the snapshot
+/// toggle runtime — this is the form loop-group steps use, where the
+/// running playlist must keep driving.
 ///
-/// Order matters:
-/// 1. Stop the loop driver and hard-clear scene playback (no release
-///    fade — its fade-out would fight the values we're about to set).
-/// 2. Overwrite base DMX + master.
-/// 3. Re-apply the FX layers (chaser / movement / chaser level).
-/// 4. Re-apply globals (blackout, Overall BPM).
-/// 5. Re-arm the loop group or scene that was running, via the normal
-///    recall path so step animation and FX-per-step behave as usual.
+/// Order matters: hard-clear scene playback first (no release fade —
+/// its fade-out would fight the values we're about to set), then
+/// overwrite base DMX + master, then FX, then globals.
 #[allow(clippy::too_many_arguments)]
-fn apply_snapshot_state(
+fn apply_snapshot_values(
     app: &AppHandle,
     engine: &EngineState,
     show: &ShowState,
@@ -3409,24 +3484,14 @@ fn apply_snapshot_state(
     movement: &SharedMovement,
     globals: &SharedGlobals,
     scenes_pb: &SharedScenePlayback,
-    loops_pb: &SharedLoopPlayback,
     snap: &Snapshot,
 ) -> Result<(), CommandError> {
-    loops_pb.lock().stop();
     scenes_pb.lock().clear_hard();
     let _ = app.emit(
         SCENE_ACTIVE_EVENT,
         SceneActiveChange {
             active_scene_id: None,
             step_index: None,
-        },
-    );
-    let _ = app.emit(
-        LOOP_GROUP_EVENT,
-        LoopGroupActiveChange {
-            active_group_id: None,
-            current_index: None,
-            current_scene_id: None,
         },
     );
 
@@ -3478,9 +3543,44 @@ fn apply_snapshot_state(
         g.set_overall_bpm(snap.overall_bpm);
     }
 
+    persist_show(show, app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Full snapshot apply: stop the loop driver, apply the captured values,
+/// then re-arm the loop group or scene that was running at capture time
+/// via the normal recall paths so step animation and FX-per-step behave
+/// as usual. Used by activate/deactivate.
+#[allow(clippy::too_many_arguments)]
+fn apply_snapshot_state(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    globals: &SharedGlobals,
+    scenes_pb: &SharedScenePlayback,
+    loops_pb: &SharedLoopPlayback,
+    snap: &Snapshot,
+) -> Result<(), CommandError> {
+    loops_pb.lock().stop();
+    let _ = app.emit(
+        LOOP_GROUP_EVENT,
+        LoopGroupActiveChange {
+            active_group_id: None,
+            current_index: None,
+            current_scene_id: None,
+        },
+    );
+
+    apply_snapshot_values(
+        app, engine, show, chasers, movement, globals, scenes_pb, snap,
+    )?;
+
     if let Some(gid) = &snap.active_loop_group_id {
         if let Err(err) = start_loop_group_impl(
-            app, engine, show, chasers, movement, scenes_pb, loops_pb, gid,
+            app, engine, show, chasers, movement, globals, scenes_pb, loops_pb, gid,
         ) {
             tracing::warn!(?err, %gid, "snapshot apply: loop group restart failed");
         }
@@ -3496,9 +3596,6 @@ fn apply_snapshot_state(
             tracing::warn!(%sid, "snapshot references a scene that no longer exists; skipping");
         }
     }
-
-    persist_show(show, app)?;
-    let _ = app.emit(SHOW_EVENT, ());
     Ok(())
 }
 

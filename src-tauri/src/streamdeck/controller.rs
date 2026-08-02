@@ -577,6 +577,7 @@ fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
                 &handles.show,
                 &handles.chasers,
                 &handles.movement,
+                &handles.globals,
                 &handles.scenes,
                 &handles.loops,
                 &id,

@@ -1,23 +1,29 @@
+import type { LoopEntry } from "@bindings/LoopEntry";
 import type { LoopGroupActiveChange } from "@bindings/LoopGroupActiveChange";
 import type { Scene } from "@bindings/Scene";
 import type { SceneLoopGroup } from "@bindings/SceneLoopGroup";
+import type { Snapshot } from "@bindings/Snapshot";
+import type { Subdivision } from "@bindings/Subdivision";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
 import { useT } from "../i18n";
+import type { Translation } from "../i18n/translations";
 import { useShowStore } from "../stores/show";
 
-/// Dedicated tab for managing scene loop groups. Layout: wide cards
+/// Dedicated tab for managing loop sequences. Layout: wide cards
 /// (one per loop) with a tall header row (Play/Stop + name + count +
-/// delete), then the sequence of scenes as horizontal chips with
-/// reorder/remove controls. Editing controls (hold time, add scene)
-/// sit at the bottom of each card. The live "Running: X [Stop]"
-/// footer over in Scenes keeps the operator informed without forcing
-/// a tab switch during a show.
+/// delete), then the sequence of entries — scenes and snapshots — as
+/// horizontal chips with reorder/remove controls. Editing controls
+/// (hold time, BPM sync + subdivision, add entry) sit at the bottom of
+/// each card. The live "Running: X [Stop]" footer over in Scenes keeps
+/// the operator informed without forcing a tab switch during a show.
 export function LoopsView() {
   const t = useT();
   const show = useShowStore((s) => s.show);
   const scenes = useMemo(() => show?.scenes ?? [], [show?.scenes]);
+  const snapshots = useMemo(() => show?.snapshots ?? [], [show?.snapshots]);
   const groups = useMemo(() => show?.scene_loop_groups ?? [], [show?.scene_loop_groups]);
+  const bpmEnabled = show?.globals.overall_bpm_enabled ?? false;
 
   const createLoopGroup = useShowStore((s) => s.createLoopGroup);
   const updateLoopGroup = useShowStore((s) => s.updateLoopGroup);
@@ -94,6 +100,8 @@ export function LoopsView() {
               key={g.id}
               group={g}
               scenes={scenes}
+              snapshots={snapshots}
+              bpmEnabled={bpmEnabled}
               isActive={activeLoop.active_group_id === g.id}
               currentIndex={
                 activeLoop.active_group_id === g.id ? (activeLoop.current_index ?? null) : null
@@ -116,9 +124,20 @@ export function LoopsView() {
   );
 }
 
+const SUBDIVISIONS: { value: Subdivision; labelKey: keyof Translation }[] = [
+  { value: "quarter", labelKey: "loops.sub.quarter" },
+  { value: "half", labelKey: "loops.sub.half" },
+  { value: "one", labelKey: "loops.sub.one" },
+  { value: "two", labelKey: "loops.sub.two" },
+  { value: "four", labelKey: "loops.sub.four" },
+  { value: "eight", labelKey: "loops.sub.eight" },
+];
+
 function LoopGroupCard({
   group,
   scenes,
+  snapshots,
+  bpmEnabled,
   isActive,
   currentIndex,
   onUpdate,
@@ -128,6 +147,8 @@ function LoopGroupCard({
 }: {
   group: SceneLoopGroup;
   scenes: Scene[];
+  snapshots: Snapshot[];
+  bpmEnabled: boolean;
   isActive: boolean;
   currentIndex: number | null;
   onUpdate: (group: SceneLoopGroup) => void | Promise<void>;
@@ -141,14 +162,15 @@ function LoopGroupCard({
   useEffect(() => setName(group.name), [group.name]);
   useEffect(() => setHold(group.hold_ms_override), [group.hold_ms_override]);
 
-  const sceneById = useMemo(() => {
-    const map: Record<string, Scene> = {};
-    for (const s of scenes) map[s.id] = s;
+  const nameById = useMemo(() => {
+    const map: Record<string, { name: string; kind: "scene" | "snapshot" }> = {};
+    for (const s of scenes) map[s.id] = { name: s.name, kind: "scene" };
+    for (const s of snapshots) map[s.id] = { name: s.name, kind: "snapshot" };
     return map;
-  }, [scenes]);
+  }, [scenes, snapshots]);
 
-  const liveCount = group.scene_ids.filter((id) => !!sceneById[id]).length;
-  const unassignedScenes = scenes.filter((s) => !group.scene_ids.includes(s.id));
+  const liveCount = group.entries.filter((e) => !!nameById[e.id]).length;
+  const bpmSyncActive = group.sync_to_bpm && bpmEnabled;
 
   const commitName = () => {
     const next = name.trim();
@@ -165,21 +187,29 @@ function LoopGroupCard({
     onUpdate({ ...group, hold_ms_override: next });
   };
 
-  const moveScene = (index: number, dir: -1 | 1) => {
+  const moveEntry = (index: number, dir: -1 | 1) => {
     const target = index + dir;
-    if (target < 0 || target >= group.scene_ids.length) return;
-    const next = [...group.scene_ids];
+    if (target < 0 || target >= group.entries.length) return;
+    const next = [...group.entries];
     [next[index], next[target]] = [next[target], next[index]];
-    onUpdate({ ...group, scene_ids: next });
+    onUpdate({ ...group, entries: next });
   };
   const removeAt = (index: number) => {
-    const next = group.scene_ids.filter((_, i) => i !== index);
-    onUpdate({ ...group, scene_ids: next });
+    const next = group.entries.filter((_, i) => i !== index);
+    onUpdate({ ...group, entries: next });
   };
-  const appendScene = (id: string) => {
-    if (!id) return;
-    onUpdate({ ...group, scene_ids: [...group.scene_ids, id] });
+  const appendEntry = (raw: string) => {
+    // Option values encode kind + id as "scene:<id>" / "snapshot:<id>".
+    if (!raw) return;
+    const sep = raw.indexOf(":");
+    if (sep < 0) return;
+    const kind = raw.slice(0, sep);
+    const id = raw.slice(sep + 1);
+    const entry: LoopEntry = kind === "snapshot" ? { type: "snapshot", id } : { type: "scene", id };
+    onUpdate({ ...group, entries: [...group.entries, entry] });
   };
+
+  const inList = (id: string) => group.entries.some((e) => e.id === id);
 
   return (
     <li className={`card loops-card${isActive ? " active" : ""}`}>
@@ -223,25 +253,34 @@ function LoopGroupCard({
       </div>
 
       <div className="loops-card-body">
-        {group.scene_ids.length === 0 ? (
+        {group.entries.length === 0 ? (
           <p className="loops-empty-scenes muted">{t("loops.emptyScenes")}</p>
         ) : (
           <ol className="loops-chips">
-            {assignSlotKeys(group.scene_ids).map(({ key, sid, i }) => {
-              const scene = sceneById[sid];
-              const label = scene?.name ?? t("loops.missingScene");
+            {assignSlotKeys(group.entries).map(({ key, entry, i }) => {
+              const target = nameById[entry.id];
+              const label = target?.name ?? t("loops.missingScene");
+              const isSnapshot = entry.type === "snapshot";
               const live = isActive && currentIndex !== null && currentIndex === i;
               return (
                 <li
                   key={key}
-                  className={`loops-chip${live ? " live" : ""}${scene ? "" : " missing"}`}
+                  className={`loops-chip${live ? " live" : ""}${target ? "" : " missing"}${
+                    isSnapshot ? " snapshot" : ""
+                  }`}
+                  title={isSnapshot ? t("loops.snapshotChipHint") : undefined}
                 >
                   <span className="loops-chip-idx">{i + 1}</span>
+                  {isSnapshot ? (
+                    <span className="loops-chip-kind" aria-hidden="true">
+                      ●
+                    </span>
+                  ) : null}
                   <span className="loops-chip-name">{label}</span>
                   <div className="loops-chip-actions">
                     <button
                       type="button"
-                      onClick={() => moveScene(i, -1)}
+                      onClick={() => moveEntry(i, -1)}
                       disabled={i === 0}
                       title={t("loops.moveUp")}
                       aria-label={t("loops.moveUp")}
@@ -250,8 +289,8 @@ function LoopGroupCard({
                     </button>
                     <button
                       type="button"
-                      onClick={() => moveScene(i, 1)}
-                      disabled={i === group.scene_ids.length - 1}
+                      onClick={() => moveEntry(i, 1)}
+                      disabled={i === group.entries.length - 1}
                       title={t("loops.moveDown")}
                       aria-label={t("loops.moveDown")}
                     >
@@ -285,49 +324,77 @@ function LoopGroupCard({
             value={hold}
             onChange={(e) => setHold(Number(e.currentTarget.value))}
             onBlur={commitHold}
-            title={t("loops.holdHint")}
+            disabled={bpmSyncActive}
+            title={bpmSyncActive ? t("loops.holdDisabledHint") : t("loops.holdHint")}
           />
         </label>
-        <span className="hint loops-hold-hint">{t("loops.holdHint")}</span>
+        <label className="loops-sync-field" title={t("loops.syncBpmHint")}>
+          <input
+            type="checkbox"
+            checked={group.sync_to_bpm}
+            onChange={(e) => onUpdate({ ...group, sync_to_bpm: e.currentTarget.checked })}
+          />
+          <span className="hint">{t("loops.syncBpm")}</span>
+        </label>
+        {group.sync_to_bpm ? (
+          <select
+            className="loops-subdivision-select"
+            value={group.subdivision}
+            onChange={(e) =>
+              onUpdate({ ...group, subdivision: e.currentTarget.value as Subdivision })
+            }
+            title={t("loops.subdivisionHint")}
+          >
+            {SUBDIVISIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {t(s.labelKey)}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {group.sync_to_bpm && !bpmEnabled ? (
+          <span className="hint loops-sync-warn">{t("loops.syncBpmOff")}</span>
+        ) : null}
         <select
           className="loops-add-select"
           value=""
           onChange={(e) => {
-            appendScene(e.currentTarget.value);
+            appendEntry(e.currentTarget.value);
             e.currentTarget.value = "";
           }}
         >
           <option value="">{t("loops.addPlaceholder")}</option>
-          {unassignedScenes.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-          {scenes
-            .filter((s) => group.scene_ids.includes(s.id))
-            .map((s) => (
-              <option key={`dup-${s.id}`} value={s.id}>
-                {t("loops.repeatOption", { name: s.name })}
+          <optgroup label={t("loops.addSceneGroup")}>
+            {scenes.map((s) => (
+              <option key={`sc-${s.id}`} value={`scene:${s.id}`}>
+                {inList(s.id) ? t("loops.repeatOption", { name: s.name }) : s.name}
               </option>
             ))}
+          </optgroup>
+          <optgroup label={t("loops.addSnapshotGroup")}>
+            {snapshots.map((s) => (
+              <option key={`sn-${s.id}`} value={`snapshot:${s.id}`}>
+                {inList(s.id) ? t("loops.repeatOption", { name: s.name }) : s.name}
+              </option>
+            ))}
+          </optgroup>
         </select>
       </div>
     </li>
   );
 }
 
-/// Build stable React keys for a list that may contain duplicate scene
-/// ids. The same scene id repeats once for each occurrence, so we
-/// append `#N` where N is how many times that id has been seen so far.
+/// Build stable React keys for a list that may contain duplicate entry
+/// ids. The same id repeats once for each occurrence, so we append
+/// `#N` where N is how many times that id has been seen so far.
 /// Avoids using the bare array index as the key (which would break
-/// reorders) while still letting the operator add the same scene
-/// twice to a playlist.
-function assignSlotKeys(scene_ids: string[]): { key: string; sid: string; i: number }[] {
+/// reorders) while still letting the operator add the same cue twice.
+function assignSlotKeys(entries: LoopEntry[]): { key: string; entry: LoopEntry; i: number }[] {
   const seen: Record<string, number> = {};
-  return scene_ids.map((sid, i) => {
-    const count = (seen[sid] ?? 0) + 1;
-    seen[sid] = count;
-    return { key: `${sid}#${count}`, sid, i };
+  return entries.map((entry, i) => {
+    const count = (seen[entry.id] ?? 0) + 1;
+    seen[entry.id] = count;
+    return { key: `${entry.type}:${entry.id}#${count}`, entry, i };
   });
 }
 

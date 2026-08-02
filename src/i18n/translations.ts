@@ -130,6 +130,20 @@ export type Translation = {
   "loops.removeFromList": string;
   "loops.addPlaceholder": string;
   "loops.repeatOption": string;
+  "loops.addSceneGroup": string;
+  "loops.addSnapshotGroup": string;
+  "loops.snapshotChipHint": string;
+  "loops.holdDisabledHint": string;
+  "loops.syncBpm": string;
+  "loops.syncBpmHint": string;
+  "loops.syncBpmOff": string;
+  "loops.subdivisionHint": string;
+  "loops.sub.quarter": string;
+  "loops.sub.half": string;
+  "loops.sub.one": string;
+  "loops.sub.two": string;
+  "loops.sub.four": string;
+  "loops.sub.eight": string;
   "scenes.list.activeLoopPrefix": string;
   "scenes.list.activeLoopStop": string;
 
@@ -938,6 +952,21 @@ export const en: Translation = {
   "loops.removeFromList": "Remove from list",
   "loops.addPlaceholder": "+ Add scene…",
   "loops.repeatOption": "{name} (repeat)",
+  "loops.addSceneGroup": "Scenes",
+  "loops.addSnapshotGroup": "Snapshots",
+  "loops.snapshotChipHint": "Snapshot — applies the whole captured look (values, FX, master)",
+  "loops.holdDisabledHint": "Interval is driven by the Overall BPM while sync is on",
+  "loops.syncBpm": "Sync to BPM",
+  "loops.syncBpmHint":
+    "Advance the playlist on the music: each entry lasts the selected subdivision at the Overall BPM",
+  "loops.syncBpmOff": "Overall BPM is off — using hold/natural timing",
+  "loops.subdivisionHint": "How long each entry holds, in musical time",
+  "loops.sub.quarter": "1/16 note",
+  "loops.sub.half": "1/8 note",
+  "loops.sub.one": "1 beat",
+  "loops.sub.two": "2 beats",
+  "loops.sub.four": "1 bar",
+  "loops.sub.eight": "2 bars",
   "scenes.list.activeLoopPrefix": "Loop: ",
   "scenes.list.activeLoopStop": "Stop",
 
@@ -1767,6 +1796,21 @@ export const es: Translation = {
   "loops.removeFromList": "Quitar de la lista",
   "loops.addPlaceholder": "+ Agregar escena…",
   "loops.repeatOption": "{name} (repetir)",
+  "loops.addSceneGroup": "Escenas",
+  "loops.addSnapshotGroup": "Snapshots",
+  "loops.snapshotChipHint": "Snapshot — aplica el look capturado completo (valores, FX, master)",
+  "loops.holdDisabledHint": "El intervalo lo maneja el BPM global mientras el sync está activo",
+  "loops.syncBpm": "Sync al BPM",
+  "loops.syncBpmHint":
+    "Avanza la lista con la música: cada paso dura la subdivisión elegida al BPM global",
+  "loops.syncBpmOff": "El BPM global está apagado — se usa hold/tiempo natural",
+  "loops.subdivisionHint": "Cuánto dura cada paso, en tiempo musical",
+  "loops.sub.quarter": "Semicorchea (1/16)",
+  "loops.sub.half": "Corchea (1/8)",
+  "loops.sub.one": "1 beat",
+  "loops.sub.two": "2 beats",
+  "loops.sub.four": "1 compás",
+  "loops.sub.eight": "2 compases",
   "scenes.list.activeLoopPrefix": "Loop: ",
   "scenes.list.activeLoopStop": "Detener",
 

@@ -5983,3 +5983,28 @@ input[type="range"]:focus-visible::-webkit-slider-thumb {
   margin-left: auto;
   min-width: 220px;
 }
+/* Snapshot entries read as "the gold family" — same identity as the
+   snapshot pills on Stage and the Launchpad snapshot row. */
+.loops-chip.snapshot {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+}
+.loops-chip-kind {
+  color: var(--accent);
+  font-size: 9px;
+  line-height: 1;
+}
+.loops-sync-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+.loops-subdivision-select {
+  min-width: 130px;
+}
+.loops-sync-warn {
+  color: var(--warn);
+  font-size: 12px;
+  margin: 0;
+}

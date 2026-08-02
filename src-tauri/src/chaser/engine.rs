@@ -331,7 +331,8 @@ fn pattern_step_at(pattern: &TempoPattern, beats: f64) -> (u64, f64, f64) {
     };
     let abs_step = cycle_idx_eff * len + (consumed_eff as u64) - 1;
     let last_hit_grid = pattern.hits[consumed_eff - 1] as f64;
-    let step_started_beat = (cycle_idx_eff as f64) * beats_per_cycle + last_hit_grid / steps_per_quarter;
+    let step_started_beat =
+        (cycle_idx_eff as f64) * beats_per_cycle + last_hit_grid / steps_per_quarter;
 
     // Distance to the next hit (wraps into the next cycle when we're
     // past the last hit of the current one).
@@ -794,7 +795,7 @@ mod tests {
 
         let t0 = Instant::now();
         engine.tick(t0, None, None); // step 0 → 255 cached as last_emitted
-                               // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
+                                     // Cross into step 1 at t = 510 ms. fade_from snapshots 255.
         let ov_at_transition = engine.tick(t0 + Duration::from_millis(510), None, None);
         // At t=510 we are 0 ms into the fade → still ~255 (linear curve, t=0).
         assert!(
@@ -843,7 +844,7 @@ mod tests {
 
         let t0 = Instant::now();
         engine.tick(t0, None, None); // step 0
-                               // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
+                                     // Jump 5 seconds (= 10 half-second steps) → step 10 → On.
         let ov = engine.tick(t0 + Duration::from_millis(5_001), None, None);
         assert_eq!(ov.get(&0).unwrap()[0], Some(255));
     }
@@ -929,20 +930,36 @@ mod tests {
         assert_eq!(ov.get(&0).unwrap()[0], Some(255), "step 0 on");
 
         // Between hit 1 and 2 (still step 0).
-        let ov = engine.tick(t0 + Duration::from_millis(200), Some(120.0), Some((&pattern, t0)));
+        let ov = engine.tick(
+            t0 + Duration::from_millis(200),
+            Some(120.0),
+            Some((&pattern, t0)),
+        );
         assert_eq!(ov.get(&0).unwrap()[0], Some(255), "still step 0 mid-gap");
 
         // Just past hit 2 (step 1): Off.
-        let ov = engine.tick(t0 + Duration::from_millis(380), Some(120.0), Some((&pattern, t0)));
+        let ov = engine.tick(
+            t0 + Duration::from_millis(380),
+            Some(120.0),
+            Some((&pattern, t0)),
+        );
         assert_eq!(ov.get(&0).unwrap()[0], Some(0), "step 1 off after 2nd hit");
 
         // Just past hit 5 (step 4): On (step 4 is even under AllTogether).
-        let ov = engine.tick(t0 + Duration::from_millis(1_510), Some(120.0), Some((&pattern, t0)));
+        let ov = engine.tick(
+            t0 + Duration::from_millis(1_510),
+            Some(120.0),
+            Some((&pattern, t0)),
+        );
         assert_eq!(ov.get(&0).unwrap()[0], Some(255), "step 4 on");
 
         // After the cycle wraps (>= 2 s) we're on step 5 = first hit of
         // the next cycle → Off.
-        let ov = engine.tick(t0 + Duration::from_millis(2_010), Some(120.0), Some((&pattern, t0)));
+        let ov = engine.tick(
+            t0 + Duration::from_millis(2_010),
+            Some(120.0),
+            Some((&pattern, t0)),
+        );
         assert_eq!(ov.get(&0).unwrap()[0], Some(0), "step 5 off (cycle wrap)");
     }
 

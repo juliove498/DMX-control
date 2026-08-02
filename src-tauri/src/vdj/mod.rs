@@ -696,7 +696,11 @@ mod tests {
         cfg.halve_above_threshold = 95.0;
         let (b, beat) = apply_halve_rule(&cfg, 140.0, Some(50.0));
         assert_eq!(b, 70.0, "BPM halved");
-        assert_eq!(beat, Some(25.0), "beat position halved so anchor stays consistent");
+        assert_eq!(
+            beat,
+            Some(25.0),
+            "beat position halved so anchor stays consistent"
+        );
     }
 
     #[test]

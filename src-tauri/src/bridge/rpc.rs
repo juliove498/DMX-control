@@ -248,15 +248,20 @@ pub fn dispatch(ctx: &Arc<RpcContext>, req: RpcRequest) -> RpcResponse {
             // every write against the patched mode (the phone is an
             // untrusted client) and emits a single programmer snapshot.
             let writes = match req.params.get("writes") {
-                Some(v) => match serde_json::from_value::<
-                    Vec<crate::commands::FixtureChannelWrite>,
-                >(v.clone())
-                {
-                    Ok(w) => w,
-                    Err(e) => {
-                        return RpcResponse::err(req.id, -32602, format!("invalid 'writes': {e}"));
+                Some(v) => {
+                    match serde_json::from_value::<Vec<crate::commands::FixtureChannelWrite>>(
+                        v.clone(),
+                    ) {
+                        Ok(w) => w,
+                        Err(e) => {
+                            return RpcResponse::err(
+                                req.id,
+                                -32602,
+                                format!("invalid 'writes': {e}"),
+                            );
+                        }
                     }
-                },
+                }
                 None => return RpcResponse::err(req.id, -32602, "missing param 'writes'"),
             };
             if writes.is_empty() {

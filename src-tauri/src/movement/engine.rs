@@ -145,7 +145,13 @@ impl MovementEngine {
             if !entry.config.enabled || entry.resolved.is_empty() {
                 continue;
             }
-            advance_phase(&mut entry.runtime, &entry.config, now, overall_bpm, current_beat);
+            advance_phase(
+                &mut entry.runtime,
+                &entry.config,
+                now,
+                overall_bpm,
+                current_beat,
+            );
             for r in &entry.resolved {
                 let (x, y) = evaluate_slot(
                     entry.runtime.global_phase,
@@ -607,7 +613,7 @@ mod tests {
         e.tick(t0, None); // snap to 0.5
         e.set_beat_anchor(None);
         e.tick(t0, None); // free-run init last_update
-        // 250 ms at 60 BPM × Subdivision::One = 1 cps → +0.25 phase
+                          // 250 ms at 60 BPM × Subdivision::One = 1 cps → +0.25 phase
         e.tick(t0 + Duration::from_millis(250), None);
         let p = e.entries[0].runtime.global_phase;
         // Free-run advanced 0.25 from previous 0.5 → 0.75

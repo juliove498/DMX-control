@@ -322,16 +322,12 @@ pub fn start_pattern_recording_impl(globals: &SharedGlobals) -> Result<(), Comma
 }
 
 #[tauri::command]
-pub fn start_pattern_recording(
-    globals: State<'_, SharedGlobals>,
-) -> Result<(), CommandError> {
+pub fn start_pattern_recording(globals: State<'_, SharedGlobals>) -> Result<(), CommandError> {
     start_pattern_recording_impl(&globals)
 }
 
 pub fn tap_pattern_record_impl(globals: &SharedGlobals) -> Result<(), CommandError> {
-    globals
-        .lock()
-        .tap_pattern_record(std::time::Instant::now());
+    globals.lock().tap_pattern_record(std::time::Instant::now());
     Ok(())
 }
 

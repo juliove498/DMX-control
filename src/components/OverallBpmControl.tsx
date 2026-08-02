@@ -142,11 +142,7 @@ export function OverallBpmControl() {
         type="button"
         className="global-btn bpm-tap-btn"
         onClick={onTap}
-        title={
-          recording
-            ? t("app.global.bpm.recordingHint")
-            : t("app.global.bpm.tapHint")
-        }
+        title={recording ? t("app.global.bpm.recordingHint") : t("app.global.bpm.tapHint")}
       >
         {t("app.global.bpm.tap")}
       </button>
@@ -155,14 +151,10 @@ export function OverallBpmControl() {
         className={`global-btn bpm-rec-btn${recording ? " active" : ""}`}
         onClick={onRecord}
         title={
-          recording
-            ? t("app.global.bpm.recordingHint")
-            : t("app.global.bpm.recordPatternHint")
+          recording ? t("app.global.bpm.recordingHint") : t("app.global.bpm.recordPatternHint")
         }
       >
-        {recording
-          ? t("app.global.bpm.recordingPattern")
-          : t("app.global.bpm.recordPattern")}
+        {recording ? t("app.global.bpm.recordingPattern") : t("app.global.bpm.recordPattern")}
       </button>
       {tempoPattern && (
         <>

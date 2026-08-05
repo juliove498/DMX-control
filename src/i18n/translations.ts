@@ -292,6 +292,17 @@ export type Translation = {
   "outputs.kind.openDmxFtdi": string;
   "outputs.add.mock": string;
   "outputs.add.artNet": string;
+  "outputs.artnetScan.button": string;
+  "outputs.artnetScan.hint": string;
+  "outputs.artnetScan.scanning": string;
+  "outputs.artnetScan.title": string;
+  "outputs.artnetScan.rescan": string;
+  "outputs.artnetScan.close": string;
+  "outputs.artnetScan.inProgress": string;
+  "outputs.artnetScan.none": string;
+  "outputs.artnetScan.universesOut": string;
+  "outputs.artnetScan.add": string;
+  "outputs.artnetScan.addHint": string;
   "outputs.add.sacn": string;
   "outputs.add.enttec": string;
   "outputs.add.openDmx": string;
@@ -1115,6 +1126,20 @@ export const en: Translation = {
   "outputs.kind.openDmxFtdi": "Open DMX / ElectroTAS (FTDI direct, recommended)",
   "outputs.add.mock": "+ Mock",
   "outputs.add.artNet": "+ Art-Net",
+  "outputs.artnetScan.button": "🔍 Scan Art-Net",
+  "outputs.artnetScan.hint":
+    "Broadcast an ArtPoll and list every Art-Net node answering on the network",
+  "outputs.artnetScan.scanning": "Scanning…",
+  "outputs.artnetScan.title": "Art-Net nodes on the network",
+  "outputs.artnetScan.rescan": "Rescan",
+  "outputs.artnetScan.close": "Close",
+  "outputs.artnetScan.inProgress": "Polling the network — nodes have ~2.5 s to answer…",
+  "outputs.artnetScan.none":
+    "No nodes answered. Check the interface/VLAN, that the node is powered, and that nothing is blocking UDP 6454.",
+  "outputs.artnetScan.universesOut": "out: {list}",
+  "outputs.artnetScan.add": "+ Output",
+  "outputs.artnetScan.addHint":
+    "Add an Art-Net output pre-filled with this node's IP and universes",
   "outputs.add.sacn": "+ sACN",
   "outputs.add.enttec": "+ Enttec USB",
   "outputs.add.openDmx": "+ Open DMX (OS serial)",
@@ -1960,6 +1985,20 @@ export const es: Translation = {
   "outputs.kind.openDmxFtdi": "Open DMX / ElectroTAS (FTDI directo, recomendado)",
   "outputs.add.mock": "+ Mock",
   "outputs.add.artNet": "+ Art-Net",
+  "outputs.artnetScan.button": "🔍 Buscar Art-Net",
+  "outputs.artnetScan.hint":
+    "Manda un ArtPoll por broadcast y lista todos los nodos Art-Net que respondan en la red",
+  "outputs.artnetScan.scanning": "Buscando…",
+  "outputs.artnetScan.title": "Nodos Art-Net en la red",
+  "outputs.artnetScan.rescan": "Re-escanear",
+  "outputs.artnetScan.close": "Cerrar",
+  "outputs.artnetScan.inProgress": "Consultando la red — los nodos tienen ~2,5 s para responder…",
+  "outputs.artnetScan.none":
+    "Ningún nodo respondió. Revisá la interfaz/VLAN, que el nodo esté encendido y que nada bloquee UDP 6454.",
+  "outputs.artnetScan.universesOut": "out: {list}",
+  "outputs.artnetScan.add": "+ Salida",
+  "outputs.artnetScan.addHint":
+    "Agrega una salida Art-Net pre-cargada con la IP y los universos de este nodo",
   "outputs.add.sacn": "+ sACN",
   "outputs.add.enttec": "+ Enttec USB",
   "outputs.add.openDmx": "+ Open DMX (OS serial)",

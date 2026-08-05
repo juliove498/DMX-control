@@ -2547,6 +2547,18 @@ pub fn active_scene_step(scenes_pb: State<'_, SharedScenePlayback>) -> Option<u3
 
 // ---- MIDI ----------------------------------------------------------------
 
+/// Discover Art-Net nodes on the LAN via ArtPoll broadcast. Blocks for
+/// `timeout_ms` (default 2.5 s, clamped) collecting ArtPollReply
+/// packets — Tauri runs sync commands off the main thread, so the UI
+/// stays live while the scan window is open.
+#[tauri::command]
+pub fn artnet_scan(
+    timeout_ms: Option<u64>,
+) -> Result<Vec<crate::output::artnet::ArtNetNodeInfo>, CommandError> {
+    let ms = timeout_ms.unwrap_or(2500).clamp(500, 10_000);
+    crate::output::artnet::scan(ms).map_err(|e| CommandError::Other(e.to_string()))
+}
+
 #[tauri::command]
 pub fn list_midi_devices() -> Vec<MidiDeviceInfo> {
     crate::midi::hub::list_devices()

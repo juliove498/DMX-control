@@ -1,6 +1,7 @@
 import type { AiAvailableModels } from "@bindings/AiAvailableModels";
 import type { AiConfig } from "@bindings/AiConfig";
 import type { AmbientChaser } from "@bindings/AmbientChaser";
+import type { ArtNetNodeInfo } from "@bindings/ArtNetNodeInfo";
 import type { ButtonBindings } from "@bindings/ButtonBindings";
 import type { D2xxDeviceInfo } from "@bindings/D2xxDeviceInfo";
 import type { DraftScene } from "@bindings/DraftScene";
@@ -50,6 +51,9 @@ interface ShowStoreState {
   renameShow: (name: string) => Promise<void>;
 
   setOutputs: (outputs: OutputsConfig) => Promise<void>;
+  /// Broadcast an ArtPoll and collect ArtPollReply packets for
+  /// ~2.5 s. Resolves with every Art-Net node found on the LAN.
+  artnetScan: (timeoutMs?: number) => Promise<ArtNetNodeInfo[]>;
 
   addFixture: (fixture: FixtureInstance) => Promise<void>;
   addFixtures: (fixtures: FixtureInstance[]) => Promise<void>;
@@ -267,6 +271,10 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   async setOutputs(outputs) {
     await invoke("set_outputs", { outputs });
     await get().refresh();
+  },
+
+  async artnetScan(timeoutMs) {
+    return invoke<ArtNetNodeInfo[]>("artnet_scan", { timeoutMs: timeoutMs ?? null });
   },
 
   async addFixture(fixture) {

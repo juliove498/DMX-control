@@ -539,6 +539,7 @@ pub fn run() {
             commands::list_ftdi_devices,
             commands::get_outputs,
             commands::set_outputs,
+            commands::artnet_scan,
             // Library + Show
             commands::list_fixture_definitions,
             commands::reload_library,

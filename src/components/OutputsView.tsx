@@ -1,3 +1,4 @@
+import type { ArtNetNodeInfo } from "@bindings/ArtNetNodeInfo";
 import type { D2xxDeviceInfo } from "@bindings/D2xxDeviceInfo";
 import type { OutputBindingConfig } from "@bindings/OutputBindingConfig";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
@@ -212,8 +213,15 @@ export function OutputsView() {
   const setOutputs = useShowStore((s) => s.setOutputs);
   const refreshSerialPorts = useShowStore((s) => s.refreshSerialPorts);
   const refreshFtdiDevices = useShowStore((s) => s.refreshFtdiDevices);
+  const artnetScan = useShowStore((s) => s.artnetScan);
 
   const [draft, setDraft] = useState<OutputsConfig | null>(null);
+  // Art-Net discovery panel. `null` = never scanned / closed;
+  // an array (possibly empty) = results of the last completed scan.
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [scanNodes, setScanNodes] = useState<ArtNetNodeInfo[] | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const config = draft ?? show?.outputs ?? null;
   const dirty = !!draft;
@@ -239,6 +247,37 @@ export function OutputsView() {
 
   const revert = () => setDraft(null);
 
+  const runScan = async () => {
+    setScanOpen(true);
+    setScanning(true);
+    setScanError(null);
+    try {
+      setScanNodes(await artnetScan());
+    } catch (e) {
+      setScanError(e instanceof Error ? e.message : JSON.stringify(e));
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  /// Add an Art-Net binding pre-filled from a discovered node: its IP
+  /// as target and the universes its DMX ports output (0 as fallback).
+  const addNodeBinding = (node: ArtNetNodeInfo) => {
+    const id = newId("art_net", config.bindings);
+    update({
+      ...config,
+      bindings: [
+        ...config.bindings,
+        {
+          kind: "art_net",
+          id,
+          target: node.ip,
+          universes: node.output_universes.length > 0 ? node.output_universes : [0],
+        },
+      ],
+    });
+  };
+
   return (
     <main className="page outputs-view">
       <header className="page-head">
@@ -259,6 +298,15 @@ export function OutputsView() {
           <button type="button" onClick={() => addBinding("art_net")}>
             {t("outputs.add.artNet")}
           </button>
+          <button
+            type="button"
+            className="artnet-scan-btn"
+            onClick={runScan}
+            disabled={scanning}
+            title={t("outputs.artnetScan.hint")}
+          >
+            {scanning ? t("outputs.artnetScan.scanning") : t("outputs.artnetScan.button")}
+          </button>
           <button type="button" onClick={() => addBinding("sacn")}>
             {t("outputs.add.sacn")}
           </button>
@@ -273,6 +321,64 @@ export function OutputsView() {
           </button>
         </div>
       </header>
+
+      {scanOpen ? (
+        <section className="artnet-scan-panel" data-doc="artnet-scan">
+          <div className="artnet-scan-head">
+            <h3>{t("outputs.artnetScan.title")}</h3>
+            <div className="actions">
+              <button type="button" onClick={runScan} disabled={scanning}>
+                {scanning ? t("outputs.artnetScan.scanning") : t("outputs.artnetScan.rescan")}
+              </button>
+              <button type="button" className="ghost" onClick={() => setScanOpen(false)}>
+                {t("outputs.artnetScan.close")}
+              </button>
+            </div>
+          </div>
+          {scanError ? <output className="error">{scanError}</output> : null}
+          {scanning && scanNodes === null ? (
+            <p className="hint">{t("outputs.artnetScan.inProgress")}</p>
+          ) : null}
+          {!scanning && scanNodes !== null && scanNodes.length === 0 ? (
+            <p className="hint">{t("outputs.artnetScan.none")}</p>
+          ) : null}
+          {scanNodes !== null && scanNodes.length > 0 ? (
+            <ul className="artnet-node-list">
+              {scanNodes.map((n) => (
+                <li key={`${n.ip}#${n.bind_index}`} className="artnet-node">
+                  <div className="artnet-node-main">
+                    <span className="artnet-node-name">{n.short_name || n.long_name || n.ip}</span>
+                    <span className="artnet-node-ip">{n.ip}</span>
+                    {n.style ? <span className="artnet-node-tag">{n.style}</span> : null}
+                  </div>
+                  <div className="artnet-node-meta">
+                    {n.long_name && n.long_name !== n.short_name ? (
+                      <span>{n.long_name}</span>
+                    ) : null}
+                    {n.output_universes.length > 0 ? (
+                      <span>
+                        {t("outputs.artnetScan.universesOut", {
+                          list: n.output_universes.join(", "),
+                        })}
+                      </span>
+                    ) : null}
+                    {n.mac ? <span className="artnet-node-mac">{n.mac}</span> : null}
+                    {n.firmware ? <span>fw {n.firmware}</span> : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="primary artnet-node-add"
+                    onClick={() => addNodeBinding(n)}
+                    title={t("outputs.artnetScan.addHint")}
+                  >
+                    {t("outputs.artnetScan.add")}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="bindings">
         {config.bindings.length === 0 ? (

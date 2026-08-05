@@ -25,6 +25,12 @@ tracing-appender = "0.2"
 ts-rs = { version = "10", features = ["serde-compat", "chrono-impl"] }
 crossbeam-channel = "0.5"
 serialport = "4"
+# Art-Net node discovery: socket2 lets the scanner bind UDP 6454 with
+# SO_REUSEADDR/SO_REUSEPORT (ArtPollReply is broadcast to that port),
+# if-addrs enumerates interfaces so ArtPoll also goes to each subnet's
+# directed broadcast. Both were already in the tree as transitive deps.
+socket2 = "0.5"
+if-addrs = "0.13"
 dirs = "5"
 uuid = { version = "1", features = ["v4", "serde"] }
 # Direct USB access to FTDI chips for Open DMX dongles (ElectroTAS TZ-MINI etc.).

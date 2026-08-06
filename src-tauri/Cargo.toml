@@ -32,9 +32,10 @@ serialport = "4"
 socket2 = "0.5"
 if-addrs = "0.13"
 # Microphone / line-in capture for the audio BPM counter (CoreAudio on
-# macOS, WASAPI on Windows). The detector itself is dependency-free
-# time-domain DSP — cpal only does device enumeration + capture.
+# macOS, WASAPI on Windows). cpal does device enumeration + capture;
+# rustfft powers the multiband spectral-flux onset detector (pure Rust).
 cpal = "0.15"
+rustfft = "6"
 dirs = "5"
 uuid = { version = "1", features = ["v4", "serde"] }
 # Direct USB access to FTDI chips for Open DMX dongles (ElectroTAS TZ-MINI etc.).

@@ -4,18 +4,22 @@
 //! 1. cpal captures the selected input device (mono-mixed to f32) and
 //!    pushes chunks over a bounded channel — the audio callback does
 //!    nothing else, so it can never glitch the driver.
-//! 2. A worker thread frames samples (hop 512) into a **log-domain
-//!    two-band onset envelope**: positive flux of `ln(energy)` for the
-//!    full band plus a one-pole low-passed "kick" band (~150 Hz).
-//!    Working in log space makes the envelope *gain invariant* — a
-//!    whisper-level laptop mic and a hot line feed produce the same
-//!    flux for the same music, which is what makes the counter usable
-//!    at different intensities without a gain knob.
+//! 2. A worker thread runs a **multiband spectral-flux onset detector**:
+//!    2048-point Hann/FFT frames every 512 samples, grouped into ~24
+//!    log-spaced bands (60 Hz–8 kHz); the onset envelope is the mean of
+//!    per-band positive `ln(energy)` differences. Two properties matter:
+//!    - *Gain invariance*: input level scales every band multiplicatively,
+//!      so the log differences don't move — a whisper-level laptop mic
+//!      and a hot line feed produce the same envelope.
+//!    - *Spectral indifference*: every band votes equally, so the beat
+//!      is caught whether it lives in a club kick, in the mids of a
+//!      phone speaker (which reproduces nothing under ~400 Hz), or in
+//!      hi-hats only.
 //! 3. Every ~500 ms the envelope is autocorrelated over the last ~8 s
-//!    (mean/variance normalised — again gain invariant), the best lag
-//!    in 60–200 BPM wins with octave disambiguation toward the 82–165
-//!    range DJs actually play, and a parabolic fit sharpens the lag to
-//!    sub-frame precision.
+//!    (mean/variance normalised — again gain invariant) with harmonic
+//!    scoring (lag + 2·lag + 3·lag) so the true period beats its
+//!    subdivisions; octave folding prefers the 82–165 range DJs play,
+//!    and a parabolic fit sharpens the lag to sub-frame precision.
 //! 4. A short median filter stabilises the reported BPM; a confidence
 //!    score (autocorrelation peak height) gates auto-apply so silence
 //!    or chatter never drags the Overall BPM around.
@@ -41,6 +45,12 @@ pub const MIN_BPM: f32 = 60.0;
 pub const MAX_BPM: f32 = 200.0;
 /// Analysis hop in samples. At 48 kHz → ~93.7 envelope frames/second.
 const HOP: usize = 512;
+/// FFT frame length (Hann window, 75% overlap at HOP=512).
+const FRAME: usize = 2048;
+/// Log-spaced analysis bands between [`BAND_LO_HZ`] and [`BAND_HI_HZ`].
+const BANDS: usize = 24;
+const BAND_LO_HZ: f32 = 60.0;
+const BAND_HI_HZ: f32 = 8_000.0;
 /// Envelope history used by the autocorrelation, in seconds.
 const ENV_WINDOW_S: f32 = 8.0;
 /// RMS below this is treated as "no signal" (−60 dBFS).
@@ -330,39 +340,70 @@ fn run_listener(
 
 pub struct OnsetDetector {
     sample_rate: f32,
-    /// One-pole low-pass coefficient for the ~150 Hz kick band.
-    lp_alpha: f32,
-    lp_state: f32,
-    acc_full: f64,
-    acc_low: f64,
-    filled: usize,
-    prev_log_full: f32,
-    prev_log_low: f32,
+    fft: std::sync::Arc<dyn rustfft::Fft<f32>>,
+    window: Vec<f32>,
+    /// Rolling frame of the last `FRAME` mono samples.
+    buf: VecDeque<f32>,
+    hop_fill: usize,
+    /// Half-open FFT-bin ranges per analysis band.
+    band_bins: Vec<(usize, usize)>,
+    prev_log_bands: Vec<f32>,
+    have_prev: bool,
     env: VecDeque<f32>,
     env_cap: usize,
+    rms_acc: f64,
+    rms_fill: usize,
     rms_smooth: f32,
     frame_count: usize,
     last_beat_frame: usize,
+    scratch: Vec<rustfft::num_complex::Complex<f32>>,
 }
 
 impl OnsetDetector {
     pub fn new(sample_rate: f32) -> Self {
         let env_rate = sample_rate / HOP as f32;
-        let lp_alpha = 1.0 - (-2.0 * std::f32::consts::PI * 150.0 / sample_rate).exp();
+        let fft = rustfft::FftPlanner::new().plan_fft_forward(FRAME);
+        let window: Vec<f32> = (0..FRAME)
+            .map(|i| {
+                let t = i as f32 / (FRAME - 1) as f32;
+                0.5 - 0.5 * (2.0 * std::f32::consts::PI * t).cos()
+            })
+            .collect();
+        // Log-spaced band edges → bin ranges. Every band gets at least
+        // one bin; bands beyond Nyquist are dropped (low sample rates).
+        let hi = BAND_HI_HZ.min(sample_rate * 0.45);
+        let bin_of = |f: f32| ((f * FRAME as f32 / sample_rate) as usize).max(1);
+        let mut band_bins: Vec<(usize, usize)> = Vec::with_capacity(BANDS);
+        let ratio = hi / BAND_LO_HZ;
+        let mut start = bin_of(BAND_LO_HZ);
+        for k in 1..=BANDS {
+            let edge = BAND_LO_HZ * ratio.powf(k as f32 / BANDS as f32);
+            let mut end = bin_of(edge).max(start + 1);
+            end = end.min(FRAME / 2);
+            if start >= FRAME / 2 {
+                break;
+            }
+            band_bins.push((start, end));
+            start = end;
+        }
+        let n_bands = band_bins.len();
         Self {
             sample_rate,
-            lp_alpha,
-            lp_state: 0.0,
-            acc_full: 0.0,
-            acc_low: 0.0,
-            filled: 0,
-            prev_log_full: 0.0,
-            prev_log_low: 0.0,
+            fft,
+            window,
+            buf: VecDeque::with_capacity(FRAME),
+            hop_fill: 0,
+            band_bins,
+            prev_log_bands: vec![0.0; n_bands],
+            have_prev: false,
             env: VecDeque::new(),
             env_cap: (env_rate * (ENV_WINDOW_S + 2.0)) as usize,
+            rms_acc: 0.0,
+            rms_fill: 0,
             rms_smooth: 0.0,
             frame_count: 0,
             last_beat_frame: 0,
+            scratch: vec![rustfft::num_complex::Complex::new(0.0, 0.0); FRAME],
         }
     }
 
@@ -389,39 +430,62 @@ impl OnsetDetector {
     pub fn process(&mut self, samples: &[f32]) -> bool {
         let mut beat = false;
         for &s in samples {
-            self.lp_state += self.lp_alpha * (s - self.lp_state);
-            self.acc_full += (s as f64) * (s as f64);
-            self.acc_low += (self.lp_state as f64) * (self.lp_state as f64);
-            self.filled += 1;
-            if self.filled == HOP {
-                beat |= self.finish_frame();
+            if self.buf.len() == FRAME {
+                self.buf.pop_front();
+            }
+            self.buf.push_back(s);
+            self.rms_acc += (s as f64) * (s as f64);
+            self.rms_fill += 1;
+            self.hop_fill += 1;
+            if self.hop_fill == HOP {
+                self.hop_fill = 0;
+                if self.buf.len() == FRAME {
+                    beat |= self.finish_frame();
+                }
             }
         }
         beat
     }
 
     fn finish_frame(&mut self) -> bool {
-        const EPS: f32 = 1e-10;
-        let e_full = (self.acc_full / HOP as f64) as f32;
-        let e_low = (self.acc_low / HOP as f64) as f32;
-        self.acc_full = 0.0;
-        self.acc_low = 0.0;
-        self.filled = 0;
+        const EPS: f32 = 1e-12;
+        // Input meter from the raw time domain (accumulated since the
+        // previous frame).
+        if self.rms_fill > 0 {
+            let rms = ((self.rms_acc / self.rms_fill as f64) as f32).sqrt();
+            self.rms_smooth = 0.9 * self.rms_smooth + 0.1 * rms;
+            self.rms_acc = 0.0;
+            self.rms_fill = 0;
+        }
 
-        let rms = e_full.sqrt();
-        self.rms_smooth = 0.9 * self.rms_smooth + 0.1 * rms;
+        // Windowed FFT of the rolling frame.
+        for (i, (c, s)) in self.scratch.iter_mut().zip(self.buf.iter()).enumerate() {
+            c.re = s * self.window[i];
+            c.im = 0.0;
+        }
+        self.fft.process(&mut self.scratch);
 
-        // Log-domain flux: gain scales energy multiplicatively, so the
-        // *difference* of logs is unchanged by input level. Kick band
-        // weighted higher — it carries the beat in club music.
-        let lf = (e_full + EPS).ln();
-        let ll = (e_low + EPS).ln();
-        let flux =
-            0.6 * (ll - self.prev_log_low).max(0.0) + 0.4 * (lf - self.prev_log_full).max(0.0);
-        self.prev_log_full = lf;
-        self.prev_log_low = ll;
-        // First frame has no meaningful predecessor.
-        let flux = if self.frame_count == 0 { 0.0 } else { flux };
+        // Multiband positive log-energy flux. Gain shifts every band's
+        // log by the same constant, so the difference is level-proof;
+        // averaging across bands means kick-heavy, mid-heavy (phone
+        // speaker) and hat-only material all light the envelope up.
+        let mut flux = 0.0f32;
+        for (b, &(lo, hi)) in self.band_bins.iter().enumerate() {
+            let mut e = 0.0f32;
+            for bin in lo..hi {
+                e += self.scratch[bin].norm_sqr();
+            }
+            let l = (e + EPS).ln();
+            if self.have_prev {
+                flux += (l - self.prev_log_bands[b]).max(0.0);
+            }
+            self.prev_log_bands[b] = l;
+        }
+        flux /= self.band_bins.len().max(1) as f32;
+        if !self.have_prev {
+            self.have_prev = true;
+            flux = 0.0;
+        }
 
         if self.env.len() == self.env_cap {
             self.env.pop_front();
@@ -441,7 +505,7 @@ impl OnsetDetector {
                 recent.iter().map(|v| (v - mean) * (v - mean)).sum::<f32>() / recent.len() as f32;
             let thresh = mean + 2.0 * var.sqrt();
             let refractory = (env_rate * 0.25) as usize;
-            if flux > thresh && flux > 0.05 && self.frame_count - self.last_beat_frame > refractory
+            if flux > thresh && flux > 0.02 && self.frame_count - self.last_beat_frame > refractory
             {
                 self.last_beat_frame = self.frame_count;
                 return true;
@@ -475,46 +539,58 @@ pub fn estimate_bpm(env: &[f32], env_rate: f32) -> Option<(f32, f32)> {
         return None;
     }
 
-    let mut corr = vec![0.0f32; max_lag + 2];
-    let mut best_lag = 0usize;
-    let mut best = f32::MIN;
-    for lag in min_lag..=max_lag {
+    // Autocorrelation out to 3× the slowest period (capped so every
+    // lag still overlaps at least ~1 s of envelope) — the harmonic
+    // terms below read corr at 2·lag and 3·lag.
+    let ext_max = (3 * max_lag).min(n.saturating_sub(env_rate as usize));
+    let mut corr = vec![0.0f32; ext_max + 2];
+    for lag in min_lag..=ext_max {
         let m = n - lag;
         let c = (0..m).map(|i| x[i] * x[i + lag]).sum::<f32>() / m as f32;
         corr[lag] = c;
-        if c > best {
-            best = c;
+    }
+
+    // Harmonic scoring: real tempos also correlate at their multiples
+    // (2 bars later is still on the grid), while spurious subdivision
+    // peaks (eighth notes) don't get reinforced the same way. This is
+    // what keeps sparse, bass-less material (phone speakers) from
+    // locking onto double-time hats.
+    let at = |lag: usize| if lag <= ext_max { corr[lag] } else { 0.0 };
+    let score_of = |lag: usize| corr[lag] + 0.5 * at(2 * lag) + 0.25 * at(3 * lag);
+    let mut best_lag = 0usize;
+    let mut best_score = f32::MIN;
+    for lag in min_lag..=max_lag {
+        let s = score_of(lag);
+        if s > best_score {
+            best_score = s;
             best_lag = lag;
         }
     }
-    if best <= 0.0 {
+    if best_score <= 0.0 || corr[best_lag] <= 0.0 {
         return None;
     }
 
-    // Octave disambiguation: an autocorrelation peaks at the period AND
-    // its multiples. Fold extremes back into the 82–165 range DJs play:
-    // a "70 BPM" peak whose half-lag also correlates is really 140.
+    // Octave disambiguation: fold extremes back into the 82–165 range
+    // DJs play — a "70 BPM" peak whose half-lag also correlates is
+    // really 140.
     let bpm_of = |lag: f32| env_rate * 60.0 / lag;
     let mut lag = best_lag;
-    let mut peak = best;
     if bpm_of(lag as f32) < 82.0 {
         let half = lag / 2;
-        if half >= min_lag && corr[half] > 0.6 * peak {
+        if half >= min_lag && corr[half] > 0.6 * corr[lag] {
             lag = half;
-            peak = corr[half];
         }
     } else if bpm_of(lag as f32) > 165.0 {
         let dbl = lag * 2;
-        if dbl <= max_lag && corr[dbl] > 0.8 * peak {
+        if dbl <= max_lag && corr[dbl] > 0.8 * corr[lag] {
             lag = dbl;
-            peak = corr[dbl];
         }
     }
 
-    // Parabolic interpolation over the peak for sub-frame lag precision
-    // (~±0.1 BPM at 128).
+    // Parabolic interpolation over the score for sub-frame lag
+    // precision (~±0.1 BPM at 128).
     let refined = if lag > min_lag && lag < max_lag {
-        let (a, b, c) = (corr[lag - 1], corr[lag], corr[lag + 1]);
+        let (a, b, c) = (score_of(lag - 1), score_of(lag), score_of(lag + 1));
         let denom = a - 2.0 * b + c;
         if denom.abs() > 1e-9 {
             lag as f32 + 0.5 * (a - c) / denom
@@ -526,7 +602,7 @@ pub fn estimate_bpm(env: &[f32], env_rate: f32) -> Option<(f32, f32)> {
     };
 
     let bpm = bpm_of(refined).clamp(MIN_BPM, MAX_BPM);
-    Some((bpm, peak.clamp(0.0, 1.0)))
+    Some((bpm, corr[lag].clamp(0.0, 1.0)))
 }
 
 #[cfg(test)]
@@ -600,6 +676,53 @@ mod tests {
         assert!(
             (bpm - 174.0).abs() < 3.0 || (bpm - 87.0).abs() < 2.0,
             "got {bpm}"
+        );
+    }
+
+    /// Phone-speaker simulation: NOTHING below ~400 Hz. Beats are a
+    /// 1.4 kHz click; off-beat eighth notes are a quieter 6 kHz "hat";
+    /// a sustained 800 Hz tone masks the mix like a melody would.
+    fn synth_phone_speaker(bpm: f32, seconds: f32, gain: f32) -> Vec<f32> {
+        let total = (SR * seconds) as usize;
+        let period = (SR * 60.0 / bpm) as usize;
+        let click_len = (SR * 0.03) as usize;
+        let mut out = vec![0.0f32; total];
+        for (i, o) in out.iter_mut().enumerate() {
+            let t_abs = i as f32 / SR;
+            // Melody-ish sustained tone, well above phone HP cutoff.
+            *o = gain * 0.15 * (2.0 * std::f32::consts::PI * 800.0 * t_abs).sin();
+            let pos = i % period;
+            if pos < click_len {
+                let t = pos as f32 / SR;
+                let envl = (-t * 120.0).exp();
+                *o += gain * envl * (2.0 * std::f32::consts::PI * 1_400.0 * t).sin();
+            }
+            // Off-beat hats at half strength (eighth-note grid).
+            let pos8 = (i + period / 2) % period;
+            if pos8 < click_len / 2 {
+                let t = pos8 as f32 / SR;
+                let envl = (-t * 200.0).exp();
+                *o += gain * 0.4 * envl * (2.0 * std::f32::consts::PI * 6_000.0 * t).sin();
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn detects_bpm_from_bassless_phone_speaker_audio() {
+        // The original two-band detector weighted a <150 Hz kick band —
+        // exactly what a phone speaker cannot reproduce. The multiband
+        // spectral flux must find the tempo from mids/highs alone, at
+        // full level AND 26 dB quieter.
+        let loud = detect(&synth_phone_speaker(128.0, 10.0, 0.6)).expect("loud phone");
+        assert!((loud.0 - 128.0).abs() < 2.0, "loud got {}", loud.0);
+        let quiet = detect(&synth_phone_speaker(128.0, 10.0, 0.03)).expect("quiet phone");
+        assert!((quiet.0 - 128.0).abs() < 2.0, "quiet got {}", quiet.0);
+        assert!(
+            (loud.0 - quiet.0).abs() < 1.0,
+            "loud {} vs quiet {}",
+            loud.0,
+            quiet.0
         );
     }
 

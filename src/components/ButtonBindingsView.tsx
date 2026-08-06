@@ -2,6 +2,7 @@ import type { ButtonAction } from "@bindings/ButtonAction";
 import type { ButtonActiveMode } from "@bindings/ButtonActiveMode";
 import type { ButtonBindings } from "@bindings/ButtonBindings";
 import type { ButtonIcon } from "@bindings/ButtonIcon";
+import type { GenericMidiBinding } from "@bindings/GenericMidiBinding";
 import type { LaunchpadBinding } from "@bindings/LaunchpadBinding";
 import type { StreamDeckBinding } from "@bindings/StreamDeckBinding";
 import { ask } from "@tauri-apps/plugin-dialog";
@@ -36,6 +37,7 @@ const EMPTY_BINDINGS: ButtonBindings = {
   custom_enabled: false,
   launchpad: [],
   streamdeck: [],
+  generic: [],
 };
 
 // Approximate the Launchpad MK2 palette index to a screen RGB so the
@@ -310,7 +312,7 @@ export function ButtonBindingsView() {
 
   const [bindings, setBindings] = useState<ButtonBindings>(EMPTY_BINDINGS);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"lp" | "sd">("lp");
+  const [activeTab, setActiveTab] = useState<"lp" | "sd" | "midi">("lp");
   const [editing, setEditing] = useState<
     { kind: "lp"; note: number; is_cc: boolean } | { kind: "sd"; key: number } | null
   >(null);
@@ -373,7 +375,9 @@ export function ButtonBindingsView() {
     }
     try {
       const defaults = await getDefaultButtonBindings();
-      await commit({ ...defaults, custom_enabled: true });
+      // Factory defaults only cover the LP/SD layouts — the user's
+      // MIDI-learn mappings survive a "load defaults".
+      await commit({ ...defaults, generic: bindings.generic, custom_enabled: true });
     } catch (e) {
       setError(stringifyError(e));
     }
@@ -458,6 +462,13 @@ export function ButtonBindingsView() {
         >
           Stream Deck
         </button>
+        <button
+          type="button"
+          className={`bindings-tab${activeTab === "midi" ? " active" : ""}`}
+          onClick={() => setActiveTab("midi")}
+        >
+          MIDI (learn)
+        </button>
       </nav>
 
       {activeTab === "lp" ? (
@@ -467,12 +478,18 @@ export function ButtonBindingsView() {
           customEnabled={bindings.custom_enabled}
           onPick={(note, is_cc) => setEditing({ kind: "lp", note, is_cc })}
         />
-      ) : (
+      ) : activeTab === "sd" ? (
         <StreamDeckGridEditor
           bindings={bindings.streamdeck}
           refs={refs}
           customEnabled={bindings.custom_enabled}
           onPick={(key) => setEditing({ kind: "sd", key })}
+        />
+      ) : (
+        <GenericMidiEditor
+          bindings={bindings.generic}
+          refs={refs}
+          onChange={(generic) => commit({ ...bindings, generic })}
         />
       )}
 
@@ -511,6 +528,170 @@ export function ButtonBindingsView() {
         />
       ) : null}
     </main>
+  );
+}
+
+// ---- Generic MIDI learn -------------------------------------------------
+
+/// MIDI-learn mappings for arbitrary controllers: arm learn, touch a
+/// control on the connected device (Config → MIDI), then assign an
+/// action or the master fader. Always active — independent of the
+/// "layout personalizado" toggle.
+function GenericMidiEditor({
+  bindings,
+  refs,
+  onChange,
+}: {
+  bindings: GenericMidiBinding[];
+  refs: BindingRefs;
+  onChange: (next: GenericMidiBinding[]) => void;
+}) {
+  const midiLearnArm = useShowStore((s) => s.midiLearnArm);
+  const midiLearnCancel = useShowStore((s) => s.midiLearnCancel);
+  const midiLearnPoll = useShowStore((s) => s.midiLearnPoll);
+  const [learning, setLearning] = useState(false);
+
+  // While learn mode is armed, poll for the captured control and turn
+  // it into a fresh (unassigned) binding row.
+  useEffect(() => {
+    if (!learning) return;
+    let cancelled = false;
+    const interval = window.setInterval(async () => {
+      try {
+        const got = await midiLearnPoll();
+        if (got && !cancelled) {
+          setLearning(false);
+          onChange([
+            ...bindings,
+            {
+              id: crypto.randomUUID(),
+              label: "",
+              is_cc: got.is_cc,
+              channel: got.channel,
+              data1: got.data1,
+              target: { type: "action", action: { type: "none" } },
+            },
+          ]);
+        }
+      } catch {
+        // Poll errors are transient; the next tick retries.
+      }
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [learning, bindings, onChange, midiLearnPoll]);
+
+  const startLearn = async () => {
+    await midiLearnArm();
+    setLearning(true);
+  };
+  const cancelLearn = async () => {
+    setLearning(false);
+    await midiLearnCancel();
+  };
+
+  return (
+    <section className="bindings-section">
+      <p className="hint">
+        Mapeá cualquier control de cualquier controladora MIDI (conectala en Config → MIDI). Estos
+        mapeos están siempre activos, independientes del layout del Launchpad/Stream Deck.
+      </p>
+      <div className="gm-toolbar">
+        {learning ? (
+          <>
+            <span className="gm-learning">🎛 Tocá un pad, tecla o fader en tu controladora…</span>
+            <button type="button" className="ghost" onClick={cancelLearn}>
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <button type="button" className="primary" onClick={startLearn}>
+            + Aprender control
+          </button>
+        )}
+      </div>
+      {bindings.length === 0 && !learning ? (
+        <p className="empty">
+          Sin mapeos todavía. Apretá "Aprender control" y tocá tu controladora.
+        </p>
+      ) : null}
+      <ul className="gm-list">
+        {bindings.map((b) => (
+          <GenericMidiRow
+            key={b.id}
+            binding={b}
+            refs={refs}
+            onUpdate={(next) => onChange(bindings.map((x) => (x.id === next.id ? next : x)))}
+            onRemove={() => onChange(bindings.filter((x) => x.id !== b.id))}
+          />
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function GenericMidiRow({
+  binding,
+  refs,
+  onUpdate,
+  onRemove,
+}: {
+  binding: GenericMidiBinding;
+  refs: BindingRefs;
+  onUpdate: (next: GenericMidiBinding) => void;
+  onRemove: () => void;
+}) {
+  const [label, setLabel] = useState(binding.label);
+  useEffect(() => setLabel(binding.label), [binding.label]);
+  const isAction = binding.target.type === "action";
+  return (
+    <li className="gm-row">
+      <div className="gm-row-head">
+        <span className="gm-chip">
+          {binding.is_cc ? "CC" : "NOTE"} {binding.data1} · ch {binding.channel + 1}
+        </span>
+        <input
+          className="gm-label"
+          placeholder="Etiqueta"
+          value={label}
+          onChange={(e) => setLabel(e.currentTarget.value)}
+          onBlur={() => {
+            if (label !== binding.label) onUpdate({ ...binding, label });
+          }}
+        />
+        <select
+          value={binding.target.type}
+          onChange={(e) =>
+            onUpdate({
+              ...binding,
+              target:
+                e.currentTarget.value === "master"
+                  ? { type: "master" }
+                  : { type: "action", action: { type: "none" } },
+            })
+          }
+        >
+          <option value="action">Acción (botón)</option>
+          <option value="master">Master general (fader)</option>
+        </select>
+        <button type="button" className="danger" onClick={onRemove} title="Eliminar mapeo">
+          ×
+        </button>
+      </div>
+      {isAction && binding.target.type === "action" ? (
+        <ActionEditor
+          action={binding.target.action}
+          refs={refs}
+          onChange={(action) => onUpdate({ ...binding, target: { type: "action", action } })}
+        />
+      ) : (
+        <p className="hint gm-master-hint">
+          El valor 0–127 del control mueve el master general (0–255) en tiempo real.
+        </p>
+      )}
+    </li>
   );
 }
 

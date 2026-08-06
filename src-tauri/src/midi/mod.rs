@@ -7,6 +7,7 @@
 //!   - Launchpad MK2 RGB feedback (palette + SysEx true-RGB).
 //!   - Auto-reconnect on app launch from the show file.
 
+pub mod generic;
 pub mod hub;
 pub mod launchpad;
 

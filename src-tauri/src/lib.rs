@@ -10,6 +10,7 @@ pub mod movement;
 pub mod output;
 pub mod power;
 pub mod programmer;
+pub mod rdm;
 pub mod show;
 pub mod snapshot;
 pub mod streamdeck;
@@ -231,6 +232,7 @@ pub fn run() {
     let programmer_handle = shared_programmer();
     let snapshot_runtime_handle = shared_snapshot_runtime();
     let audio_bpm_handle = crate::audio_bpm::shared_audio_bpm();
+    let midi_learn_handle = crate::midi::generic::shared_midi_learn();
     let bridge_state = crate::bridge::BridgeState::new();
     let vdj_state = crate::vdj::VdjState::new();
 
@@ -258,6 +260,7 @@ pub fn run() {
         .manage(programmer_handle.clone())
         .manage(snapshot_runtime_handle.clone())
         .manage(audio_bpm_handle.clone())
+        .manage(midi_learn_handle.clone())
         .manage(bridge_state.clone())
         .manage(vdj_state.clone())
         .setup(move |app| {
@@ -321,6 +324,23 @@ pub fn run() {
                 g.update_show_context(fixtures, library);
                 g.replace_config(globals_cfg);
             }
+
+            // MIDI-learn dispatcher: a hub-level router that maps any
+            // learned note/CC to actions or the master fader. Installed
+            // once; survives surface connect/disconnect cycles.
+            crate::midi::generic::install(
+                &midi_handle,
+                midi_learn_handle.clone(),
+                app_handle.clone(),
+                chasers_st.inner().clone(),
+                movement_st.inner().clone(),
+                globals_st.inner().clone(),
+                scenes_st.inner().clone(),
+                loop_playback_handle.clone(),
+                engine_state.inner().clone(),
+                show_state_st.inner().clone(),
+                snapshot_runtime_handle.clone(),
+            );
 
             // Auto-connect: if a Launchpad is already plugged in at
             // launch, fire it up without waiting for the user to open
@@ -543,6 +563,7 @@ pub fn run() {
             commands::get_outputs,
             commands::set_outputs,
             commands::artnet_scan,
+            commands::rdm_discover,
             // Library + Show
             commands::list_fixture_definitions,
             commands::reload_library,
@@ -638,6 +659,11 @@ pub fn run() {
             commands::audio_bpm_stop,
             commands::audio_bpm_status,
             commands::audio_bpm_set_auto,
+            commands::audio_bpm_set_phase_sync,
+            // MIDI learn
+            commands::midi_learn_arm,
+            commands::midi_learn_cancel,
+            commands::midi_learn_poll,
             // MIDI
             commands::list_midi_devices,
             commands::connect_midi_device,

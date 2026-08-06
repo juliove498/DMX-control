@@ -56,6 +56,9 @@ interface ShowStoreState {
   /// Broadcast an ArtPoll and collect ArtPollReply packets for
   /// ~2.5 s. Resolves with every Art-Net node found on the LAN.
   artnetScan: (timeoutMs?: number) => Promise<ArtNetNodeInfo[]>;
+  /// RDM discovery on the DMX line behind an FTDI dongle. Pauses the
+  /// output thread for a few seconds while the E1.20 walk runs.
+  rdmDiscover: (serial: string) => Promise<import("@bindings/RdmDeviceInfo").RdmDeviceInfo[]>;
 
   addFixture: (fixture: FixtureInstance) => Promise<void>;
   addFixtures: (fixtures: FixtureInstance[]) => Promise<void>;
@@ -157,6 +160,12 @@ interface ShowStoreState {
   audioBpmStop: () => Promise<void>;
   audioBpmStatus: () => Promise<AudioBpmStatus>;
   audioBpmSetAuto: (enabled: boolean) => Promise<void>;
+  audioBpmSetPhaseSync: (enabled: boolean) => Promise<void>;
+
+  // MIDI learn (generic controller mappings)
+  midiLearnArm: () => Promise<void>;
+  midiLearnCancel: () => Promise<void>;
+  midiLearnPoll: () => Promise<import("@bindings/LearnedControl").LearnedControl | null>;
 
   listMidiDevices: () => Promise<{ name: string; has_input: boolean; has_output: boolean }[]>;
   connectMidiDevice: (name: string) => Promise<void>;
@@ -284,6 +293,9 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
 
   async artnetScan(timeoutMs) {
     return invoke<ArtNetNodeInfo[]>("artnet_scan", { timeoutMs: timeoutMs ?? null });
+  },
+  async rdmDiscover(serial) {
+    return invoke<import("@bindings/RdmDeviceInfo").RdmDeviceInfo[]>("rdm_discover", { serial });
   },
 
   async addFixture(fixture) {
@@ -605,6 +617,19 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   },
   async audioBpmSetAuto(enabled) {
     await invoke("audio_bpm_set_auto", { enabled });
+  },
+  async audioBpmSetPhaseSync(enabled) {
+    await invoke("audio_bpm_set_phase_sync", { enabled });
+  },
+
+  async midiLearnArm() {
+    await invoke("midi_learn_arm");
+  },
+  async midiLearnCancel() {
+    await invoke("midi_learn_cancel");
+  },
+  async midiLearnPoll() {
+    return invoke<import("@bindings/LearnedControl").LearnedControl | null>("midi_learn_poll");
   },
 
   async listMidiDevices() {

@@ -183,6 +183,39 @@ pub struct StreamDeckBinding {
     pub active_mode: ButtonActiveMode,
 }
 
+/// What a learned generic MIDI control drives.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../bindings/")]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum MidiControlTarget {
+    /// Fire a [`ButtonAction`] on press (NoteOn vel>0, or a CC crossing
+    /// the ≥64 threshold). Blind stays momentary: release fires too.
+    Action { action: ButtonAction },
+    /// Continuous fader: the control's 0–127 value drives the grand
+    /// master (0–255). Not persisted per move — the engine autosave
+    /// already snapshots the master.
+    Master,
+}
+
+/// One "MIDI learn" mapping: any note/CC from any controller connected
+/// through the MIDI hub, bound to an action or a continuous target.
+/// Independent of the Launchpad/Stream Deck factory layouts and always
+/// active (no `custom_enabled` gate).
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct GenericMidiBinding {
+    pub id: String,
+    #[serde(default)]
+    pub label: String,
+    /// `true` = ControlChange, `false` = NoteOn/NoteOff.
+    pub is_cc: bool,
+    /// 0-based MIDI channel.
+    pub channel: u8,
+    /// Note number or CC number.
+    pub data1: u8,
+    pub target: MidiControlTarget,
+}
+
 /// Top-level config that lives off the show file.
 #[derive(Debug, Clone, Serialize, Deserialize, TS, Default, PartialEq)]
 #[ts(export, export_to = "../bindings/")]
@@ -197,6 +230,9 @@ pub struct ButtonBindings {
     pub launchpad: Vec<LaunchpadBinding>,
     #[serde(default)]
     pub streamdeck: Vec<StreamDeckBinding>,
+    /// MIDI-learn mappings for arbitrary controllers. Always active.
+    #[serde(default)]
+    pub generic: Vec<GenericMidiBinding>,
 }
 
 impl ButtonBindings {

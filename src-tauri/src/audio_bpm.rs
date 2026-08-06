@@ -38,7 +38,8 @@ use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 use ts_rs::TS;
 
-use crate::engine::output_thread::SharedGlobals;
+use crate::engine::beatgrid::BeatAnchor;
+use crate::engine::output_thread::{SharedChasers, SharedGlobals, SharedMovement};
 use crate::show::ShowState;
 
 pub const MIN_BPM: f32 = 60.0;
@@ -80,6 +81,11 @@ pub struct AudioBpmStatus {
     /// While true the worker writes confident estimates straight into
     /// the Overall BPM (rounded to 0.1, with hysteresis).
     pub auto_apply: bool,
+    /// While true the worker also anchors the chasers'/movements' beat
+    /// grid to the detected beat *phase* — steps land on the music, not
+    /// just at the right rate. Ignored while the VDJ bridge is enabled
+    /// (that clock wins).
+    pub phase_sync: bool,
     pub error: Option<String>,
 }
 
@@ -92,6 +98,7 @@ struct SharedInner {
     level: f32,
     last_beat: Option<Instant>,
     auto_apply: bool,
+    phase_sync: bool,
     error: Option<String>,
 }
 
@@ -139,6 +146,7 @@ pub fn status(state: &SharedAudioBpm) -> AudioBpmStatus {
             .map(|t| t.elapsed() < Duration::from_millis(150))
             .unwrap_or(false),
         auto_apply: s.auto_apply,
+        phase_sync: s.phase_sync,
         error: s.error.clone(),
     }
 }
@@ -146,6 +154,11 @@ pub fn status(state: &SharedAudioBpm) -> AudioBpmStatus {
 pub fn set_auto_apply(state: &SharedAudioBpm, enabled: bool) {
     let rt = state.lock();
     rt.shared.lock().auto_apply = enabled;
+}
+
+pub fn set_phase_sync(state: &SharedAudioBpm, enabled: bool) {
+    let rt = state.lock();
+    rt.shared.lock().phase_sync = enabled;
 }
 
 pub fn stop(state: &SharedAudioBpm) {
@@ -163,10 +176,13 @@ pub fn stop(state: &SharedAudioBpm) {
 /// Start listening on `device_name` (or the system default input).
 /// Spawns a dedicated thread that owns the cpal stream (`Stream` is
 /// !Send, so it must be created and dropped on the same thread).
+#[allow(clippy::too_many_arguments)]
 pub fn start(
     app: AppHandle,
     show: ShowState,
     globals: SharedGlobals,
+    chasers: SharedChasers,
+    movement: SharedMovement,
     state: &SharedAudioBpm,
     device_name: Option<String>,
 ) {
@@ -186,8 +202,16 @@ pub fn start(
     std::thread::Builder::new()
         .name("dmx-audio-bpm".into())
         .spawn(move || {
-            if let Err(err) = run_listener(&app, &show, &globals, &shared, &stop_flag, device_name)
-            {
+            if let Err(err) = run_listener(
+                &app,
+                &show,
+                &globals,
+                &chasers,
+                &movement,
+                &shared,
+                &stop_flag,
+                device_name,
+            ) {
                 tracing::warn!(%err, "audio bpm listener stopped with error");
                 let mut s = shared.lock();
                 s.error = Some(err);
@@ -197,10 +221,13 @@ pub fn start(
         .expect("spawn audio bpm thread");
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_listener(
     app: &AppHandle,
     show: &ShowState,
     globals: &SharedGlobals,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
     shared: &Arc<Mutex<SharedInner>>,
     stop_flag: &Arc<AtomicBool>,
     device_name: Option<String>,
@@ -268,6 +295,9 @@ fn run_listener(
     let mut estimates: VecDeque<f32> = VecDeque::with_capacity(5);
     let mut last_estimate_at = Instant::now();
     let mut last_applied: f32 = 0.0;
+    // True while WE are feeding beat anchors — so we can clear them
+    // (and only ours) when sync turns off / signal drops / we exit.
+    let mut anchoring = false;
 
     while !stop_flag.load(Ordering::Relaxed) {
         if let Some(e) = err_flag.lock().take() {
@@ -307,6 +337,7 @@ fn run_listener(
                     s.bpm = Some(rounded);
                     s.confidence = conf;
                     let auto = s.auto_apply;
+                    let phase = s.phase_sync;
                     drop(s);
                     // Auto-apply with hysteresis: confident, and moved
                     // at least 0.3 BPM since the last write — keeps the
@@ -319,6 +350,37 @@ fn run_listener(
                             tracing::warn!(?err, "audio bpm auto-apply failed");
                         }
                     }
+                    // Beat-phase sync: anchor the chaser/movement beat
+                    // grid to where the beats actually land. The VDJ
+                    // bridge owns the grid when it's enabled — two
+                    // writers at different cadences would make the rig
+                    // stutter between clocks.
+                    let vdj_owns = show.read().show.vdj.enabled;
+                    if phase && !vdj_owns && conf >= 0.35 {
+                        if let Some(delay_frames) =
+                            estimate_phase(&detector.envelope(), detector.env_rate(), rounded)
+                        {
+                            // Newest envelope frame represents audio
+                            // centred FRAME/2 samples ago; fold that
+                            // into the "last beat was N frames ago"
+                            // offset so the anchor lands on the true
+                            // wall-clock beat.
+                            let delay_s = delay_frames / detector.env_rate()
+                                + (FRAME as f32) / (2.0 * sample_rate);
+                            let anchor = BeatAnchor {
+                                set_at: Instant::now() - Duration::from_secs_f32(delay_s.max(0.0)),
+                                beat_at_set: 0.0,
+                                bpm: rounded,
+                            };
+                            chasers.lock().set_beat_anchor(Some(anchor));
+                            movement.lock().set_beat_anchor(Some(anchor));
+                            anchoring = true;
+                        }
+                    } else if anchoring && (!phase || vdj_owns) {
+                        chasers.lock().set_beat_anchor(None);
+                        movement.lock().set_beat_anchor(None);
+                        anchoring = false;
+                    }
                 }
                 _ => {
                     if silent {
@@ -326,14 +388,75 @@ fn run_listener(
                         s.bpm = None;
                     }
                     s.confidence = 0.0;
+                    drop(s);
+                    // Signal gone — release the grid so effects free-run
+                    // instead of chasing a stale anchor.
+                    if anchoring {
+                        chasers.lock().set_beat_anchor(None);
+                        movement.lock().set_beat_anchor(None);
+                        anchoring = false;
+                    }
                 }
             }
         }
     }
     drop(stream);
+    if anchoring {
+        chasers.lock().set_beat_anchor(None);
+        movement.lock().set_beat_anchor(None);
+    }
     shared.lock().running = false;
     tracing::info!("audio bpm listener stopped");
     Ok(())
+}
+
+/// Locate the beat phase: fold the tail of the onset envelope by the
+/// beat period and find the offset (in envelope frames, from "now"
+/// backwards) where onsets pile up. Returns how many frames ago the
+/// most recent beat landed. Like everything upstream this works on
+/// normalised flux, so it is input-level independent.
+pub fn estimate_phase(env: &[f32], env_rate: f32, bpm: f32) -> Option<f32> {
+    let n = env.len();
+    let period = env_rate * 60.0 / bpm.max(1.0);
+    let period_i = period.round() as usize;
+    if period_i < 4 || n < period_i * 3 {
+        return None;
+    }
+    // Use up to 8 beats of history — enough votes to ignore one weak
+    // bar, recent enough to track a live drummer drifting.
+    let beats = ((n / period_i).min(8)).max(2);
+    let mut best_delta = 0usize;
+    let mut best_score = f32::MIN;
+    let mut scores = vec![0.0f32; period_i];
+    for (delta, slot) in scores.iter_mut().enumerate() {
+        let mut sum = 0.0f32;
+        for k in 0..beats {
+            let back = delta as f32 + k as f32 * period;
+            let idx = n as isize - 1 - back.round() as isize;
+            if idx >= 0 {
+                sum += env[idx as usize];
+            }
+        }
+        *slot = sum;
+        if sum > best_score {
+            best_score = sum;
+            best_delta = delta;
+        }
+    }
+    if best_score <= 0.0 {
+        return None;
+    }
+    // Parabolic refinement over the circular neighbourhood.
+    let prev = scores[(best_delta + period_i - 1) % period_i];
+    let next = scores[(best_delta + 1) % period_i];
+    let here = scores[best_delta];
+    let denom = prev - 2.0 * here + next;
+    let frac = if denom.abs() > 1e-9 {
+        (0.5 * (prev - next) / denom).clamp(-0.5, 0.5)
+    } else {
+        0.0
+    };
+    Some(best_delta as f32 + frac)
 }
 
 // ---- DSP: onset envelope ---------------------------------------------------
@@ -724,6 +847,32 @@ mod tests {
             loud.0,
             quiet.0
         );
+    }
+
+    #[test]
+    fn phase_estimate_finds_last_beat_offset() {
+        // Envelope with clean impulses every 44 frames, the most recent
+        // one 7 frames before "now" — at any amplitude.
+        let env_rate = 93.75f32;
+        let period = 44usize;
+        let bpm = env_rate * 60.0 / period as f32;
+        for amp in [1.0f32, 0.02] {
+            let n = 750usize;
+            let mut env = vec![0.0f32; n];
+            let mut idx = n as isize - 1 - 7;
+            while idx >= 0 {
+                env[idx as usize] = amp;
+                idx -= period as isize;
+            }
+            let delta = estimate_phase(&env, env_rate, bpm).expect("phase");
+            assert!((delta - 7.0).abs() < 1.0, "amp {amp}: delta {delta}");
+        }
+    }
+
+    #[test]
+    fn phase_estimate_rejects_flat_envelope() {
+        let env = vec![0.0f32; 750];
+        assert!(estimate_phase(&env, 93.75, 128.0).is_none());
     }
 
     #[test]

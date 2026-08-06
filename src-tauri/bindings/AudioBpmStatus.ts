@@ -22,4 +22,11 @@ beat: boolean,
  * While true the worker writes confident estimates straight into
  * the Overall BPM (rounded to 0.1, with hysteresis).
  */
-auto_apply: boolean, error: string | null, };
+auto_apply: boolean, 
+/**
+ * While true the worker also anchors the chasers'/movements' beat
+ * grid to the detected beat *phase* — steps land on the music, not
+ * just at the right rate. Ignored while the VDJ bridge is enabled
+ * (that clock wins).
+ */
+phase_sync: boolean, error: string | null, };

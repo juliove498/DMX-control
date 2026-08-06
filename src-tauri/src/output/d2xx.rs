@@ -27,15 +27,15 @@ use ts_rs::TS;
 use super::{OutputDriver, OutputError};
 use crate::engine::DMX_CHANNELS;
 
-const FTDI_VID: u16 = 0x0403;
+pub(crate) const FTDI_VID: u16 = 0x0403;
 
-const REQ_TYPE_VENDOR_OUT: u8 = 0x40;
-const FTDI_REQ_RESET: u8 = 0x00;
-const FTDI_REQ_SET_MODEM_CTRL: u8 = 0x01;
-const FTDI_REQ_SET_FLOW_CTRL: u8 = 0x02;
-const FTDI_REQ_SET_BAUD_RATE: u8 = 0x03;
-const FTDI_REQ_SET_LINE_PROP: u8 = 0x04;
-const FTDI_REQ_SET_LATENCY: u8 = 0x09;
+pub(crate) const REQ_TYPE_VENDOR_OUT: u8 = 0x40;
+pub(crate) const FTDI_REQ_RESET: u8 = 0x00;
+pub(crate) const FTDI_REQ_SET_MODEM_CTRL: u8 = 0x01;
+pub(crate) const FTDI_REQ_SET_FLOW_CTRL: u8 = 0x02;
+pub(crate) const FTDI_REQ_SET_BAUD_RATE: u8 = 0x03;
+pub(crate) const FTDI_REQ_SET_LINE_PROP: u8 = 0x04;
+pub(crate) const FTDI_REQ_SET_LATENCY: u8 = 0x09;
 
 /// Modem-control wValue encoding:
 ///   bit 0 = DTR state (0 = low, 1 = high)
@@ -47,7 +47,7 @@ const FTDI_REQ_SET_LATENCY: u8 = 0x09;
 /// transceiver enable pins, and the right combination is hardware-specific.
 /// We expose these as runtime-selectable values so the user can sweep them
 /// without recompiling.
-fn modem_value(dtr_high: bool, rts_high: bool) -> u16 {
+pub(crate) fn modem_value(dtr_high: bool, rts_high: bool) -> u16 {
     let mut v: u16 = 0x0300; // both writes enabled
     if dtr_high {
         v |= 0x0001;
@@ -58,9 +58,9 @@ fn modem_value(dtr_high: bool, rts_high: bool) -> u16 {
     v
 }
 
-const FTDI_RESET_SIO: u16 = 0;
-const FTDI_RESET_PURGE_RX: u16 = 1;
-const FTDI_RESET_PURGE_TX: u16 = 2;
+pub(crate) const FTDI_RESET_SIO: u16 = 0;
+pub(crate) const FTDI_RESET_PURGE_RX: u16 = 1;
+pub(crate) const FTDI_RESET_PURGE_TX: u16 = 2;
 
 /// Line property word for `SIO_SET_DATA_REQUEST`. Encoding (per libftdi /
 /// FTDI's own protocol — note the bit ordering trips people up):
@@ -72,12 +72,12 @@ const FTDI_RESET_PURGE_TX: u16 = 2;
 /// 8N2 = word_len 8 + parity 0 + stop_bits 2 + break 0
 ///     = 0x08 | (0 << 8) | (2 << 11) | (0 << 14)
 ///     = 0x1008
-const LINE_8N2: u16 = 0x1008;
-const LINE_8N2_BREAK: u16 = LINE_8N2 | 0x4000;
+pub(crate) const LINE_8N2: u16 = 0x1008;
+pub(crate) const LINE_8N2_BREAK: u16 = LINE_8N2 | 0x4000;
 
 /// Baud rate divisor for 250 000 baud assuming the standard 3 MHz UART clock
 /// (FT232R / FT232BL / FT245). 3_000_000 / 250_000 = 12, no fractional part.
-const BAUD_DIVISOR_250K: u16 = 12;
+pub(crate) const BAUD_DIVISOR_250K: u16 = 12;
 
 const USB_TIMEOUT: Duration = Duration::from_millis(100);
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(2);
@@ -365,7 +365,7 @@ impl Drop for D2xxOpenDmxDriver {
     }
 }
 
-fn ftdi_control(
+pub(crate) fn ftdi_control(
     handle: &rusb::DeviceHandle<GlobalContext>,
     request: u8,
     value: u16,
@@ -377,7 +377,7 @@ fn ftdi_control(
         .map_err(|e| format!("ftdi req=0x{request:02x} value=0x{value:04x}: {e}"))
 }
 
-fn find_out_endpoint<C: UsbContext>(dev: &rusb::Device<C>, iface_num: u8) -> Option<u8> {
+pub(crate) fn find_out_endpoint<C: UsbContext>(dev: &rusb::Device<C>, iface_num: u8) -> Option<u8> {
     let cfg = dev.active_config_descriptor().ok()?;
     for iface in cfg.interfaces() {
         if iface.number() != iface_num {
@@ -432,7 +432,7 @@ fn ftdi_access_hint(e: &rusb::Error) -> &'static str {
 
 /// Busy-wait for the given duration. macOS `thread::sleep` is too coarse
 /// (~1 ms granularity) for our 12 µs MAB target; CPU spin is correct here.
-fn spin_for(d: Duration) {
+pub(crate) fn spin_for(d: Duration) {
     let until = Instant::now() + d;
     while Instant::now() < until {
         std::hint::spin_loop();

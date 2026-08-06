@@ -32,6 +32,8 @@ export function OverallBpmControl() {
   const audioBpmStop = useShowStore((s) => s.audioBpmStop);
   const audioBpmStatus = useShowStore((s) => s.audioBpmStatus);
   const audioBpmSetAuto = useShowStore((s) => s.audioBpmSetAuto);
+  const audioBpmSetPhaseSync = useShowStore((s) => s.audioBpmSetPhaseSync);
+  const vdjEnabled = useShowStore((s) => s.show?.vdj?.enabled ?? false);
 
   // Mic BPM counter: popover open state, device list, live status.
   const [micOpen, setMicOpen] = useState(false);
@@ -298,7 +300,22 @@ export function OverallBpmControl() {
               />
               {t("app.global.bpm.micAuto")}
             </label>
+            <label className="bpm-mic-auto" title={t("app.global.bpm.micPhaseHint")}>
+              <input
+                type="checkbox"
+                checked={mic?.phase_sync ?? false}
+                onChange={async (e) => {
+                  const v = e.currentTarget.checked;
+                  await audioBpmSetPhaseSync(v);
+                  setMic((s) => (s ? { ...s, phase_sync: v } : s));
+                }}
+              />
+              {t("app.global.bpm.micPhase")}
+            </label>
           </div>
+          {mic?.phase_sync && vdjEnabled ? (
+            <p className="bpm-mic-error">{t("app.global.bpm.micPhaseVdj")}</p>
+          ) : null}
           {mic?.error ? <p className="bpm-mic-error">{mic.error}</p> : null}
         </div>
       ) : null}

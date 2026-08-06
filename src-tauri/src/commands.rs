@@ -2547,6 +2547,66 @@ pub fn active_scene_step(scenes_pb: State<'_, SharedScenePlayback>) -> Option<u3
 
 // ---- MIDI ----------------------------------------------------------------
 
+// ---- RDM discovery (FTDI) ---------------------------------------------------
+
+/// Discover RDM responders on the DMX line behind an FTDI dongle.
+/// The DMX output thread owns the FTDI handle, so we shut it down for
+/// the duration of the walk and rebuild it afterwards — a few seconds
+/// of frozen (not blacked-out) output. Blocking; runs off-main-thread
+/// like every sync command.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn rdm_discover(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    output_thread: State<'_, OutputThreadState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes: State<'_, SharedScenePlayback>,
+    serial: String,
+) -> Result<Vec<crate::rdm::RdmDeviceInfo>, CommandError> {
+    // Pause: stop the output thread so its FTDI handle is released.
+    {
+        let handle = output_thread.0.lock().unwrap().take();
+        if let Some(h) = handle {
+            tracing::info!("rdm: pausing output thread for discovery");
+            h.shutdown();
+        }
+    }
+    // The libusb release takes a beat to settle before a re-claim.
+    std::thread::sleep(std::time::Duration::from_millis(150));
+
+    let result = crate::rdm::discover(&serial);
+
+    // Resume: rebuild the output thread from the persisted config, no
+    // matter how discovery went.
+    let (outputs, fixture_universes) = {
+        let s = show.read();
+        let outputs = s.show.outputs.clone();
+        let mut us: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
+        us.sort_unstable();
+        us.dedup();
+        (outputs, us)
+    };
+    if let Err(err) = apply_outputs(
+        &app,
+        &engine,
+        &output_thread,
+        &chasers,
+        &movement,
+        &globals,
+        &scenes,
+        &outputs,
+        &fixture_universes,
+    ) {
+        tracing::warn!(?err, "rdm: failed to restart outputs after discovery");
+    }
+
+    result.map_err(CommandError::Other)
+}
+
 // ---- Audio BPM counter -----------------------------------------------------
 
 #[tauri::command]
@@ -2559,6 +2619,8 @@ pub fn audio_bpm_start(
     app: AppHandle,
     show: State<'_, ShowState>,
     globals: State<'_, SharedGlobals>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
     audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>,
     device: Option<String>,
 ) {
@@ -2566,6 +2628,8 @@ pub fn audio_bpm_start(
         app,
         show.inner().clone(),
         globals.inner().clone(),
+        chasers.inner().clone(),
+        movement.inner().clone(),
         audio_bpm.inner(),
         device,
     );
@@ -2588,6 +2652,14 @@ pub fn audio_bpm_set_auto(audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>
     crate::audio_bpm::set_auto_apply(audio_bpm.inner(), enabled);
 }
 
+#[tauri::command]
+pub fn audio_bpm_set_phase_sync(
+    audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>,
+    enabled: bool,
+) {
+    crate::audio_bpm::set_phase_sync(audio_bpm.inner(), enabled);
+}
+
 /// Discover Art-Net nodes on the LAN via ArtPoll broadcast. Blocks for
 /// `timeout_ms` (default 2.5 s, clamped) collecting ArtPollReply
 /// packets — Tauri runs sync commands off the main thread, so the UI
@@ -2598,6 +2670,29 @@ pub fn artnet_scan(
 ) -> Result<Vec<crate::output::artnet::ArtNetNodeInfo>, CommandError> {
     let ms = timeout_ms.unwrap_or(2500).clamp(500, 10_000);
     crate::output::artnet::scan(ms).map_err(|e| CommandError::Other(e.to_string()))
+}
+
+// ---- MIDI learn ------------------------------------------------------------
+
+/// Arm learn mode: the next note/CC seen on the wire is captured (and
+/// swallowed — nothing dispatches while armed).
+#[tauri::command]
+pub fn midi_learn_arm(learn: State<'_, crate::midi::generic::SharedMidiLearn>) {
+    crate::midi::generic::learn_arm(learn.inner());
+}
+
+#[tauri::command]
+pub fn midi_learn_cancel(learn: State<'_, crate::midi::generic::SharedMidiLearn>) {
+    crate::midi::generic::learn_cancel(learn.inner());
+}
+
+/// Returns the captured control once, then clears it. The UI polls
+/// this while learn mode is armed.
+#[tauri::command]
+pub fn midi_learn_poll(
+    learn: State<'_, crate::midi::generic::SharedMidiLearn>,
+) -> Option<crate::midi::generic::LearnedControl> {
+    crate::midi::generic::learn_poll(learn.inner())
 }
 
 #[tauri::command]
@@ -3952,5 +4047,8 @@ pub fn get_default_button_bindings() -> ButtonBindings {
         custom_enabled: true,
         launchpad: default_launchpad_bindings(),
         streamdeck: default_streamdeck_bindings(),
+        // MIDI-learn mappings have no factory layout — the caller is
+        // expected to preserve the user's list when loading defaults.
+        generic: Vec::new(),
     }
 }

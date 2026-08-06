@@ -31,6 +31,10 @@ pub struct MidiHub {
     connected_name: Option<String>,
     last_event: Option<MidiMessage>,
     input_router: Option<InputRouter>,
+    /// Second, surface-independent router: the MIDI-learn dispatcher.
+    /// Installed once at boot and NOT cleared on disconnect — it isn't
+    /// tied to any particular device.
+    generic_router: Option<InputRouter>,
 }
 
 pub fn shared_midi() -> SharedMidi {
@@ -96,6 +100,10 @@ impl MidiHub {
         self.input_router = router;
     }
 
+    pub fn set_generic_router(&mut self, router: Option<InputRouter>) {
+        self.generic_router = router;
+    }
+
     /// Open input and output ports of the given device by name. Some
     /// devices expose only one side; we surface that via `has_output`
     /// in the status without making it an error.
@@ -132,13 +140,18 @@ impl MidiHub {
                         // Clone the router out under the lock and call it
                         // afterwards — calling user code while holding the
                         // hub lock would deadlock anything that re-enters.
-                        let router = {
+                        let (router, generic) = {
                             let mut g = shared_for_cb.lock();
                             g.last_event = Some(parsed.clone());
-                            g.input_router.clone()
+                            (g.input_router.clone(), g.generic_router.clone())
                         };
                         // Push-style stream for live UIs.
                         let _ = app_for_cb.emit(MIDI_EVENT, &parsed);
+                        // MIDI-learn dispatcher first (it may be in
+                        // learn-capture mode), then the surface router.
+                        if let Some(generic) = generic {
+                            generic(&parsed);
+                        }
                         if let Some(router) = router {
                             router(&parsed);
                         }

@@ -72,12 +72,16 @@ function BindingRow({
   onRemove,
   serialPorts,
   ftdiDevices,
+  onRdmScan,
+  rdmBusy,
 }: {
   binding: OutputBindingConfig;
   onChange: (next: OutputBindingConfig) => void;
   onRemove: () => void;
   serialPorts: SerialPortInfo[];
   ftdiDevices: D2xxDeviceInfo[];
+  onRdmScan: (serial: string) => void;
+  rdmBusy: boolean;
 }) {
   const t = useT();
   const universes = universesToString(binding.universes);
@@ -194,6 +198,15 @@ function BindingRow({
               />
               {t("outputs.field.rtsHigh")}
             </label>
+            <button
+              type="button"
+              className="rdm-scan-btn"
+              disabled={!binding.serial || rdmBusy}
+              onClick={() => onRdmScan(binding.serial)}
+              title={t("outputs.rdm.hint")}
+            >
+              {rdmBusy ? t("outputs.rdm.scanning") : t("outputs.rdm.button")}
+            </button>
           </>
         ) : null}
         <label>
@@ -214,8 +227,17 @@ export function OutputsView() {
   const refreshSerialPorts = useShowStore((s) => s.refreshSerialPorts);
   const refreshFtdiDevices = useShowStore((s) => s.refreshFtdiDevices);
   const artnetScan = useShowStore((s) => s.artnetScan);
+  const rdmDiscover = useShowStore((s) => s.rdmDiscover);
 
   const [draft, setDraft] = useState<OutputsConfig | null>(null);
+  // RDM discovery over the FTDI line. One run at a time (it pauses the
+  // DMX output thread while walking the bus).
+  const [rdmBusy, setRdmBusy] = useState(false);
+  const [rdmDevices, setRdmDevices] = useState<
+    import("@bindings/RdmDeviceInfo").RdmDeviceInfo[] | null
+  >(null);
+  const [rdmError, setRdmError] = useState<string | null>(null);
+  const [rdmOpen, setRdmOpen] = useState(false);
   // Art-Net discovery panel. `null` = never scanned / closed;
   // an array (possibly empty) = results of the last completed scan.
   const [scanOpen, setScanOpen] = useState(false);
@@ -257,6 +279,19 @@ export function OutputsView() {
       setScanError(e instanceof Error ? e.message : JSON.stringify(e));
     } finally {
       setScanning(false);
+    }
+  };
+
+  const runRdm = async (serial: string) => {
+    setRdmOpen(true);
+    setRdmBusy(true);
+    setRdmError(null);
+    try {
+      setRdmDevices(await rdmDiscover(serial));
+    } catch (e) {
+      setRdmError(e instanceof Error ? e.message : JSON.stringify(e));
+    } finally {
+      setRdmBusy(false);
     }
   };
 
@@ -380,6 +415,49 @@ export function OutputsView() {
         </section>
       ) : null}
 
+      {rdmOpen ? (
+        <section className="artnet-scan-panel rdm-panel" data-doc="rdm-scan">
+          <div className="artnet-scan-head">
+            <h3>{t("outputs.rdm.title")}</h3>
+            <div className="actions">
+              <button type="button" className="ghost" onClick={() => setRdmOpen(false)}>
+                {t("outputs.artnetScan.close")}
+              </button>
+            </div>
+          </div>
+          {rdmError ? <output className="error">{rdmError}</output> : null}
+          {rdmBusy ? <p className="hint">{t("outputs.rdm.inProgress")}</p> : null}
+          {!rdmBusy && rdmDevices !== null && rdmDevices.length === 0 ? (
+            <p className="hint">{t("outputs.rdm.none")}</p>
+          ) : null}
+          {rdmDevices !== null && rdmDevices.length > 0 ? (
+            <ul className="artnet-node-list">
+              {rdmDevices.map((d) => (
+                <li key={d.uid} className="artnet-node">
+                  <div className="artnet-node-main">
+                    <span className="artnet-node-name">{d.label || d.model || d.uid}</span>
+                    <span className="artnet-node-ip">{d.uid}</span>
+                    {d.dmx_start_address > 0 ? (
+                      <span className="artnet-node-tag">
+                        {t("outputs.rdm.addr", { addr: String(d.dmx_start_address) })}
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="artnet-node-meta">
+                    {d.manufacturer ? <span>{d.manufacturer}</span> : null}
+                    {d.model && d.model !== d.label ? <span>{d.model}</span> : null}
+                    {d.footprint > 0 ? (
+                      <span>{t("outputs.rdm.footprint", { n: String(d.footprint) })}</span>
+                    ) : null}
+                    {d.software_version ? <span>sw {d.software_version}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="bindings">
         {config.bindings.length === 0 ? (
           <p className="empty">{t("outputs.empty")}</p>
@@ -390,6 +468,8 @@ export function OutputsView() {
               binding={b}
               serialPorts={serialPorts}
               ftdiDevices={ftdiDevices}
+              onRdmScan={runRdm}
+              rdmBusy={rdmBusy}
               onChange={(next) =>
                 update({ ...config, bindings: config.bindings.map((x, j) => (j === i ? next : x)) })
               }

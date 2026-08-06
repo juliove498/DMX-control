@@ -54,6 +54,9 @@ export type Translation = {
   "app.global.bpm.micApplyHint": string;
   "app.global.bpm.micAuto": string;
   "app.global.bpm.micAutoHint": string;
+  "app.global.bpm.micPhase": string;
+  "app.global.bpm.micPhaseHint": string;
+  "app.global.bpm.micPhaseVdj": string;
   "app.show.untitled": string;
   "app.show.unsaved": string;
   "app.show.renameHint": string;
@@ -315,6 +318,14 @@ export type Translation = {
   "outputs.artnetScan.universesOut": string;
   "outputs.artnetScan.add": string;
   "outputs.artnetScan.addHint": string;
+  "outputs.rdm.button": string;
+  "outputs.rdm.hint": string;
+  "outputs.rdm.scanning": string;
+  "outputs.rdm.title": string;
+  "outputs.rdm.inProgress": string;
+  "outputs.rdm.none": string;
+  "outputs.rdm.addr": string;
+  "outputs.rdm.footprint": string;
   "outputs.add.sacn": string;
   "outputs.add.enttec": string;
   "outputs.add.openDmx": string;
@@ -899,6 +910,10 @@ export const en: Translation = {
   "app.global.bpm.micAuto": "Auto",
   "app.global.bpm.micAutoHint":
     "Keep applying the detected tempo to the Overall BPM while confidence is high",
+  "app.global.bpm.micPhase": "Beat sync",
+  "app.global.bpm.micPhaseHint":
+    "Anchor chaser/movement steps to the detected beat phase — steps land ON the music",
+  "app.global.bpm.micPhaseVdj": "VirtualDJ owns the beat grid while its bridge is enabled",
   "app.show.untitled": "Untitled",
   "app.show.unsaved": "(unsaved) · click to rename",
   "app.show.renameHint": "{path} · click to rename",
@@ -1166,6 +1181,16 @@ export const en: Translation = {
   "outputs.artnetScan.add": "+ Output",
   "outputs.artnetScan.addHint":
     "Add an Art-Net output pre-filled with this node's IP and universes",
+  "outputs.rdm.button": "🔍 RDM",
+  "outputs.rdm.hint":
+    "Discover RDM fixtures on this DMX line (pauses output for a few seconds while scanning)",
+  "outputs.rdm.scanning": "Scanning…",
+  "outputs.rdm.title": "RDM devices on the DMX line",
+  "outputs.rdm.inProgress": "Walking the RDM discovery tree — output is paused for a few seconds…",
+  "outputs.rdm.none":
+    "No RDM responders. Check the fixtures support RDM — and note many Open DMX clones are transmit-only (no RS-485 receive path), which makes discovery impossible on that hardware.",
+  "outputs.rdm.addr": "DMX {addr}",
+  "outputs.rdm.footprint": "{n} ch",
   "outputs.add.sacn": "+ sACN",
   "outputs.add.enttec": "+ Enttec USB",
   "outputs.add.openDmx": "+ Open DMX (OS serial)",
@@ -1769,6 +1794,10 @@ export const es: Translation = {
   "app.global.bpm.micAuto": "Auto",
   "app.global.bpm.micAutoHint":
     "Sigue aplicando el tempo detectado al BPM global mientras la confianza sea alta",
+  "app.global.bpm.micPhase": "Sync al beat",
+  "app.global.bpm.micPhaseHint":
+    "Ancla los pasos de chasers/movements a la fase del beat detectado — los pasos caen CON la música",
+  "app.global.bpm.micPhaseVdj": "VirtualDJ es dueño del beat grid mientras su bridge esté activo",
   "app.show.untitled": "Sin título",
   "app.show.unsaved": "(sin guardar) · click para renombrar",
   "app.show.renameHint": "{path} · click para renombrar",
@@ -2039,6 +2068,17 @@ export const es: Translation = {
   "outputs.artnetScan.add": "+ Salida",
   "outputs.artnetScan.addHint":
     "Agrega una salida Art-Net pre-cargada con la IP y los universos de este nodo",
+  "outputs.rdm.button": "🔍 RDM",
+  "outputs.rdm.hint":
+    "Descubre fixtures RDM en esta línea DMX (pausa la salida unos segundos durante el escaneo)",
+  "outputs.rdm.scanning": "Buscando…",
+  "outputs.rdm.title": "Dispositivos RDM en la línea DMX",
+  "outputs.rdm.inProgress":
+    "Recorriendo el árbol de discovery RDM — la salida queda pausada unos segundos…",
+  "outputs.rdm.none":
+    "Ningún dispositivo RDM respondió. Verificá que los fixtures soporten RDM — y ojo: muchos clones Open DMX son solo-transmisión (sin recepción RS-485), y en ese hardware el discovery es imposible.",
+  "outputs.rdm.addr": "DMX {addr}",
+  "outputs.rdm.footprint": "{n} ch",
   "outputs.add.sacn": "+ sACN",
   "outputs.add.enttec": "+ Enttec USB",
   "outputs.add.openDmx": "+ Open DMX (OS serial)",

@@ -18,6 +18,9 @@
          ad-hoc signing without breaking Tauri's bundled WebView. -->
     <key>com.apple.security.cs.disable-library-validation</key>
     <true/>
+    <!-- Audio input for the mic-based BPM counter. -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
     <!-- Network client (in case sACN E1.31 over UDP is used). -->
     <key>com.apple.security.network.client</key>
     <true/>

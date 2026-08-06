@@ -2547,6 +2547,47 @@ pub fn active_scene_step(scenes_pb: State<'_, SharedScenePlayback>) -> Option<u3
 
 // ---- MIDI ----------------------------------------------------------------
 
+// ---- Audio BPM counter -----------------------------------------------------
+
+#[tauri::command]
+pub fn audio_bpm_devices() -> Vec<crate::audio_bpm::AudioInputInfo> {
+    crate::audio_bpm::list_input_devices()
+}
+
+#[tauri::command]
+pub fn audio_bpm_start(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    globals: State<'_, SharedGlobals>,
+    audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>,
+    device: Option<String>,
+) {
+    crate::audio_bpm::start(
+        app,
+        show.inner().clone(),
+        globals.inner().clone(),
+        audio_bpm.inner(),
+        device,
+    );
+}
+
+#[tauri::command]
+pub fn audio_bpm_stop(audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>) {
+    crate::audio_bpm::stop(audio_bpm.inner());
+}
+
+#[tauri::command]
+pub fn audio_bpm_status(
+    audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>,
+) -> crate::audio_bpm::AudioBpmStatus {
+    crate::audio_bpm::status(audio_bpm.inner())
+}
+
+#[tauri::command]
+pub fn audio_bpm_set_auto(audio_bpm: State<'_, crate::audio_bpm::SharedAudioBpm>, enabled: bool) {
+    crate::audio_bpm::set_auto_apply(audio_bpm.inner(), enabled);
+}
+
 /// Discover Art-Net nodes on the LAN via ArtPoll broadcast. Blocks for
 /// `timeout_ms` (default 2.5 s, clamped) collecting ArtPollReply
 /// packets — Tauri runs sync commands off the main thread, so the UI

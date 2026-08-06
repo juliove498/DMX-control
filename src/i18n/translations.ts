@@ -42,6 +42,18 @@ export type Translation = {
   "app.global.bpm.clearPattern": string;
   "app.global.bpm.clearPatternHint": string;
   "app.global.bpm.patternActive": string;
+  "app.global.bpm.micHint": string;
+  "app.global.bpm.micTitle": string;
+  "app.global.bpm.micDevice": string;
+  "app.global.bpm.micDefault": string;
+  "app.global.bpm.micStart": string;
+  "app.global.bpm.micStop": string;
+  "app.global.bpm.micWaiting": string;
+  "app.global.bpm.micConfidence": string;
+  "app.global.bpm.micApply": string;
+  "app.global.bpm.micApplyHint": string;
+  "app.global.bpm.micAuto": string;
+  "app.global.bpm.micAutoHint": string;
   "app.show.untitled": string;
   "app.show.unsaved": string;
   "app.show.renameHint": string;
@@ -873,6 +885,20 @@ export const en: Translation = {
   "app.global.bpm.clearPattern": "✕",
   "app.global.bpm.clearPatternHint": "Clear the active pattern; chasers go back to plain BPM.",
   "app.global.bpm.patternActive": "{count} hits / {bars} bar(s)",
+  "app.global.bpm.micHint":
+    "Audio BPM counter: detect the tempo from the mic or the selected input device",
+  "app.global.bpm.micTitle": "Audio BPM",
+  "app.global.bpm.micDevice": "Input",
+  "app.global.bpm.micDefault": "System default",
+  "app.global.bpm.micStart": "▶ Listen",
+  "app.global.bpm.micStop": "■ Stop",
+  "app.global.bpm.micWaiting": "listening…",
+  "app.global.bpm.micConfidence": "Detection confidence",
+  "app.global.bpm.micApply": "Apply to BPM",
+  "app.global.bpm.micApplyHint": "Set the Overall BPM to the detected tempo",
+  "app.global.bpm.micAuto": "Auto",
+  "app.global.bpm.micAutoHint":
+    "Keep applying the detected tempo to the Overall BPM while confidence is high",
   "app.show.untitled": "Untitled",
   "app.show.unsaved": "(unsaved) · click to rename",
   "app.show.renameHint": "{path} · click to rename",
@@ -1729,6 +1755,20 @@ export const es: Translation = {
   "app.global.bpm.clearPattern": "✕",
   "app.global.bpm.clearPatternHint": "Borrá el patrón activo; los chasers vuelven al BPM normal.",
   "app.global.bpm.patternActive": "{count} golpes / {bars} compás(es)",
+  "app.global.bpm.micHint":
+    "Contador de BPM por audio: detecta el tempo desde el mic o el dispositivo de entrada elegido",
+  "app.global.bpm.micTitle": "BPM por audio",
+  "app.global.bpm.micDevice": "Entrada",
+  "app.global.bpm.micDefault": "Default del sistema",
+  "app.global.bpm.micStart": "▶ Escuchar",
+  "app.global.bpm.micStop": "■ Parar",
+  "app.global.bpm.micWaiting": "escuchando…",
+  "app.global.bpm.micConfidence": "Confianza de la detección",
+  "app.global.bpm.micApply": "Aplicar al BPM",
+  "app.global.bpm.micApplyHint": "Setea el BPM global con el tempo detectado",
+  "app.global.bpm.micAuto": "Auto",
+  "app.global.bpm.micAutoHint":
+    "Sigue aplicando el tempo detectado al BPM global mientras la confianza sea alta",
   "app.show.untitled": "Sin título",
   "app.show.unsaved": "(sin guardar) · click para renombrar",
   "app.show.renameHint": "{path} · click para renombrar",

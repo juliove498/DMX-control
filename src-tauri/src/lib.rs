@@ -1,4 +1,5 @@
 pub mod ai;
+pub mod audio_bpm;
 pub mod bridge;
 pub mod chaser;
 pub mod commands;
@@ -229,6 +230,7 @@ pub fn run() {
     let loop_playback_handle = shared_loop_playback();
     let programmer_handle = shared_programmer();
     let snapshot_runtime_handle = shared_snapshot_runtime();
+    let audio_bpm_handle = crate::audio_bpm::shared_audio_bpm();
     let bridge_state = crate::bridge::BridgeState::new();
     let vdj_state = crate::vdj::VdjState::new();
 
@@ -255,6 +257,7 @@ pub fn run() {
         .manage(loop_playback_handle.clone())
         .manage(programmer_handle.clone())
         .manage(snapshot_runtime_handle.clone())
+        .manage(audio_bpm_handle.clone())
         .manage(bridge_state.clone())
         .manage(vdj_state.clone())
         .setup(move |app| {
@@ -629,6 +632,12 @@ pub fn run() {
             commands::tap_pattern_record,
             commands::stop_pattern_recording,
             commands::clear_tempo_pattern,
+            // Audio BPM counter (mic / line-in)
+            commands::audio_bpm_devices,
+            commands::audio_bpm_start,
+            commands::audio_bpm_stop,
+            commands::audio_bpm_status,
+            commands::audio_bpm_set_auto,
             // MIDI
             commands::list_midi_devices,
             commands::connect_midi_device,

@@ -2,6 +2,8 @@ import type { AiAvailableModels } from "@bindings/AiAvailableModels";
 import type { AiConfig } from "@bindings/AiConfig";
 import type { AmbientChaser } from "@bindings/AmbientChaser";
 import type { ArtNetNodeInfo } from "@bindings/ArtNetNodeInfo";
+import type { AudioBpmStatus } from "@bindings/AudioBpmStatus";
+import type { AudioInputInfo } from "@bindings/AudioInputInfo";
 import type { ButtonBindings } from "@bindings/ButtonBindings";
 import type { D2xxDeviceInfo } from "@bindings/D2xxDeviceInfo";
 import type { DraftScene } from "@bindings/DraftScene";
@@ -148,6 +150,13 @@ interface ShowStoreState {
   stopPatternRecording: () => Promise<import("@bindings/TempoPattern").TempoPattern | null>;
   /// Drop the active pattern; chasers go back to plain overall_bpm.
   clearTempoPattern: () => Promise<void>;
+
+  // Audio BPM counter (mic / line-in)
+  audioBpmDevices: () => Promise<AudioInputInfo[]>;
+  audioBpmStart: (device?: string | null) => Promise<void>;
+  audioBpmStop: () => Promise<void>;
+  audioBpmStatus: () => Promise<AudioBpmStatus>;
+  audioBpmSetAuto: (enabled: boolean) => Promise<void>;
 
   listMidiDevices: () => Promise<{ name: string; has_input: boolean; has_output: boolean }[]>;
   connectMidiDevice: (name: string) => Promise<void>;
@@ -579,6 +588,23 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   async clearTempoPattern() {
     await invoke("clear_tempo_pattern");
     await get().refresh();
+  },
+
+  // ---- Audio BPM counter ----
+  async audioBpmDevices() {
+    return invoke<AudioInputInfo[]>("audio_bpm_devices");
+  },
+  async audioBpmStart(device) {
+    await invoke("audio_bpm_start", { device: device ?? null });
+  },
+  async audioBpmStop() {
+    await invoke("audio_bpm_stop");
+  },
+  async audioBpmStatus() {
+    return invoke<AudioBpmStatus>("audio_bpm_status");
+  },
+  async audioBpmSetAuto(enabled) {
+    await invoke("audio_bpm_set_auto", { enabled });
   },
 
   async listMidiDevices() {

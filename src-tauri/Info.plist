@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Audio BPM counter: the app listens to the selected input device
+         to detect the music's tempo. Merged into the bundle's Info.plist
+         by Tauri; without it macOS kills the process on first mic use. -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>DMX Control usa el micrófono (o la entrada de audio elegida) para detectar el BPM de la música en vivo.</string>
+</dict>
+</plist>

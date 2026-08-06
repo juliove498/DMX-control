@@ -265,7 +265,7 @@ def convert(pff_path, out_path=None):
             a, b = int(lines[k].strip()), int(lines[k + 1].strip())
         except ValueError:
             continue
-        if 180 <= a <= 720 and 90 <= b <= 360 and a > b:
+        if 360 <= a <= 720 and 180 <= b <= 360 and a > b:
             pan_deg, tilt_deg = float(a), float(b)
 
     # ---- build ranges ----

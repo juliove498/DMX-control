@@ -101,9 +101,34 @@ fn init_tracing() {
         .with(env_filter)
         .with(stdout_layer);
 
-    if can_write_log {
-        let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_dir, "dmx-control.log");
-        let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
+    // The probe above catches directory-level problems, but the fatal
+    // case it CANNOT see is today's log file itself being owned by root
+    // (left behind by a `sudo tauri dev` run) while the directory stays
+    // writable — `RollingFileAppender::new` would panic opening it and,
+    // under `panic = "abort"`, kill the app 40 ms into launch. The
+    // builder returns a Result instead, so that scenario degrades to
+    // stderr-only logging.
+    let file_appender = if can_write_log {
+        RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix("dmx-control.log")
+            .build(&log_dir)
+            .map_err(|e| {
+                eprintln!(
+                    "[dmx-control] rolling log init failed ({e}); falling back to stderr-only — \
+                     check ownership of the files in {log_dir:?}"
+                );
+            })
+            .ok()
+    } else {
+        eprintln!(
+            "[dmx-control] log dir {log_dir:?} not writable (check ownership); falling back to stderr-only"
+        );
+        None
+    };
+
+    if let Some(appender) = file_appender {
+        let (file_writer, guard) = tracing_appender::non_blocking(appender);
         Box::leak(Box::new(guard));
         let file_layer = fmt::layer()
             .with_writer(file_writer)
@@ -113,13 +138,9 @@ fn init_tracing() {
         tracing::info!(log_dir = ?log_dir, "tracing initialized (file + stderr)");
     } else {
         registry.init();
-        eprintln!(
-            "[dmx-control] log dir {:?} not writable (check ownership); falling back to stderr-only",
-            log_dir
-        );
         tracing::warn!(
             log_dir = ?log_dir,
-            "log dir not writable; tracing to stderr only — check ownership/permissions of the directory"
+            "file logging unavailable; tracing to stderr only — check ownership/permissions in the log directory"
         );
     }
 }

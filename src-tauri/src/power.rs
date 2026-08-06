@@ -61,6 +61,7 @@ mod imp {
 
 #[cfg(not(target_os = "macos"))]
 mod imp {
+    #[derive(Default)]
     pub struct SleepInhibitor;
     impl SleepInhibitor {
         pub fn new() -> Self {

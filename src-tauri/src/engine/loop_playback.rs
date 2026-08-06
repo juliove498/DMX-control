@@ -123,6 +123,7 @@ pub const SNAPSHOT_DEFAULT_DWELL_MS: u32 = 2000;
 ///    on): one `subdivision` worth of quarter-note beats at `bpm`.
 /// 2. The group's per-entry override.
 /// 3. The entry's natural duration (`None` for snapshots → 2 s default).
+///
 /// Hard floor of 200 ms keeps a misconfigured group from busy-looping.
 pub fn dwell_ms_for_entry(
     group: &SceneLoopGroup,

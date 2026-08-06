@@ -389,9 +389,9 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
             active_mode: ButtonActiveMode::Auto,
         });
     }
-    for i in 0..8 {
+    for (i, &note) in DEFAULT_LP_SNAPSHOT_NOTES.iter().enumerate() {
         out.push(LaunchpadBinding {
-            note: DEFAULT_LP_SNAPSHOT_NOTES[i],
+            note,
             is_cc: false,
             action: ButtonAction::ToggleSnapshotByIndex { index: i as u8 },
             label: format!("Snapshot {}", i + 1),

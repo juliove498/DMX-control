@@ -424,7 +424,7 @@ pub fn estimate_phase(env: &[f32], env_rate: f32, bpm: f32) -> Option<f32> {
     }
     // Use up to 8 beats of history — enough votes to ignore one weak
     // bar, recent enough to track a live drummer drifting.
-    let beats = ((n / period_i).min(8)).max(2);
+    let beats = (n / period_i).clamp(2, 8);
     let mut best_delta = 0usize;
     let mut best_score = f32::MIN;
     let mut scores = vec![0.0f32; period_i];

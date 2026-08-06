@@ -681,9 +681,11 @@ mod tests {
 
     #[test]
     fn halve_rule_skips_below_threshold() {
-        let mut cfg = VdjConfig::default();
-        cfg.halve_above_enabled = true;
-        cfg.halve_above_threshold = 95.0;
+        let cfg = VdjConfig {
+            halve_above_enabled: true,
+            halve_above_threshold: 95.0,
+            ..VdjConfig::default()
+        };
         let (b, beat) = apply_halve_rule(&cfg, 80.0, Some(12.0));
         assert_eq!(b, 80.0);
         assert_eq!(beat, Some(12.0));
@@ -691,9 +693,11 @@ mod tests {
 
     #[test]
     fn halve_rule_applies_above_threshold() {
-        let mut cfg = VdjConfig::default();
-        cfg.halve_above_enabled = true;
-        cfg.halve_above_threshold = 95.0;
+        let cfg = VdjConfig {
+            halve_above_enabled: true,
+            halve_above_threshold: 95.0,
+            ..VdjConfig::default()
+        };
         let (b, beat) = apply_halve_rule(&cfg, 140.0, Some(50.0));
         assert_eq!(b, 70.0, "BPM halved");
         assert_eq!(
@@ -708,9 +712,11 @@ mod tests {
         // BPM == threshold should NOT halve. Otherwise toggling the
         // threshold to "match the song's BPM exactly" would surprise
         // the operator with a half-rate they didn't ask for.
-        let mut cfg = VdjConfig::default();
-        cfg.halve_above_enabled = true;
-        cfg.halve_above_threshold = 100.0;
+        let cfg = VdjConfig {
+            halve_above_enabled: true,
+            halve_above_threshold: 100.0,
+            ..VdjConfig::default()
+        };
         let (b, _) = apply_halve_rule(&cfg, 100.0, None);
         assert_eq!(b, 100.0);
         let (b, _) = apply_halve_rule(&cfg, 100.01, None);
@@ -719,9 +725,11 @@ mod tests {
 
     #[test]
     fn halve_rule_off_passes_through() {
-        let mut cfg = VdjConfig::default();
-        cfg.halve_above_enabled = false;
-        cfg.halve_above_threshold = 95.0;
+        let cfg = VdjConfig {
+            halve_above_enabled: false,
+            halve_above_threshold: 95.0,
+            ..VdjConfig::default()
+        };
         let (b, beat) = apply_halve_rule(&cfg, 140.0, Some(50.0));
         assert_eq!(b, 140.0);
         assert_eq!(beat, Some(50.0));

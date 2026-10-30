@@ -2034,29 +2034,41 @@ export function StageView() {
     return m;
   }, [library, libraryDir]);
 
-  // Group fixtures by definition for the left sidebar. Definition order
-  // follows first-appearance in `show.fixtures` so the layout is stable as the
-  // user adds units.
-  const groups = useMemo(() => {
-    const order: string[] = [];
-    const map = new Map<string, FixtureInstance[]>();
+  // Left sidebar: fixtures grouped by universe (two rigs in the booth =
+  // two universes, each selectable in one click), then by definition.
+  // Definition order follows first appearance in `show.fixtures` so the
+  // layout is stable as the user adds units.
+  const universeGroups = useMemo(() => {
+    const byUniverse = new Map<number, { order: string[]; map: Map<string, FixtureInstance[]> }>();
     for (const f of visibleFixtures) {
-      let arr = map.get(f.definition_id);
+      let u = byUniverse.get(f.universe);
+      if (!u) {
+        u = { order: [], map: new Map() };
+        byUniverse.set(f.universe, u);
+      }
+      let arr = u.map.get(f.definition_id);
       if (!arr) {
         arr = [];
-        map.set(f.definition_id, arr);
-        order.push(f.definition_id);
+        u.map.set(f.definition_id, arr);
+        u.order.push(f.definition_id);
       }
       arr.push(f);
     }
-    return order
-      .map((id) => ({
-        defId: id,
-        def: libraryById[id],
-        fixtures: map.get(id) ?? [],
-      }))
-      .filter((g) => g.def);
+    return [...byUniverse.keys()]
+      .sort((a, b) => a - b)
+      .map((universe) => {
+        const u = byUniverse.get(universe);
+        const groups = (u?.order ?? [])
+          .map((id) => ({
+            defId: id,
+            def: libraryById[id],
+            fixtures: u?.map.get(id) ?? [],
+          }))
+          .filter((g) => g.def);
+        return { universe, fixtures: groups.flatMap((g) => g.fixtures), groups };
+      });
   }, [visibleFixtures, libraryById]);
+  const groups = useMemo(() => universeGroups.flatMap((u) => u.groups), [universeGroups]);
 
   const selectedFixtures = useMemo(() => {
     if (!show) return [];
@@ -2544,19 +2556,35 @@ export function StageView() {
           {groups.length === 0 ? (
             <p className="empty">{t("stage.empty")}</p>
           ) : (
-            groups.map(({ defId, def, fixtures }) => {
-              const allSelected =
-                fixtures.length > 0 && fixtures.every((f) => selectedIds.has(f.id));
-              if (!def) return null;
+            universeGroups.map(({ universe, fixtures: uFixtures, groups: uGroups }) => {
+              const uAll = uFixtures.length > 0 && uFixtures.every((f) => selectedIds.has(f.id));
               return (
-                <TypeCard
-                  key={defId}
-                  def={def}
-                  count={fixtures.length}
-                  imageUrl={imageUrlByDef[defId] ?? null}
-                  active={allSelected}
-                  onSelect={(e) => onTypeClick(fixtures, e)}
-                />
+                <div key={universe} className="stage-universe" data-doc-universe={universe}>
+                  <button
+                    type="button"
+                    className={`stage-universe-head${uAll ? " active" : ""}`}
+                    onClick={(e) => onTypeClick(uFixtures, e)}
+                    title={t("stage.universeHint", { n: universe })}
+                  >
+                    <span>{t("stage.universe", { n: universe })}</span>
+                    <span className="stage-universe-count">{uFixtures.length}</span>
+                  </button>
+                  {uGroups.map(({ defId, def, fixtures }) => {
+                    const allSelected =
+                      fixtures.length > 0 && fixtures.every((f) => selectedIds.has(f.id));
+                    if (!def) return null;
+                    return (
+                      <TypeCard
+                        key={defId}
+                        def={def}
+                        count={fixtures.length}
+                        imageUrl={imageUrlByDef[defId] ?? null}
+                        active={allSelected}
+                        onSelect={(e) => onTypeClick(fixtures, e)}
+                      />
+                    );
+                  })}
+                </div>
               );
             })
           )}

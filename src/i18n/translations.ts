@@ -1162,6 +1162,8 @@ export type Translation = {
   "stage.test.count": string;
   "stage.test.remaining": string;
   "stage.empty": string;
+  "stage.universe": string;
+  "stage.universeHint": string;
   "stage.sidebar.placeholder": string;
   "stage.fixture.untouchAria": string;
   "stage.fixture.untouchTitle": string;
@@ -2543,6 +2545,8 @@ export const en: Translation = {
   "stage.test.count": "{n} fixtures",
   "stage.test.remaining": "auto-off in {m} min",
   "stage.empty": "No fixtures.",
+  "stage.universe": "Universe {n}",
+  "stage.universeHint": "Select every fixture on universe {n} (⌘/Ctrl-click adds or removes)",
   "stage.sidebar.placeholder":
     "Select a fixture or a type to open its encoders. ⌘/Ctrl-click adds or removes from the selection.",
   "stage.fixture.untouchAria": "Remove from touched ({count} channels)",
@@ -3938,6 +3942,8 @@ export const es: Translation = {
   "stage.test.count": "{n} fixtures",
   "stage.test.remaining": "se apaga solo en {m} min",
   "stage.empty": "Sin fixtures.",
+  "stage.universe": "Universo {n}",
+  "stage.universeHint": "Seleccionar todas las luces del universo {n} (⌘/Ctrl-click suma o quita)",
   "stage.sidebar.placeholder":
     "Seleccioná un fixture o un tipo para abrir sus encoders. ⌘/Ctrl-click suma o quita de la selección.",
   "stage.fixture.untouchAria": "Quitar de touched ({count} canales)",

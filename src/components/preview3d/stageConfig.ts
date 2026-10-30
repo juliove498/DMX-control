@@ -193,12 +193,14 @@ export function defaultStageConfig(): StageConfig {
       depth: 8,
       cellSize: 1,
       gridColor: "#3a4a5a",
-      color: "#0c1218",
+      // Mid-dark grey with some albedo: a black floor swallows every
+      // wash and the rig reads as "nothing is on".
+      color: "#2a2f37",
     },
     backWall: {
       enabled: true,
       height: 5,
-      color: "#0a0d12",
+      color: "#1e232b",
     },
     trusses: [
       // Front truss across stage width at FOH height — typical small
@@ -225,8 +227,8 @@ export function defaultStageConfig(): StageConfig {
       },
     ],
     rigHeight: 5,
-    atmosphere: 0.5,
-    ambientLevel: 0.1,
+    atmosphere: 0.55,
+    ambientLevel: 0.22,
     pixelsPerMeter: 100,
     fixturePlacements: {},
     definitionOverrides: {},
@@ -277,5 +279,38 @@ export function saveStageConfig(showPath: string | null, cfg: StageConfig) {
     localStorage.setItem(key, JSON.stringify(cfg));
   } catch {
     // localStorage unavailable — config still works in-session.
+  }
+}
+
+/// Room looks the operator can jump between: colours + haze + house
+/// light in one click, instead of hunting five sliders.
+export type StagePreset = "club" | "theatre" | "rehearsal";
+
+export function applyStagePreset(cfg: StageConfig, preset: StagePreset): StageConfig {
+  switch (preset) {
+    case "club":
+      return {
+        ...cfg,
+        floor: { ...cfg.floor, color: "#23272e" },
+        backWall: { ...cfg.backWall, color: "#161a20" },
+        atmosphere: 0.65,
+        ambientLevel: 0.14,
+      };
+    case "theatre":
+      return {
+        ...cfg,
+        floor: { ...cfg.floor, color: "#2f2a26" },
+        backWall: { ...cfg.backWall, color: "#26221f" },
+        atmosphere: 0.4,
+        ambientLevel: 0.2,
+      };
+    case "rehearsal":
+      return {
+        ...cfg,
+        floor: { ...cfg.floor, color: "#4a4f57" },
+        backWall: { ...cfg.backWall, color: "#3a3f47" },
+        atmosphere: 0.2,
+        ambientLevel: 0.55,
+      };
   }
 }

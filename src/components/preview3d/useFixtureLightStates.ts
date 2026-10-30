@@ -31,8 +31,8 @@ export interface FixtureLightState {
   intensity: number;
   pan: number;
   tilt: number;
-  /// 0..1 mapping to beam half-angle. Spots: 4° → 12° (narrow → mid).
-  /// Washes: 25° → 55° (always wide).
+  /// 0..1 mapping to beam half-angle. Spots: 2° → 8° (narrow → mid).
+  /// Washes: 12° → 30° (LED par / wash head).
   zoom: number;
   strobe: number;
   /// Raw prism channel value 0..255. The renderer combines this
@@ -475,8 +475,12 @@ function decodeFixture(
     tiltRaw = readWord(snap, fixture.address, layout.tilt, layout.tiltFine);
     tiltMaxRaw = layout.tiltFine !== null ? 0xffff : 0xff00;
   }
-  const panNorm = panMaxRaw > 0 ? panRaw / panMaxRaw : 0;
-  const tiltNorm = tiltMaxRaw > 0 ? tiltRaw / tiltMaxRaw : 0;
+  // No pan/tilt channel (PARs, blinders, static washes) → the fixture
+  // hangs at its mechanical centre: straight down, then the operator's
+  // aim (yaw/pitch) takes over. Defaulting the raw value to 0 used to
+  // resolve to tilt = -135°, i.e. every PAR pointed at the ceiling.
+  const panNorm = layout.pan !== null && panMaxRaw > 0 ? panRaw / panMaxRaw : 0.5;
+  const tiltNorm = layout.tilt !== null && tiltMaxRaw > 0 ? tiltRaw / tiltMaxRaw : 0.5;
   const pan = ((panNorm - 0.5) * layout.panDegrees * Math.PI) / 180;
   const tilt = ((tiltNorm - 0.5) * layout.tiltDegrees * Math.PI) / 180;
 
@@ -518,7 +522,11 @@ export function useFixtureLightStates(
 
   useEffect(() => {
     if (fixtures.length === 0) {
-      setStates({});
+      // Functional update that keeps the same object when already
+      // empty: a fresh `{}` here re-rendered the caller, whose `?? []`
+      // fallback handed us a new array, which re-ran this effect —
+      // an infinite passive-update loop while no show is loaded.
+      setStates((s) => (Object.keys(s).length === 0 ? s : {}));
       return;
     }
     const libById: Record<string, FixtureDefinition> = {};

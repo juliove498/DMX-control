@@ -127,14 +127,18 @@ pub fn instantiate(config: &OutputsConfig) -> Vec<OutputBinding> {
     let mut out = Vec::with_capacity(config.bindings.len());
     for cfg in &config.bindings {
         match cfg {
-            OutputBindingConfig::Mock { universes, .. } => {
+            OutputBindingConfig::Mock { id, universes, .. } => {
                 out.push(OutputBinding {
+                    id: id.clone(),
                     driver: Box::new(MockDriver),
                     universes: universes.clone(),
                 });
             }
             OutputBindingConfig::ArtNet {
-                target, universes, ..
+                id,
+                target,
+                universes,
+                ..
             } => {
                 let addr = if target.contains(':') {
                     target.clone()
@@ -144,49 +148,66 @@ pub fn instantiate(config: &OutputsConfig) -> Vec<OutputBinding> {
                 match addr.parse() {
                     Ok(parsed) => match ArtNetDriver::new(parsed) {
                         Ok(d) => out.push(OutputBinding {
+                            id: id.clone(),
                             driver: Box::new(d) as Box<dyn OutputDriver>,
                             universes: universes.clone(),
                         }),
                         Err(e) => {
                             tracing::warn!(target = %target, error = %e, "art-net bind failed");
+                            super::health::note_open_failure(id, &e.to_string());
                         }
                     },
                     Err(e) => {
                         tracing::warn!(target = %target, error = %e, "art-net target parse failed");
+                        super::health::note_open_failure(id, &format!("destino inválido: {e}"));
                     }
                 }
             }
             OutputBindingConfig::Sacn {
+                id,
                 source_name,
                 priority,
                 universes,
                 ..
             } => match SacnDriver::new(cid, source_name, *priority) {
                 Ok(d) => out.push(OutputBinding {
+                    id: id.clone(),
                     driver: Box::new(d) as Box<dyn OutputDriver>,
                     universes: universes.clone(),
                 }),
-                Err(e) => tracing::warn!(error = %e, "sacn driver init failed"),
+                Err(e) => {
+                    tracing::warn!(error = %e, "sacn driver init failed");
+                    super::health::note_open_failure(id, &e.to_string());
+                }
             },
             OutputBindingConfig::EnttecUsb {
-                port, universes, ..
+                id,
+                port,
+                universes,
+                ..
             } => {
                 let d = EnttecDriver::new(port.clone());
                 out.push(OutputBinding {
+                    id: id.clone(),
                     driver: Box::new(d) as Box<dyn OutputDriver>,
                     universes: universes.clone(),
                 });
             }
             OutputBindingConfig::OpenDmx {
-                port, universes, ..
+                id,
+                port,
+                universes,
+                ..
             } => {
                 let d = OpenDmxDriver::new(port.clone());
                 out.push(OutputBinding {
+                    id: id.clone(),
                     driver: Box::new(d) as Box<dyn OutputDriver>,
                     universes: universes.clone(),
                 });
             }
             OutputBindingConfig::OpenDmxFtdi {
+                id,
                 serial,
                 universes,
                 dtr_high,
@@ -195,6 +216,7 @@ pub fn instantiate(config: &OutputsConfig) -> Vec<OutputBinding> {
             } => {
                 let d = D2xxOpenDmxDriver::new(serial.clone(), *dtr_high, *rts_high);
                 out.push(OutputBinding {
+                    id: id.clone(),
                     driver: Box::new(d) as Box<dyn OutputDriver>,
                     universes: universes.clone(),
                 });

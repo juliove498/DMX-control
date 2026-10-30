@@ -2,11 +2,14 @@ import type { ButtonAction } from "@bindings/ButtonAction";
 import type { ButtonActiveMode } from "@bindings/ButtonActiveMode";
 import type { ButtonBindings } from "@bindings/ButtonBindings";
 import type { ButtonIcon } from "@bindings/ButtonIcon";
+import type { ButtonMode } from "@bindings/ButtonMode";
 import type { GenericMidiBinding } from "@bindings/GenericMidiBinding";
 import type { LaunchpadBinding } from "@bindings/LaunchpadBinding";
 import type { StreamDeckBinding } from "@bindings/StreamDeckBinding";
+import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useState } from "react";
+import { newId } from "../lib/compat";
 import { useShowStore } from "../stores/show";
 
 // Launchpad MK2 grid layout. The hardware addresses pads with two-digit
@@ -120,7 +123,22 @@ type ActionKind =
   | "tap"
   | "toggle_overall_bpm"
   | "bump_bpm"
-  | "stop_loop_group";
+  | "stop_loop_group"
+  | "toggle_autopilot"
+  | "energy_low"
+  | "energy_mid"
+  | "energy_high"
+  | "magic_next"
+  | "magic_back"
+  | "magic_hold"
+  | "magic_burst"
+  | "magic_drop"
+  | "magic_movement"
+  | "magic_palette_auto"
+  | "magic_palette_warm"
+  | "magic_palette_cold"
+  | "magic_palette_rainbow"
+  | "magic_palette_mono";
 
 const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   none: "Sin acción",
@@ -132,6 +150,21 @@ const ACTION_KIND_LABELS: Record<ActionKind, string> = {
   blackout: "Blackout",
   blind: "Blind (momentáneo)",
   tap: "TAP tempo",
+  toggle_autopilot: "Modo Mágico (autopiloto)",
+  energy_low: "Mágico: energía tranqui (25%)",
+  energy_mid: "Mágico: energía groove (55%)",
+  energy_high: "Mágico: energía fiesta (85%)",
+  magic_next: "Mágico: siguiente look",
+  magic_back: "Mágico: look anterior",
+  magic_hold: "Mágico: mantener look (toggle, o mientras apretás en Flash)",
+  magic_burst: "Mágico: ráfaga de strobo al beat (1 compás, o mientras apretás en Flash)",
+  magic_drop: "Mágico: drop de un beat (en el próximo beat)",
+  magic_movement: "Mágico: cabezales on/off",
+  magic_palette_auto: "Mágico: paleta auto",
+  magic_palette_warm: "Mágico: paleta cálida",
+  magic_palette_cold: "Mágico: paleta fría",
+  magic_palette_rainbow: "Mágico: paleta arcoíris",
+  magic_palette_mono: "Mágico: paleta mono",
   toggle_overall_bpm: "Toggle BPM global",
   bump_bpm: "Subir/bajar BPM del chaser activo",
   stop_loop_group: "Detener lista loop",
@@ -168,6 +201,22 @@ function actionToKind(a: ButtonAction): ActionKind {
       return "bump_bpm";
     case "stop_loop_group":
       return "stop_loop_group";
+    case "toggle_autopilot":
+      return "toggle_autopilot";
+    case "autopilot_energy":
+      return a.level <= 0.4 ? "energy_low" : a.level <= 0.7 ? "energy_mid" : "energy_high";
+    case "autopilot_nudge":
+      return a.kind === "next" ? "magic_next" : "magic_back";
+    case "autopilot_hold":
+      return "magic_hold";
+    case "autopilot_burst":
+      return "magic_burst";
+    case "autopilot_drop":
+      return "magic_drop";
+    case "autopilot_movement":
+      return "magic_movement";
+    case "autopilot_palette":
+      return `magic_palette_${a.style}` as ActionKind;
   }
 }
 
@@ -237,6 +286,36 @@ function buildAction(
       return { type: "bump_active_chaser_bpm", delta };
     case "stop_loop_group":
       return { type: "stop_loop_group" };
+    case "toggle_autopilot":
+      return { type: "toggle_autopilot" };
+    case "energy_low":
+      return { type: "autopilot_energy", level: 0.25 };
+    case "energy_mid":
+      return { type: "autopilot_energy", level: 0.55 };
+    case "energy_high":
+      return { type: "autopilot_energy", level: 0.85 };
+    case "magic_next":
+      return { type: "autopilot_nudge", kind: "next" };
+    case "magic_back":
+      return { type: "autopilot_nudge", kind: "back" };
+    case "magic_hold":
+      return { type: "autopilot_hold" };
+    case "magic_burst":
+      return { type: "autopilot_burst" };
+    case "magic_drop":
+      return { type: "autopilot_drop" };
+    case "magic_movement":
+      return { type: "autopilot_movement" };
+    case "magic_palette_auto":
+      return { type: "autopilot_palette", style: "auto" };
+    case "magic_palette_warm":
+      return { type: "autopilot_palette", style: "warm" };
+    case "magic_palette_cold":
+      return { type: "autopilot_palette", style: "cold" };
+    case "magic_palette_rainbow":
+      return { type: "autopilot_palette", style: "rainbow" };
+    case "magic_palette_mono":
+      return { type: "autopilot_palette", style: "mono" };
   }
 }
 
@@ -287,6 +366,22 @@ function summariseAction(
       return `BPM ${a.delta >= 0 ? "+" : ""}${a.delta}`;
     case "stop_loop_group":
       return "Detener loop";
+    case "toggle_autopilot":
+      return "Modo Mágico";
+    case "autopilot_energy":
+      return `Mágico ${Math.round(a.level * 100)}%`;
+    case "autopilot_nudge":
+      return a.kind === "next" ? "Mágico: siguiente" : "Mágico: anterior";
+    case "autopilot_hold":
+      return "Mágico: mantener";
+    case "autopilot_burst":
+      return "Mágico: strobo";
+    case "autopilot_drop":
+      return "Mágico: drop";
+    case "autopilot_movement":
+      return "Mágico: cabezales";
+    case "autopilot_palette":
+      return `Mágico: paleta ${a.style}`;
   }
 }
 
@@ -354,6 +449,19 @@ export function ButtonBindingsView() {
     setBindings(next);
     try {
       await updateButtonBindings(next);
+    } catch (e) {
+      setError(stringifyError(e));
+    }
+  };
+
+  // Put the Modo Mágico strip on the Launchpad's rows 7 and 8, keeping
+  // everything else the operator has wired up.
+  const addMagicRows = async () => {
+    try {
+      const rows = await invoke<LaunchpadBinding[]>("magic_launchpad_rows");
+      const notes = new Set(rows.map((r) => r.note));
+      const kept = bindings.launchpad.filter((b) => b.is_cc || !notes.has(b.note));
+      await commit({ ...bindings, custom_enabled: true, launchpad: [...kept, ...rows] });
     } catch (e) {
       setError(stringifyError(e));
     }
@@ -431,6 +539,13 @@ export function ButtonBindingsView() {
           </label>
           <button type="button" onClick={loadDefaults}>
             Cargar layout de fábrica
+          </button>
+          <button
+            type="button"
+            onClick={addMagicRows}
+            title="Pone los controles del Modo Mágico en las filas 7 y 8 del Launchpad. Reemplaza solo lo que haya en esos pads."
+          >
+            Tira Mágica (filas 7 y 8)
           </button>
         </div>
       </header>
@@ -564,7 +679,7 @@ function GenericMidiEditor({
           onChange([
             ...bindings,
             {
-              id: crypto.randomUUID(),
+              id: newId(),
               label: "",
               is_cc: got.is_cc,
               channel: got.channel,
@@ -927,6 +1042,7 @@ function LpBindingModal({
     color_dim: 1,
     color_bright: 3,
     active_mode: "auto",
+    mode: "toggle",
   };
   const [draft, setDraft] = useState(seed);
   return (
@@ -1001,6 +1117,10 @@ function LpBindingModal({
           mode={draft.active_mode}
           onChange={(active_mode) => setDraft({ ...draft, active_mode })}
         />
+        <ButtonModeEditor
+          mode={draft.mode ?? "toggle"}
+          onChange={(mode) => setDraft({ ...draft, mode })}
+        />
         <div className="bindings-modal-actions">
           {binding ? (
             <button type="button" className="danger" onClick={onRemove}>
@@ -1043,6 +1163,7 @@ function SdBindingModal({
     color_on: [200, 200, 200],
     icon: "play",
     active_mode: "auto",
+    mode: "toggle",
   };
   const [draft, setDraft] = useState(seed);
   return (
@@ -1102,6 +1223,10 @@ function SdBindingModal({
         <ActiveModeEditor
           mode={draft.active_mode}
           onChange={(active_mode) => setDraft({ ...draft, active_mode })}
+        />
+        <ButtonModeEditor
+          mode={draft.mode ?? "toggle"}
+          onChange={(mode) => setDraft({ ...draft, mode })}
         />
         <div className="bindings-modal-actions">
           {binding ? (
@@ -1293,6 +1418,28 @@ function ActionEditor({
         </label>
       ) : null}
     </div>
+  );
+}
+
+/// grandMA-style executor behaviour per button: Toggle fires on press,
+/// Flash holds the action while pressed and restores on release, Swop does
+/// the same and darkens every fixture the action does not drive meanwhile.
+function ButtonModeEditor({
+  mode,
+  onChange,
+}: {
+  mode: ButtonMode;
+  onChange: (m: ButtonMode) => void;
+}) {
+  return (
+    <label>
+      Modo del botón
+      <select value={mode} onChange={(e) => onChange(e.currentTarget.value as ButtonMode)}>
+        <option value="toggle">Toggle (apretar alterna)</option>
+        <option value="flash">Flash (mientras lo tenés apretado, después vuelve)</option>
+        <option value="swop">Swop (como Flash y apaga todo lo demás)</option>
+      </select>
+    </label>
   );
 }
 

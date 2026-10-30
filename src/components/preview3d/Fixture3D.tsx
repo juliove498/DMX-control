@@ -1,6 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import type { RenderQuality } from "./quality";
 import type { FixtureKind, FixtureLightState } from "./useFixtureLightStates";
 
 /// Per-fixture-definition render overrides delivered from the
@@ -320,12 +321,15 @@ function buildDiscMaterial(radius: number, falloffK: number): THREE.ShaderMateri
 /// slices. 24 discs over a typical beam length (~22m) gives ~1m
 /// spacing which reads as a continuous extrusion when the camera
 /// isn't perpendicular to the beam.
-const BEAM_DISC_COUNT = 24;
-
-function buildBeamDiscs(beamLength: number, maxRadius: number, falloffK: number): BeamDisc[] {
+function buildBeamDiscs(
+  beamLength: number,
+  maxRadius: number,
+  falloffK: number,
+  count: number,
+): BeamDisc[] {
   const arr: BeamDisc[] = [];
-  for (let i = 0; i < BEAM_DISC_COUNT; i++) {
-    const t = (i + 0.5) / BEAM_DISC_COUNT;
+  for (let i = 0; i < count; i++) {
+    const t = (i + 0.5) / count;
     const radius = Math.max(t * maxRadius, 1e-4);
     const axial = smoothstepEase(0, 0.05, t) * (1 - smoothstepEase(0.55, 1, t));
     arr.push({
@@ -359,12 +363,15 @@ function smoothstepEase(edge0: number, edge1: number, x: number): number {
 /// could see an 8-ray cross artefact on any wall the beam hits;
 /// 8 planes wash that into a near-circular footprint while the
 /// per-plane opacity is reduced to keep total brightness flat.
-const BEAM_PLANE_COUNT = 8;
-
-function buildBeamPlanes(beamLength: number, maxRadius: number, falloffK: number): BeamPlane[] {
+function buildBeamPlanes(
+  beamLength: number,
+  maxRadius: number,
+  falloffK: number,
+  count: number,
+): BeamPlane[] {
   const planes: BeamPlane[] = [];
-  for (let i = 0; i < BEAM_PLANE_COUNT; i++) {
-    const angle = (i / BEAM_PLANE_COUNT) * Math.PI; // 0..π, the other half is the same plane
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI; // 0..π, the other half is the same plane
     planes.push({
       angle,
       mat: buildBeamPlaneMaterial(beamLength, maxRadius, angle, falloffK),
@@ -465,6 +472,38 @@ function getProceduralGoboTexture(label: string): THREE.Texture {
 /// `clippingPlanes`. Without that, the additive cone meshes
 /// visibly cross the floor — bad enough that the user noticed it
 /// the first second they opened the preview.
+/// Soft radial gradient for the light pool a beam paints on the floor or
+/// the back wall. One shared texture; per-fixture colour/opacity live on
+/// the material.
+let poolTexture: THREE.Texture | null = null;
+function getPoolTexture(): THREE.Texture {
+  if (poolTexture) return poolTexture;
+  const size = 128;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext("2d");
+  if (ctx) {
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.35, "rgba(255,255,255,0.75)");
+    g.addColorStop(0.7, "rgba(255,255,255,0.22)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  poolTexture = tex;
+  return tex;
+}
+
+const _origin = new THREE.Vector3();
+const _dir = new THREE.Vector3();
+const _hit = new THREE.Vector3();
+const _quat = new THREE.Quaternion();
+const _up = new THREE.Vector3(0, 1, 0);
+
 export function Fixture3D({
   position,
   state,
@@ -478,6 +517,10 @@ export function Fixture3D({
   // actual castShadow decision now uses isSpot — see prop docs.
   hasGobo: _hasGobo,
   isSpot,
+  quality,
+  stage,
+  selected = false,
+  onSelect,
 }: {
   position: [number, number, number];
   state: FixtureLightState | undefined;
@@ -507,8 +550,16 @@ export function Fixture3D({
   /// projection. Wash fixtures stay false so big rigs don't blow
   /// past the GPU's 16 texture-unit cap.
   isSpot: boolean;
+  quality: RenderQuality;
+  /// Floor depth + whether a back wall exists, for the light pool.
+  stage: { depth: number; wallEnabled: boolean };
+  selected?: boolean;
+  onSelect?: () => void;
 }) {
   const yokeRef = useRef<THREE.Group | null>(null);
+  const tiltRef = useRef<THREE.Group | null>(null);
+  const poolRef = useRef<THREE.Mesh | null>(null);
+  const poolMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
   const lightRef = useRef<THREE.SpotLight | null>(null);
   const bodyMatRef = useRef<THREE.MeshStandardMaterial | null>(null);
   const haloMatRef = useRef<THREE.MeshBasicMaterial | null>(null);
@@ -520,7 +571,7 @@ export function Fixture3D({
   const kind: FixtureKind = state?.kind ?? "wash";
   const beamLength = kind === "spot" ? 22 : 9;
   const maxRadius = useMemo(() => {
-    const maxDeg = overrides.beamAngle?.maxDeg ?? (kind === "spot" ? 8 : 55);
+    const maxDeg = overrides.beamAngle?.maxDeg ?? (kind === "spot" ? 8 : 30);
     return beamLength * Math.tan(maxDeg * THREE.MathUtils.DEG2RAD);
   }, [kind, beamLength, overrides.beamAngle?.maxDeg]);
   // Gaussian sharpness chosen per fixture kind: spots get a tighter
@@ -531,24 +582,28 @@ export function Fixture3D({
   // azimuths 0/45/90/135°. Combined additively they read as a
   // continuous volumetric shaft with the gobo's shape extruded
   // along the beam, not discrete floating discs.
+  const planeCount =
+    kind === "spot" ? quality.beamPlanes : Math.max(2, Math.round(quality.beamPlanes * 0.6));
+  const discCount =
+    kind === "spot" ? quality.beamDiscs : Math.max(4, Math.round(quality.beamDiscs * 0.6));
   const mainBeamPlanes = useMemo(
-    () => buildBeamPlanes(beamLength, maxRadius, falloffK),
-    [beamLength, maxRadius, falloffK],
+    () => buildBeamPlanes(beamLength, maxRadius, falloffK, planeCount),
+    [beamLength, maxRadius, falloffK, planeCount],
   );
   const prismBeamPlanes = useMemo(
-    () => buildBeamPlanes(beamLength, maxRadius * 0.55, falloffK),
-    [beamLength, maxRadius, falloffK],
+    () => buildBeamPlanes(beamLength, maxRadius * 0.55, falloffK, planeCount),
+    [beamLength, maxRadius, falloffK, planeCount],
   );
   // Discs perpendicular to the beam axis carry the gobo's full 2D
   // pattern (planes can only show 1D chords). Together they read
   // as a volumetric beam shaft with the gobo extruded.
   const mainBeamDiscs = useMemo(
-    () => buildBeamDiscs(beamLength, maxRadius, falloffK),
-    [beamLength, maxRadius, falloffK],
+    () => buildBeamDiscs(beamLength, maxRadius, falloffK, discCount),
+    [beamLength, maxRadius, falloffK, discCount],
   );
   const prismBeamDiscs = useMemo(
-    () => buildBeamDiscs(beamLength, maxRadius * 0.55, falloffK),
-    [beamLength, maxRadius, falloffK],
+    () => buildBeamDiscs(beamLength, maxRadius * 0.55, falloffK, discCount),
+    [beamLength, maxRadius, falloffK, discCount],
   );
   // Apply clipping planes so the beam doesn't punch the floor or
   // back wall when the fixture is aimed at them.
@@ -617,7 +672,10 @@ export function Fixture3D({
     // pattern detail at oblique views.
     const baseOpacity = lit * (0.55 + atmosphere * 1.6);
     const prismOn = (s.prismValue ?? 0) > prismThreshold;
-    const mainScale = prismOn ? 0.55 : 1;
+    // Washes throw a wide, faint cone that only really shows in haze;
+    // spots keep the crisp volumetric beam.
+    const coneMul = s.kind === "spot" ? 1 : 0.12 * (0.3 + atmosphere);
+    const mainScale = (prismOn ? 0.55 : 1) * coneMul;
     // Plane contribution is intentionally low (0.18) so the 8
     // crossed planes don't sum to a bright "burst" where they
     // converge on the cone axis — that artefact was masking the
@@ -663,7 +721,7 @@ export function Fixture3D({
       // a brighter spotlight means stronger contrast between the
       // gobo's open and blocked areas relative to the additive
       // haze layer drawn on top.
-      const baseLum = s.kind === "spot" ? 38 : 12;
+      const baseLum = s.kind === "spot" ? 38 : 22;
       lightRef.current.intensity = lit * baseLum;
       lightRef.current.angle = beamHalfAngleRad(s.kind, s.zoom, overrides.beamAngle);
       // Spots: tight penumbra so the gobo / beam edges read sharp.
@@ -719,6 +777,47 @@ export function Fixture3D({
     if (tiltChild) {
       tiltChild.rotation.x = THREE.MathUtils.lerp(tiltChild.rotation.x, s.tilt, k);
     }
+
+    // Light pool: where the beam axis meets the floor (or the back wall)
+    // gets a soft additive splash sized by distance × beam angle and
+    // stretched by the incidence angle. This is what makes a PAR read as
+    // "light on the stage" instead of a coloured disc on the truss.
+    const tilt = tiltRef.current;
+    const pool = poolRef.current;
+    const pm = poolMatRef.current;
+    if (tilt && pool && pm) {
+      tilt.updateWorldMatrix(true, false);
+      tilt.getWorldPosition(_origin);
+      tilt.getWorldQuaternion(_quat);
+      _dir.set(0, -1, 0).applyQuaternion(_quat).normalize();
+      const half = beamHalfAngleRad(s.kind, s.zoom, overrides.beamAngle);
+      let placed = false;
+      if (_dir.y < -0.03) {
+        const tFloor = -_origin.y / _dir.y;
+        _hit.copy(_origin).addScaledVector(_dir, tFloor);
+        const onWall = stage.wallEnabled && _hit.z > stage.depth / 2 && _dir.z > 0.05;
+        const dist = onWall ? (stage.depth / 2 - _origin.z) / _dir.z : tFloor;
+        if (onWall) _hit.copy(_origin).addScaledVector(_dir, dist);
+        const radius = Math.max(0.15, dist * Math.tan(half) * (s.kind === "spot" ? 1.15 : 1.35));
+        pool.position.set(_hit.x - position[0], _hit.y - position[1], _hit.z - position[2]);
+        if (onWall) {
+          pool.position.z = stage.depth / 2 - 0.02 - position[2];
+          pool.rotation.set(0, Math.PI, 0);
+          pool.scale.set(radius, radius, 1);
+        } else {
+          pool.position.y += 0.015;
+          const stretch = 1 / Math.max(-_dir.y, 0.3);
+          pool.rotation.set(-Math.PI / 2, 0, 0);
+          pool.rotateOnWorldAxis(_up, Math.atan2(-_dir.x, -_dir.z));
+          pool.scale.set(radius, radius * stretch, 1);
+        }
+        const reach = Math.max(0.2, 1 - dist / (beamLength * 1.35));
+        pm.opacity = Math.min(1, lit * (s.kind === "wash" ? 0.95 : 0.6) * reach);
+        pm.color.setRGB(s.color.r, s.color.g, s.color.b);
+        placed = lit > 0.01;
+      }
+      pool.visible = placed;
+    }
   });
 
   return (
@@ -739,7 +838,7 @@ export function Fixture3D({
         <group rotation={[aimPitch, 0, 0]}>
           <group ref={yokeRef} position={[0, -0.18, 0]}>
             {/* Tilt child — beam, light, lens all rotate around X here. */}
-            <group>
+            <group ref={tiltRef}>
               {/* Lens face — the bright disc you see when looking up at
               a fixture. Small + emissive, drives the bloom hot
               core. */}
@@ -778,34 +877,30 @@ export function Fixture3D({
               SpotLight bathing the surfaces below with very soft
               edges. That matches what an LED par actually looks
               like in a smokeless room. */}
-              {kind === "spot"
-                ? mainBeamPlanes.map((p) => (
-                    <mesh
-                      key={`plane-${p.angle}`}
-                      position={[0, -beamLength / 2, 0]}
-                      rotation={[0, p.angle, 0]}
-                    >
-                      <planeGeometry args={[2 * maxRadius, beamLength]} />
-                      <primitive object={p.mat} attach="material" />
-                    </mesh>
-                  ))
-                : null}
+              {mainBeamPlanes.map((p) => (
+                <mesh
+                  key={`plane-${p.angle}`}
+                  position={[0, -beamLength / 2, 0]}
+                  rotation={[0, p.angle, 0]}
+                >
+                  <planeGeometry args={[2 * maxRadius, beamLength]} />
+                  <primitive object={p.mat} attach="material" />
+                </mesh>
+              ))}
               {/* Disc cross-sections paired with the planes — these
               carry the gobo's actual 2D pattern (planes only see
               chords). They mostly show when the camera isn't
               perpendicular to the beam axis. */}
-              {kind === "spot"
-                ? mainBeamDiscs.map((d) => (
-                    <mesh
-                      key={`disc-${d.depth}`}
-                      position={[0, -d.depth, 0]}
-                      rotation={[-Math.PI / 2, 0, 0]}
-                    >
-                      <circleGeometry args={[d.radius, 48]} />
-                      <primitive object={d.mat} attach="material" />
-                    </mesh>
-                  ))
-                : null}
+              {mainBeamDiscs.map((d) => (
+                <mesh
+                  key={`disc-${d.depth}`}
+                  position={[0, -d.depth, 0]}
+                  rotation={[-Math.PI / 2, 0, 0]}
+                >
+                  <circleGeometry args={[d.radius, 48]} />
+                  <primitive object={d.mat} attach="material" />
+                </mesh>
+              ))}
               {kind === "spot" && prismActive
                 ? Array.from({ length: prismFacets }).flatMap((_, i, arr) => {
                     if (i === 0) return [];
@@ -870,6 +965,39 @@ export function Fixture3D({
         </group>
       </group>
 
+      {/* Light pool on the floor / back wall (positioned every frame). */}
+      <mesh ref={poolRef} visible={false} renderOrder={2}>
+        <planeGeometry args={[2, 2]} />
+        <meshBasicMaterial
+          ref={poolMatRef}
+          map={getPoolTexture()}
+          color={new THREE.Color(0xffffff)}
+          transparent
+          opacity={0}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Selection hit target (edit mode) + highlight. */}
+      {onSelect ? (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: three.js mesh picked by raycast, not a DOM control; Esc/keyboard handled at the view level
+        <mesh
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
+        >
+          <sphereGeometry args={[0.42, 12, 12]} />
+          <meshBasicMaterial color="#ffffff" transparent opacity={0.001} depthWrite={false} />
+        </mesh>
+      ) : null}
+      {selected ? (
+        <mesh>
+          <boxGeometry args={[0.6, 0.55, 0.6]} />
+          <meshBasicMaterial color="#f472b6" wireframe toneMapped={false} />
+        </mesh>
+      ) : null}
       <mesh position={[0, 0.18, 0]}>
         <sphereGeometry args={[0.05, 12, 12]} />
         <meshBasicMaterial color="#3a3a3a" toneMapped={false} />
@@ -901,10 +1029,12 @@ function beamHalfAngleRad(
       zoom,
     );
   }
-  // Defaults by kind. Spots = small-format beam-class (2-8°);
-  // washes = wide ambient bath (25-55°).
+  // Defaults by kind. Spots = small-format beam-class (2-8° half
+  // angle); washes = LED par / wash head (12-30° half angle, i.e.
+  // 24-60° full beam — a 110° flood made every PAR cone swallow the
+  // whole stage).
   if (kind === "spot") {
     return THREE.MathUtils.lerp(2 * THREE.MathUtils.DEG2RAD, 8 * THREE.MathUtils.DEG2RAD, zoom);
   }
-  return THREE.MathUtils.lerp(25 * THREE.MathUtils.DEG2RAD, 55 * THREE.MathUtils.DEG2RAD, zoom);
+  return THREE.MathUtils.lerp(12 * THREE.MathUtils.DEG2RAD, 30 * THREE.MathUtils.DEG2RAD, zoom);
 }

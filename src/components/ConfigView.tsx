@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import type { Translation } from "../i18n/translations";
+import { useShowStore } from "../stores/show";
 import { AiConfigView } from "./AiConfigView";
 import { ButtonBindingsView } from "./ButtonBindingsView";
 import { ButtonsConfigView } from "./ButtonsConfigView";
@@ -84,6 +85,14 @@ export function ConfigView() {
   const t = useT();
   // Default to Library: that's where a fresh setup starts.
   const [sub, setSub] = useState<ConfigTab>("library");
+  // The header chips can ask for a section ("outputs", "vdj").
+  const requested = useShowStore((s) => s.configTabRequest);
+  const requestConfigTab = useShowStore((s) => s.requestConfigTab);
+  useEffect(() => {
+    if (!requested) return;
+    setSub(requested as ConfigTab);
+    requestConfigTab(null);
+  }, [requested, requestConfigTab]);
 
   return (
     <main className="page config-view">

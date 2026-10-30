@@ -13,13 +13,23 @@ use crate::globals::runtime::GlobalsRuntime;
 use crate::movement::engine::MovementEngine;
 use crate::output::OutputDriver;
 
-pub const TARGET_FPS: u32 = 15;
-/// Frame budget warning threshold. Sized at ~80% of the period (66.6 ms at
-/// 15 fps) so we only warn when a frame is genuinely at risk of overshooting.
-pub const WATCHDOG_THRESHOLD: Duration = Duration::from_millis(53);
+/// 30 fps, matching what Freestyler / QLC+ / hardware consoles put on the
+/// wire. It used to be 15, and that was implicated in real hardware
+/// misbehaviour: cheap fixtures run a "DMX signal present" watchdog with a
+/// window not much above 66 ms, so a 15 fps line sits right at the edge and
+/// flaps between signal/no-signal — harmless mid-show (they hold values)
+/// but catastrophic while a moving head runs its power-on homing sweep.
+/// Don't raise past ~40: a full 513-slot frame takes 22.8 ms on the wire
+/// at 250 kbaud, and the FTDI drain guard (see `d2xx.rs`) needs headroom.
+pub const TARGET_FPS: u32 = 30;
+/// Frame budget warning threshold. Sized at ~80% of the period (33.3 ms at
+/// 30 fps) so we only warn when a frame is genuinely at risk of overshooting.
+pub const WATCHDOG_THRESHOLD: Duration = Duration::from_millis(26);
 const STATS_PERIOD: Duration = Duration::from_secs(1);
 
 pub struct OutputBinding {
+    /// Config id, so send results can be reported per output (header chips).
+    pub id: String,
     pub driver: Box<dyn OutputDriver>,
     pub universes: Vec<u16>,
 }
@@ -154,6 +164,7 @@ where
             // channels that actually changed and confirm UI fader moves are
             // making it all the way to the wire.
             let mut previous: HashMap<u16, [u8; DMX_CHANNELS]> = HashMap::new();
+            let mut send_logs: Vec<SendLog> = Vec::new();
 
             loop {
                 if stop_thread.load(Ordering::Relaxed) {
@@ -193,6 +204,10 @@ where
                         }
                     }
                 }
+                // A snapshot crossfade writes the base layer the same way.
+                if engine.read().base_fade_active() {
+                    engine.write().tick_base_fade(frame_start);
+                }
                 // Tick the effect modules + the globals runtime, then push
                 // their outputs into the engine before we snapshot. Each
                 // tick is a few arithmetic ops per slot so locks are
@@ -204,6 +219,13 @@ where
                         .tick(frame_start, overall_bpm, pattern_ref);
                     let movement_ov = movement_thread.lock().tick(frame_start, overall_bpm);
                     let merged = merge_overlays(chaser_ov, movement_ov);
+                    // Modo Mágico rides on top: it owns its participants outright.
+                    let autopilot_ov = crate::autopilot::tick(frame_start, overall_bpm);
+                    let merged = merge_overlays(merged, autopilot_ov);
+                    // Pre-show fixture check: a highlight on top of everything,
+                    // still under blind / blackout / master.
+                    let test_ov = crate::fixture_test::tick(frame_start);
+                    let merged = merge_overlays(merged, test_ov);
                     let (blind_overlay, blackout_overlay, master_mask, blackout_factor, blind_factor) = {
                         let mut g = globals_thread.lock();
                         let out = g.tick(frame_start);
@@ -237,19 +259,50 @@ where
                             if let Some(data) =
                                 snapshots.iter().find(|(id, _)| *id == u).map(|(_, d)| d)
                             {
-                                if let Err(err) = binding.driver.send(u, data) {
-                                    tracing::warn!(
-                                        target: "dmx::output",
-                                        driver = binding.driver.name(),
-                                        universe = u,
-                                        error = %err,
-                                        "send failed"
-                                    );
+                                match binding.driver.send(u, data) {
+                                    Ok(()) => {
+                                        crate::output::health::note_send_ok(&binding.id);
+                                        if let Some(l) = send_logs.iter_mut().find(|l| {
+                                            l.failing && l.binding_id == binding.id && l.universe == u
+                                        }) {
+                                            l.failing = false;
+                                            tracing::info!(
+                                                target: "dmx::output",
+                                                driver = binding.driver.name(),
+                                                universe = u,
+                                                "send recovered"
+                                            );
+                                        }
+                                    }
+                                    Err(err) => {
+                                        let text = err.to_string();
+                                        let l = send_log_entry(&mut send_logs, &binding.id, u);
+                                        let changed = !l.failing || l.error != text;
+                                        if changed || l.since_warn.elapsed() >= SEND_WARN_EVERY {
+                                            tracing::warn!(
+                                                target: "dmx::output",
+                                                driver = binding.driver.name(),
+                                                universe = u,
+                                                error = %text,
+                                                suppressed = l.suppressed,
+                                                "send failed"
+                                            );
+                                            l.since_warn = Instant::now();
+                                            l.suppressed = 0;
+                                            l.error = text.clone();
+                                        } else {
+                                            l.suppressed += 1;
+                                        }
+                                        l.failing = true;
+                                        crate::output::health::note_send_error(&binding.id, &text);
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                crate::output::health::tick(frame_start);
 
                 let elapsed = frame_start.elapsed();
                 if elapsed > WATCHDOG_THRESHOLD {
@@ -287,11 +340,21 @@ where
 
                 next_tick += period;
                 let now = Instant::now();
-                if next_tick > now {
-                    thread::sleep(next_tick - now);
-                } else {
-                    next_tick = now;
+                if next_tick <= now {
+                    // Late frame. Do NOT fire a catch-up frame immediately:
+                    // two DMX frames back-to-back overlap the FTDI's TX
+                    // drain (write_bulk returns while ~256 bytes are still
+                    // shifting out), and the second frame then goes on the
+                    // wire with residual bytes prepended — the receiver
+                    // reads those as start code + first channels and every
+                    // real channel lands shifted. Cheap movers read that
+                    // garbage as pan/tilt commands. Skip the missed ticks
+                    // and re-align to the grid instead.
+                    while next_tick <= now {
+                        next_tick += period;
+                    }
                 }
+                thread::sleep(next_tick - now);
             }
 
             tracing::info!(target: "dmx::output", frames_total, late_frames, "output thread stopped");
@@ -361,6 +424,40 @@ fn collect_snapshots(
         .collect()
 }
 
+/// Per-universe send-failure log throttle: the first failure (and any
+/// change of error text) is a WARN, repeats are summarised every
+/// `SEND_WARN_EVERY`, recovery is an INFO. An unplugged node used to
+/// log ~90 lines per second from the real-time thread.
+struct SendLog {
+    binding_id: String,
+    universe: u16,
+    failing: bool,
+    error: String,
+    since_warn: Instant,
+    suppressed: u32,
+}
+
+const SEND_WARN_EVERY: Duration = Duration::from_secs(10);
+
+fn send_log_entry<'a>(logs: &'a mut Vec<SendLog>, id: &str, u: u16) -> &'a mut SendLog {
+    if let Some(i) = logs
+        .iter()
+        .position(|l| l.binding_id == id && l.universe == u)
+    {
+        &mut logs[i]
+    } else {
+        logs.push(SendLog {
+            binding_id: id.to_string(),
+            universe: u,
+            failing: false,
+            error: String::new(),
+            since_warn: Instant::now(),
+            suppressed: 0,
+        });
+        logs.last_mut().expect("just pushed")
+    }
+}
+
 fn send_blackout(bindings: &mut [OutputBinding]) {
     let zero = [0u8; DMX_CHANNELS];
     for binding in bindings.iter_mut() {
@@ -412,6 +509,7 @@ mod tests {
             last: last.clone(),
         };
         let bindings = shared_bindings(vec![OutputBinding {
+            id: "test".into(),
             driver: Box::new(driver),
             universes: vec![0],
         }]);
@@ -428,7 +526,7 @@ mod tests {
         thread::sleep(Duration::from_millis(400));
         handle.shutdown();
 
-        // ~6 frames in 400ms at 15Hz; allow slack for slow CI.
+        // ~12 frames in 400ms at 30Hz; allow generous slack for slow CI.
         assert!(frames.load(Ordering::Relaxed) >= 4);
         assert_eq!(last.lock().unwrap()[0], 0);
     }
@@ -443,6 +541,7 @@ mod tests {
         let last_b = Arc::new(std::sync::Mutex::new([0u8; DMX_CHANNELS]));
 
         let initial = vec![OutputBinding {
+            id: "test".into(),
             driver: Box::new(CountingDriver {
                 frames: frames_a.clone(),
                 last: Arc::new(std::sync::Mutex::new([0u8; DMX_CHANNELS])),
@@ -464,6 +563,7 @@ mod tests {
         let frames_a_at_swap = frames_a.load(Ordering::Relaxed);
 
         handle.replace_bindings(vec![OutputBinding {
+            id: "test".into(),
             driver: Box::new(CountingDriver {
                 frames: frames_b.clone(),
                 last: last_b.clone(),

@@ -91,11 +91,9 @@ pub struct StreamDeckController {
 struct SdHandles {
     app: AppHandle,
     chasers: SharedChasers,
-    movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
     loops: SharedLoopPlayback,
-    engine: EngineState,
     show: ShowState,
     snapshots: SharedSnapshotRuntime,
     blind_held: Arc<AtomicBool>,
@@ -164,11 +162,11 @@ pub fn start(
     app: AppHandle,
     serial: Option<&str>,
     chasers: SharedChasers,
-    movement: SharedMovement,
+    _movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
     loops: SharedLoopPlayback,
-    engine: EngineState,
+    _engine: EngineState,
     show: ShowState,
     snapshots: SharedSnapshotRuntime,
 ) -> Result<StreamDeckController, String> {
@@ -216,11 +214,9 @@ pub fn start(
     let handles = SdHandles {
         app,
         chasers,
-        movement,
         globals: globals.clone(),
         scenes,
         loops,
-        engine,
         show,
         snapshots,
         blind_held: blind_held.clone(),
@@ -407,6 +403,14 @@ fn is_action_active(action: &ButtonAction, handles: &SdHandles) -> bool {
             .active_id()
             .map(|a| a == id)
             .unwrap_or(false),
+        ButtonAction::ToggleAutopilot => crate::autopilot::is_enabled(),
+        ButtonAction::AutopilotEnergy { level } => crate::autopilot::manual_energy_is(*level),
+        ButtonAction::AutopilotHold => crate::autopilot::is_hold(),
+        ButtonAction::AutopilotBurst => crate::autopilot::is_bursting(),
+        ButtonAction::AutopilotPalette { style } => {
+            handles.show.read().show.autopilot.palette == *style
+        }
+        ButtonAction::AutopilotMovement => handles.show.read().show.autopilot.allow_movement,
         _ => false,
     }
 }
@@ -428,200 +432,16 @@ fn handle_button_transition(key: u8, pressed: bool, handles: &SdHandles) {
         );
         return;
     }
-    if !pressed {
-        return;
-    }
-    let Some(action) = resolve_indexed_action(handles, &action) else {
-        return;
-    };
-    match action {
-        ButtonAction::None => (),
-        ButtonAction::ToggleChaser { id } => {
-            let desired = !handles
-                .show
-                .read()
-                .show
-                .chasers
-                .iter()
-                .any(|c| c.id == id && c.enabled);
-            if let Err(err) = crate::commands::toggle_chaser_impl(
-                &handles.app,
-                &handles.show,
-                &handles.chasers,
-                &id,
-                desired,
-            ) {
-                tracing::warn!(?err, "streamdeck action toggle_chaser failed");
-            }
-        }
-        ButtonAction::ToggleMovement { id } => {
-            let desired = !handles
-                .show
-                .read()
-                .show
-                .movements
-                .iter()
-                .any(|m| m.id == id && m.enabled);
-            if let Err(err) = crate::commands::toggle_movement_impl(
-                &handles.app,
-                &handles.show,
-                &handles.movement,
-                &id,
-                desired,
-            ) {
-                tracing::warn!(?err, "streamdeck action toggle_movement failed");
-            }
-        }
-        ButtonAction::RecallScene { id } => {
-            let active_id = handles
-                .scenes
-                .lock()
-                .active_scene_id()
-                .map(|s| s.to_string());
-            if active_id.as_deref() == Some(id.as_str()) {
-                handles.scenes.lock().release(std::time::Instant::now());
-                let _ = tauri::Emitter::emit(
-                    &handles.app,
-                    crate::commands::SCENE_ACTIVE_EVENT,
-                    crate::commands::SceneActiveChange {
-                        active_scene_id: None,
-                        step_index: None,
-                    },
-                );
-                return;
-            }
-            if let Err(err) = crate::commands::recall_scene_impl(
-                &handles.app,
-                &handles.engine,
-                &handles.show,
-                &handles.chasers,
-                &handles.movement,
-                &handles.scenes,
-                &id,
-            ) {
-                tracing::warn!(?err, "streamdeck action recall_scene failed");
-            }
-        }
-        ButtonAction::Blackout => {
-            let on = !handles.show.read().show.globals.blackout.active;
-            if let Err(err) = crate::commands::set_blackout_impl(
-                &handles.app,
-                &handles.show,
-                &handles.globals,
-                on,
-            ) {
-                tracing::warn!(?err, "streamdeck action blackout failed");
-            }
-        }
-        ButtonAction::Blind => (),
-        ButtonAction::Tap => {
-            match crate::commands::tap_overall_bpm_impl(
-                &handles.app,
-                &handles.show,
-                &handles.globals,
-            ) {
-                Ok(Some(bpm)) => tracing::info!(bpm, "streamdeck action tap → bpm"),
-                Ok(None) => tracing::info!("streamdeck action tap → first of window"),
-                Err(err) => tracing::warn!(?err, "streamdeck action tap failed"),
-            }
-        }
-        ButtonAction::ToggleOverallBpm => {
-            let next = !handles.show.read().show.globals.overall_bpm_enabled;
-            if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
-                &handles.app,
-                &handles.show,
-                &handles.globals,
-                next,
-            ) {
-                tracing::warn!(?err, "streamdeck action toggle overall bpm failed");
-            }
-        }
-        ButtonAction::BumpActiveChaserBpm { delta } => {
-            let active = {
-                let s = handles.show.read();
-                s.show.chasers.iter().find(|c| c.enabled).cloned()
-            };
-            let Some(mut chaser) = active else { return };
-            let crate::chaser::TempoSource::Fixed { bpm } = chaser.tempo;
-            let new_bpm = (bpm + delta).clamp(20.0, 300.0);
-            if (new_bpm - bpm).abs() < f32::EPSILON {
-                return;
-            }
-            chaser.tempo = crate::chaser::TempoSource::Fixed { bpm: new_bpm };
-            if let Err(err) = crate::commands::update_chaser_impl(
-                &handles.app,
-                &handles.show,
-                &handles.chasers,
-                chaser,
-            ) {
-                tracing::warn!(?err, "streamdeck BPM nudge failed");
-            }
-        }
-        ButtonAction::StartLoopGroup { id } => {
-            let active = handles
-                .loops
-                .lock()
-                .active_group_id()
-                .map(|s| s.to_string());
-            if active.as_deref() == Some(id.as_str()) {
-                crate::commands::stop_loop_group_impl(
-                    &handles.app,
-                    &handles.scenes,
-                    &handles.loops,
-                );
-                return;
-            }
-            if let Err(err) = crate::commands::start_loop_group_impl(
-                &handles.app,
-                &handles.engine,
-                &handles.show,
-                &handles.chasers,
-                &handles.movement,
-                &handles.globals,
-                &handles.scenes,
-                &handles.loops,
-                &id,
-            ) {
-                tracing::warn!(?err, "streamdeck action start loop group failed");
-            }
-        }
-        ButtonAction::StopLoopGroup => {
-            crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops);
-        }
-        ButtonAction::ToggleSnapshot { id } => {
-            let active = handles.snapshots.lock().active_id().map(|s| s.to_string());
-            let result = if active.as_deref() == Some(id.as_str()) {
-                crate::commands::deactivate_snapshot_impl(
-                    &handles.app,
-                    &handles.engine,
-                    &handles.show,
-                    &handles.chasers,
-                    &handles.movement,
-                    &handles.globals,
-                    &handles.scenes,
-                    &handles.loops,
-                    &handles.snapshots,
-                )
-            } else {
-                crate::commands::activate_snapshot_impl(
-                    &handles.app,
-                    &handles.engine,
-                    &handles.show,
-                    &handles.chasers,
-                    &handles.movement,
-                    &handles.globals,
-                    &handles.scenes,
-                    &handles.loops,
-                    &handles.snapshots,
-                    &id,
-                )
-            };
-            if let Err(err) = result {
-                tracing::warn!(?err, "streamdeck action toggle snapshot failed");
-            }
-        }
-        _ => (),
-    }
+    // Shared button-mode path (Toggle / Flash / Swop), same as the Launchpad
+    // and OS2L pads.
+    let generic = crate::standalone_handles(&handles.app);
+    crate::midi::generic::button_event(
+        &generic,
+        &format!("sd:{key}"),
+        &action,
+        binding.mode,
+        pressed,
+    );
 }
 
 fn compute_targets(handles: &SdHandles, key_count: usize, animation_phase: u32) -> Vec<KeyVisual> {

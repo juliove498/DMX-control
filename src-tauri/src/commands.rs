@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 
@@ -80,6 +81,19 @@ pub struct LoopGroupActiveChange {
 }
 
 pub struct OutputThreadState(pub Mutex<Option<OutputThreadHandle>>);
+
+/// Fixture ids currently held in "safe boot": their whole DMX footprint
+/// is forced to 0 (engine `safe_boot_mask`) so the head can power up and
+/// home cleanly with the DMX cable connected. Runtime-only on purpose —
+/// a hold must never survive an app restart and silently keep part of
+/// the rig dark.
+pub struct SafeBootState(pub Mutex<HashSet<String>>);
+
+impl Default for SafeBootState {
+    fn default() -> Self {
+        Self(Mutex::new(HashSet::new()))
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../bindings/")]
@@ -893,6 +907,78 @@ fn apply_channel_defaults(engine: &EngineState, show: &ShowState, ids: &[String]
     }
 }
 
+/// Rebuild the engine's safe-boot mask from the currently held fixture
+/// ids. Called on every toggle; fixtures that no longer exist in the
+/// show are dropped from the set on the way (removing a patched fixture
+/// while it's held shouldn't leave orphan zeros on the wire).
+fn rebuild_safe_boot_mask(engine: &EngineState, show: &ShowState, held: &mut HashSet<String>) {
+    let s = show.read();
+    held.retain(|id| s.show.fixtures.iter().any(|f| &f.id == id));
+    let mut masks: HashMap<u16, crate::engine::ChannelMask> = HashMap::new();
+    for id in held.iter() {
+        let Some(inst) = s.show.fixtures.iter().find(|f| &f.id == id) else {
+            continue;
+        };
+        let Some(def) = s.library.get(&inst.definition_id) else {
+            continue;
+        };
+        let Some(mode) = def.mode(inst.mode_index as usize) else {
+            continue;
+        };
+        let mask = masks
+            .entry(inst.universe)
+            .or_insert_with(crate::engine::empty_mask);
+        let start = (inst.address as usize).saturating_sub(1);
+        for offset in 0..mode.channels.len() {
+            if let Some(slot) = mask.get_mut(start + offset) {
+                *slot = true;
+            }
+        }
+    }
+    engine.write().replace_safe_boot_mask(masks);
+}
+
+/// Toggle the safe-boot hold for one fixture. While held, every channel
+/// of its footprint outputs 0 with absolute priority — the same frame a
+/// manual console with all faders down sends, which is what lets cheap
+/// moving heads run their power-on homing without the DMX line fighting
+/// them (non-zero pan/tilt during the homing sweep corrupts their
+/// end-stop reference and they slam the physical stops afterwards).
+#[tauri::command]
+pub fn set_fixture_safe_boot(
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    safe_boot: State<'_, SafeBootState>,
+    fixture_id: String,
+    on: bool,
+) -> Result<Vec<String>, CommandError> {
+    {
+        let s = show.read();
+        if !s.show.fixtures.iter().any(|f| f.id == fixture_id) {
+            return Err(CommandError::Other(format!("unknown fixture {fixture_id}")));
+        }
+    }
+    let mut held = safe_boot.0.lock().expect("safe boot lock");
+    if on {
+        held.insert(fixture_id.clone());
+    } else {
+        held.remove(&fixture_id);
+    }
+    tracing::info!(target: "dmx::engine", %fixture_id, on, "safe-boot hold toggled");
+    rebuild_safe_boot_mask(&engine, &show, &mut held);
+    let mut ids: Vec<String> = held.iter().cloned().collect();
+    ids.sort();
+    Ok(ids)
+}
+
+#[tauri::command]
+pub fn list_safe_boot_fixtures(safe_boot: State<'_, SafeBootState>) -> Vec<String> {
+    let held = safe_boot.0.lock().expect("safe boot lock");
+    let mut ids: Vec<String> = held.iter().cloned().collect();
+    ids.sort();
+    ids
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 pub fn remove_fixture(
@@ -1443,13 +1529,123 @@ pub fn set_channel_range_image(
     Ok(data_url)
 }
 
+/// Replace an entire fixture definition with user-edited JSON from the
+/// Library editor. Takes the raw string (not a deserialized argument)
+/// so a malformed edit surfaces serde's own error — with line/column —
+/// instead of a generic Tauri argument-parsing failure the UI can't
+/// explain to the user.
+///
+/// The definition `id` is immutable: patched fixtures reference their
+/// definition by id, so silently renaming one would strand every
+/// instance in the show. Structural edits (channel counts, modes) are
+/// allowed — the operator owns their library — but get the same basic
+/// sanity checks as an imported file.
+#[tauri::command]
+pub fn update_fixture_definition(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    definition_id: String,
+    definition_json: String,
+) -> Result<FixtureDefinition, CommandError> {
+    let def: FixtureDefinition = serde_json::from_str(&definition_json)
+        .map_err(|e| CommandError::Other(format!("invalid JSON: {e}")))?;
+    if def.id != definition_id {
+        return Err(CommandError::Other(format!(
+            "the definition id cannot be changed (was {definition_id}, got {})",
+            def.id
+        )));
+    }
+    validate_definition(&def)?;
+
+    {
+        let s = show.read();
+        if !s.library.contains_key(&definition_id) {
+            return Err(CommandError::Other(format!(
+                "unknown definition {definition_id}"
+            )));
+        }
+    }
+
+    let lib_dir = library_dir().ok_or_else(|| CommandError::Other("no config dir".into()))?;
+    let path = save_def(&lib_dir, &def).map_err(|e| CommandError::Show(e.to_string()))?;
+    tracing::info!(
+        target: "dmx::library",
+        path = %path.display(),
+        id = %def.id,
+        "definition updated from library editor"
+    );
+
+    let lib = load_all(&lib_dir).map_err(|e| CommandError::Show(e.to_string()))?;
+    show.write().library = lib;
+    crate::mirror::notify_library_changed(&app);
+    Ok(def)
+}
+
+/// Sanity checks shared by the library editor. Deliberately light: the
+/// goal is catching edits that would render the fixture unusable (or
+/// unaddressable), not second-guessing how the operator models their
+/// hardware.
+fn validate_definition(def: &FixtureDefinition) -> Result<(), CommandError> {
+    if def.modes.is_empty() {
+        return Err(CommandError::Other(
+            "a definition needs at least one mode".into(),
+        ));
+    }
+    for mode in &def.modes {
+        if mode.name.trim().is_empty() {
+            return Err(CommandError::Other("a mode has an empty name".into()));
+        }
+        if mode.channels.is_empty() {
+            return Err(CommandError::Other(format!(
+                "mode {} has no channels",
+                mode.name
+            )));
+        }
+        if mode.channels.len() > 512 {
+            return Err(CommandError::Other(format!(
+                "mode {} has {} channels; a DMX universe holds 512",
+                mode.name,
+                mode.channels.len()
+            )));
+        }
+        for (ci, ch) in mode.channels.iter().enumerate() {
+            for r in &ch.ranges {
+                if r.from > r.to {
+                    return Err(CommandError::Other(format!(
+                        "mode {}, channel {}: range \"{}\" has from={} > to={}",
+                        mode.name,
+                        ci + 1,
+                        r.label,
+                        r.from,
+                        r.to
+                    )));
+                }
+            }
+        }
+        for preset in &mode.presets {
+            for ch_num in preset.values.keys() {
+                if *ch_num == 0 || *ch_num as usize > mode.channels.len() {
+                    return Err(CommandError::Other(format!(
+                        "mode {}: preset \"{}\" writes channel {} but the mode has channels 1..{} (preset channel numbers are 1-based)",
+                        mode.name,
+                        preset.name,
+                        ch_num,
+                        mode.channels.len()
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 // ---- Ambient Chaser ------------------------------------------------------
 
 /// Push the show's chasers and current fixture/library context into the
 /// shared chaser engine. Runtime state for each chaser id is preserved
 /// inside the engine, so calling this after a fixture move or unrelated
 /// chaser edit doesn't reset timing.
-fn sync_chasers(show: &ShowState, chasers: &SharedChasers) {
+pub(crate) fn sync_chasers(show: &ShowState, chasers: &SharedChasers) {
     let snapshot = {
         let s = show.read();
         (
@@ -1461,6 +1657,10 @@ fn sync_chasers(show: &ShowState, chasers: &SharedChasers) {
     let mut engine = chasers.lock();
     engine.update_show_context(snapshot.0, snapshot.1);
     engine.replace_chasers(snapshot.2);
+    drop(engine);
+    // Same trigger set as the chasers: patch/library/show changes.
+    crate::autopilot::sync_from_show(show);
+    crate::fixture_test::sync_from_show(show);
 }
 
 #[tauri::command]
@@ -1656,7 +1856,7 @@ pub fn set_chaser_master_impl(
 /// Push the show's fixture/library context plus the persisted globals
 /// config into the live runtime. The runtime's interpolating factors are
 /// preserved, so a slot list change doesn't snap blackout/blind state.
-fn sync_globals(show: &ShowState, globals: &SharedGlobals) {
+pub(crate) fn sync_globals(show: &ShowState, globals: &SharedGlobals) {
     let snapshot = {
         let s = show.read();
         (
@@ -1676,7 +1876,7 @@ fn sync_globals(show: &ShowState, globals: &SharedGlobals) {
 /// list into the live engine. Runtime phase is preserved per-id by the
 /// engine itself, so editing one generator (or adding/removing others)
 /// doesn't snap surviving generators back to phase 0.
-fn sync_movements(show: &ShowState, movement: &SharedMovement) {
+pub(crate) fn sync_movements(show: &ShowState, movement: &SharedMovement) {
     let snapshot = {
         let s = show.read();
         (
@@ -2322,6 +2522,9 @@ pub fn recall_scene_impl(
     // restores this. If the rig had chaser X running before this
     // recall, releasing brings X back even if the scene's last step
     // had set a different chaser.
+    // A snapshot crossfade in flight hands the base layer over to the
+    // scene: its lerp starts from the values on the wire right now.
+    engine.write().cancel_base_fade();
     let pre_recall_fx = current_fx_state(show);
 
     // Resolve every step into (universe, channel) → value maps and
@@ -2607,6 +2810,77 @@ pub fn rdm_discover(
     result.map_err(CommandError::Other)
 }
 
+// ---- Output suspend (diagnostics / safe power-up) --------------------------
+
+/// Stop the DMX output thread entirely: one final blackout frame goes
+/// out, then the line idles at mark — no breaks, no data — and the FTDI
+/// handle is released. The point is isolation testing: a fixture that
+/// still misbehaves while the interface is powered but the line is
+/// silent has an electrical problem (grounding/common mode), not a
+/// data/timing one. Also doubles as a big red switch while re-wiring.
+#[tauri::command]
+pub fn suspend_output(output_thread: State<'_, OutputThreadState>) -> bool {
+    let handle = output_thread.0.lock().unwrap().take();
+    match handle {
+        Some(h) => {
+            tracing::info!(target: "dmx::output", "output suspended by user");
+            h.shutdown();
+            true
+        }
+        None => false,
+    }
+}
+
+/// Rebuild the output thread from the persisted outputs config —
+/// exact mirror of the RDM-discovery resume path.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn resume_output(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    output_thread: State<'_, OutputThreadState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes: State<'_, SharedScenePlayback>,
+) -> Result<(), CommandError> {
+    if output_thread.0.lock().unwrap().is_some() {
+        return Ok(());
+    }
+    let (outputs, fixture_universes) = {
+        let s = show.read();
+        let outputs = s.show.outputs.clone();
+        let mut us: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
+        us.sort_unstable();
+        us.dedup();
+        (outputs, us)
+    };
+    tracing::info!(target: "dmx::output", "output resumed by user");
+    apply_outputs(
+        &app,
+        &engine,
+        &output_thread,
+        &chasers,
+        &movement,
+        &globals,
+        &scenes,
+        &outputs,
+        &fixture_universes,
+    )
+}
+
+/// Per-output health for the header chips (also pushed as `output:health`).
+#[tauri::command]
+pub fn output_health() -> Vec<crate::output::health::OutputHealth> {
+    crate::output::health::snapshot()
+}
+
+#[tauri::command]
+pub fn output_suspended(output_thread: State<'_, OutputThreadState>) -> bool {
+    output_thread.0.lock().unwrap().is_none()
+}
+
 // ---- Audio BPM counter -----------------------------------------------------
 
 #[tauri::command]
@@ -2842,6 +3116,505 @@ pub fn get_streamdeck_status(
     }
 }
 
+// ---- OS2L (VirtualDJ cues → actions) ---------------------------------------
+
+/// Build the standalone dispatcher handles for OS2L from managed state.
+#[allow(clippy::too_many_arguments)]
+fn os2l_handles(
+    app: &AppHandle,
+    engine: &EngineState,
+    show: &ShowState,
+    chasers: &SharedChasers,
+    movement: &SharedMovement,
+    globals: &SharedGlobals,
+    scenes: &SharedScenePlayback,
+    loops: &SharedLoopPlayback,
+    snapshots: &SharedSnapshotRuntime,
+) -> crate::midi::generic::GenericHandles {
+    crate::midi::generic::GenericHandles::standalone(
+        app.clone(),
+        chasers.clone(),
+        movement.clone(),
+        globals.clone(),
+        scenes.clone(),
+        loops.clone(),
+        engine.clone(),
+        show.clone(),
+        snapshots.clone(),
+    )
+}
+
+#[tauri::command]
+pub fn os2l_status(state: State<'_, crate::os2l::Os2lState>) -> crate::os2l::Os2lStatus {
+    state.snapshot()
+}
+
+/// Persist the OS2L config into the show and restart the server to
+/// match it (stop when disabled). One command instead of separate
+/// save/start/stop keeps the UI a single "Aplicar" button.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn os2l_apply_config(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes: State<'_, SharedScenePlayback>,
+    loops: State<'_, SharedLoopPlayback>,
+    snapshots: State<'_, SharedSnapshotRuntime>,
+    state: State<'_, crate::os2l::Os2lState>,
+    config: crate::os2l::Os2lConfig,
+) -> Result<crate::os2l::Os2lStatus, CommandError> {
+    show.write().show.os2l = config.clone();
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    if config.enabled {
+        // start_server stops the previous listener itself and waits for
+        // it to close before binding; stopping here first would detach
+        // that wait and bring the bind race back.
+        let handles = os2l_handles(
+            &app, &engine, &show, &chasers, &movement, &globals, &scenes, &loops, &snapshots,
+        );
+        crate::os2l::start_server(handles, state.inner().clone(), config);
+    } else {
+        crate::os2l::stop_server(&state);
+    }
+    Ok(state.snapshot())
+}
+
+/// Fire a button name through the exact same resolve+dispatch path as
+/// a live OS2L event — lets the operator test mappings and naming
+/// conventions without VirtualDJ connected.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn os2l_test_button(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes: State<'_, SharedScenePlayback>,
+    loops: State<'_, SharedLoopPlayback>,
+    snapshots: State<'_, SharedSnapshotRuntime>,
+    state: State<'_, crate::os2l::Os2lState>,
+    name: String,
+) -> crate::os2l::Os2lStatus {
+    let handles = os2l_handles(
+        &app, &engine, &show, &chasers, &movement, &globals, &scenes, &loops, &snapshots,
+    );
+    crate::os2l::handle_button(&handles, &state, &name, true);
+    state.snapshot()
+}
+
+/// Empty the recent-buttons log. Broadcasts the fresh status so any
+/// other view listening to the OS2L event stays in sync.
+#[tauri::command]
+pub fn os2l_clear_recent(
+    app: AppHandle,
+    state: State<'_, crate::os2l::Os2lState>,
+) -> crate::os2l::Os2lStatus {
+    state.clear_recent();
+    let snap = state.snapshot();
+    let _ = app.emit(crate::os2l::OS2L_STATUS_EVENT, snap.clone());
+    snap
+}
+
+// ---- Cue follower (per-track cues over the VDJ playhead) -------------------
+
+#[tauri::command]
+pub fn cue_follower_status(
+    state: State<'_, crate::vdj::cues::CueFollower>,
+) -> crate::vdj::cues::CueFollowerStatus {
+    state.snapshot()
+}
+
+/// Persist the flag and start/stop the follower to match. Reuses the
+/// VDJ HTTP connection config (host/port/bearer) from the poller.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub fn cue_follower_set_enabled(
+    app: AppHandle,
+    engine: State<'_, EngineState>,
+    show: State<'_, ShowState>,
+    chasers: State<'_, SharedChasers>,
+    movement: State<'_, SharedMovement>,
+    globals: State<'_, SharedGlobals>,
+    scenes: State<'_, SharedScenePlayback>,
+    loops: State<'_, SharedLoopPlayback>,
+    snapshots: State<'_, SharedSnapshotRuntime>,
+    state: State<'_, crate::vdj::cues::CueFollower>,
+    enabled: bool,
+) -> Result<crate::vdj::cues::CueFollowerStatus, CommandError> {
+    let cfg = {
+        let mut s = show.write();
+        s.show.vdj.cue_follower_enabled = enabled;
+        s.show.vdj.clone()
+    };
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    crate::vdj::cues::stop(&state);
+    if enabled {
+        let handles = os2l_handles(
+            &app, &engine, &show, &chasers, &movement, &globals, &scenes, &loops, &snapshots,
+        );
+        crate::vdj::cues::start(handles, state.inner().clone(), cfg);
+    }
+    Ok(state.snapshot())
+}
+
+/// The cue editor's open track, for OS2L following while VDJ's HTTP
+/// server is down. `None` when the editor closes the track.
+#[tauri::command]
+pub async fn cue_follower_assume_file(
+    state: State<'_, crate::vdj::cues::CueFollower>,
+    path: Option<String>,
+) -> Result<(), CommandError> {
+    let st = state.inner().clone();
+    crate::vdj::cues::set_assumed_file(&st, path.clone());
+    if let Some(p) = path {
+        let _ = tauri::async_runtime::spawn_blocking(move || {
+            crate::vdj::cues::load_vdj_grid_into(&st, &p)
+        })
+        .await;
+    }
+    Ok(())
+}
+
+/// Replace the cue list for one track (empty list deletes the set).
+/// Cues are kept sorted by beat so the follower's crossing scan and
+/// the UI list agree on order.
+#[tauri::command]
+pub fn set_track_cues(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    file_path: String,
+    title: String,
+    cues: Vec<crate::show::track_cues::TrackCue>,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        match s
+            .show
+            .track_cues
+            .iter_mut()
+            .find(|t| t.file_path == file_path)
+        {
+            Some(existing) => {
+                existing.cues = cues;
+                if !title.is_empty() {
+                    existing.title = title;
+                }
+                existing.sort_cues();
+            }
+            None => {
+                let mut set = crate::show::track_cues::TrackCueSet {
+                    file_path,
+                    title,
+                    cues,
+                    grid: None,
+                    sections: Vec::new(),
+                    duration_secs: 0.0,
+                    owned: Vec::new(),
+                };
+                set.sort_cues();
+                s.show.track_cues.push(set);
+            }
+        }
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Export the show's per-track cues as real action POIs inside
+/// VirtualDJ's database.xml (visible on VDJ's waveform, fired by VDJ
+/// over OS2L). Refuses while VirtualDJ runs — it keeps the database in
+/// memory and would overwrite our edits on exit.
+#[tauri::command]
+pub fn export_pois_to_vdj(
+    show: State<'_, ShowState>,
+) -> Result<crate::vdj::poi_export::PoiExportReport, CommandError> {
+    if crate::vdj::poi_export::vdj_running() {
+        return Err(CommandError::Other(
+            "VirtualDJ está abierto: cerralo antes de escribir los POIs (guarda su base al salir y pisaría lo nuestro)".into(),
+        ));
+    }
+    let (sets, db_override) = {
+        let s = show.read();
+        (
+            s.show.track_cues.clone(),
+            s.show.vdj.vdj_database_path.trim().to_string(),
+        )
+    };
+    let db = if db_override.is_empty() {
+        crate::vdj::poi_export::find_database().ok_or_else(|| {
+            CommandError::Other(
+                "no encontré database.xml de VirtualDJ (busqué en Documents/VirtualDJ y Application Support/VirtualDJ); si VDJ corre en otra máquina, configurá la ruta en la pestaña VDJ".into(),
+            )
+        })?
+    } else {
+        std::path::PathBuf::from(db_override)
+    };
+    if sets.iter().all(|s| s.cues.is_empty()) {
+        return Err(CommandError::Other("no hay cues para exportar".into()));
+    }
+    crate::vdj::poi_export::export_to_database(&db, &sets).map_err(CommandError::Other)
+}
+
+/// Peak envelope of an audio file for the cue editor's waveform view.
+/// The path comes from the cue follower (VDJ's own file path) and is
+/// rewritten by the configured network mapping before local access.
+#[tauri::command]
+pub async fn waveform_for_file(
+    show: State<'_, ShowState>,
+    path: String,
+    peaks_per_second: Option<u32>,
+) -> Result<crate::audio_waveform::WaveformData, CommandError> {
+    let pps = peaks_per_second.unwrap_or(crate::audio_waveform::PEAKS_PER_SECOND);
+    let mapped = {
+        let s = show.read();
+        crate::vdj::map_music_path(&s.show.vdj, &path)
+    };
+    tauri::async_runtime::spawn_blocking(move || crate::audio_waveform::waveform_for(&mapped, pps))
+        .await
+        .map_err(|e| CommandError::Other(format!("waveform task: {e}")))?
+        .map(|arc| (*arc).clone())
+        .map_err(CommandError::Other)
+}
+
+// ---- Cue editor ---------------------------------------------------------------
+
+/// Upsert a whole cue set (cues, grid, sections, duration) — the editor's
+/// save path. Keeps the set's position in the setlist.
+#[tauri::command]
+pub fn save_track_cue_set(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    set: crate::show::track_cues::TrackCueSet,
+) -> Result<(), CommandError> {
+    let mut set = set;
+    set.sort_cues();
+    {
+        let mut s = show.write();
+        match s
+            .show
+            .track_cues
+            .iter()
+            .position(|t| t.file_path == set.file_path)
+        {
+            Some(i) => s.show.track_cues[i] = set,
+            None => s.show.track_cues.push(set),
+        }
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+#[tauri::command]
+pub fn remove_track_cue_set(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    file_path: String,
+) -> Result<(), CommandError> {
+    show.write()
+        .show
+        .track_cues
+        .retain(|t| t.file_path != file_path);
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Setlist order = the order of `track_cues`. Paths not mentioned keep
+/// trailing in their old relative order.
+#[tauri::command]
+pub fn reorder_track_cue_sets(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    file_paths: Vec<String>,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        let mut old = std::mem::take(&mut s.show.track_cues);
+        let mut next = Vec::with_capacity(old.len());
+        for fp in &file_paths {
+            if let Some(i) = old.iter().position(|t| &t.file_path == fp) {
+                next.push(old.remove(i));
+            }
+        }
+        next.extend(old);
+        s.show.track_cues = next;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Fire an action right now — the editor's "preview while playing", so
+/// the organiser sees the lights react at the marked moment.
+#[tauri::command]
+pub fn preview_action(app: AppHandle, action: crate::show::button_bindings::ButtonAction) {
+    let handles = crate::standalone_handles(&app);
+    crate::midi::generic::dispatch_action(action, true, true, &handles);
+}
+
+/// Local, playable path for a track (network mapping applied) — the
+/// editor feeds it to the webview's audio element via the asset protocol.
+#[tauri::command]
+pub fn resolve_music_path(show: State<'_, ShowState>, path: String) -> String {
+    let s = show.read();
+    crate::vdj::map_music_path(&s.show.vdj, &path)
+}
+
+/// Offline BPM + first-beat estimate for a track (see `audio_tempo`).
+#[tauri::command]
+pub async fn estimate_track_grid(
+    show: State<'_, ShowState>,
+    path: String,
+) -> Result<crate::audio_tempo::GridEstimate, CommandError> {
+    let mapped = {
+        let s = show.read();
+        crate::vdj::map_music_path(&s.show.vdj, &path)
+    };
+    tauri::async_runtime::spawn_blocking(move || {
+        let wave = crate::audio_waveform::waveform_for(&mapped, 400)?;
+        crate::audio_tempo::estimate_grid(&wave.peaks, wave.peaks_per_second)
+            .ok_or_else(|| "no pude detectar un tempo claro en este tema".to_string())
+    })
+    .await
+    .map_err(|e| CommandError::Other(format!("tempo task: {e}")))?
+    .map_err(CommandError::Other)
+}
+
+/// Printable cue sheet for the event organiser: one CSV row per cue,
+/// setlist order, semicolon-separated with a BOM so Excel (es-AR) opens
+/// it as columns. Returns the row count.
+#[tauri::command]
+pub fn export_cue_sheet(show: State<'_, ShowState>, dest: String) -> Result<usize, CommandError> {
+    fn cell(s: &str) -> String {
+        if s.contains([';', '"', '\n', '\r']) {
+            format!("\"{}\"", s.replace('"', "\"\""))
+        } else {
+            s.to_string()
+        }
+    }
+    fn mmss(secs: f64) -> String {
+        let secs = secs.max(0.0);
+        let m = (secs / 60.0).floor() as u64;
+        let s = secs - m as f64 * 60.0;
+        format!("{m}:{s:06.3}")
+    }
+    let s = show.read();
+    let mut out = String::from("\u{FEFF}Orden;Tema;Tiempo;Beat;Cue;Acción;Color\n");
+    let mut rows = 0usize;
+    for (i, set) in s.show.track_cues.iter().enumerate() {
+        for c in &set.cues {
+            out.push_str(&format!(
+                "{};{};{};{:.2};{};{};{}\n",
+                i + 1,
+                cell(&set.title),
+                mmss(c.pos_secs),
+                c.beat,
+                cell(&c.name),
+                cell(&describe_action(&s.show, &c.action)),
+                c.color.clone().unwrap_or_default()
+            ));
+            rows += 1;
+        }
+    }
+    drop(s);
+    std::fs::write(&dest, out.as_bytes()).map_err(|e| CommandError::Io(format!("{dest}: {e}")))?;
+    Ok(rows)
+}
+
+/// Human label for an action, resolving ids to current names.
+fn describe_action(show: &ShowFileV1, a: &crate::show::button_bindings::ButtonAction) -> String {
+    use crate::show::button_bindings::ButtonAction as A;
+    fn name_of<'a>(pairs: impl Iterator<Item = (&'a str, &'a str)>, id: &str) -> String {
+        pairs
+            .into_iter()
+            .find(|(i, _)| *i == id)
+            .map(|(_, n)| n.to_string())
+            .unwrap_or_else(|| format!("({id})"))
+    }
+    match a {
+        A::None => "—".into(),
+        A::ToggleChaser { id } => format!(
+            "Chaser: {}",
+            name_of(
+                show.chasers
+                    .iter()
+                    .map(|c| (c.id.as_str(), c.name.as_str())),
+                id
+            )
+        ),
+        A::ToggleChaserByIndex { index } => format!("Chaser #{}", index + 1),
+        A::ToggleMovement { id } => format!(
+            "Movimiento: {}",
+            name_of(
+                show.movements
+                    .iter()
+                    .map(|m| (m.id.as_str(), m.name.as_str())),
+                id
+            )
+        ),
+        A::ToggleMovementByIndex { index } => format!("Movimiento #{}", index + 1),
+        A::RecallScene { id } => format!(
+            "Escena: {}",
+            name_of(
+                show.scenes.iter().map(|s| (s.id.as_str(), s.name.as_str())),
+                id
+            )
+        ),
+        A::RecallSceneByIndex { index } => format!("Escena #{}", index + 1),
+        A::StartLoopGroup { id } => format!(
+            "Loop: {}",
+            name_of(
+                show.scene_loop_groups
+                    .iter()
+                    .map(|l| (l.id.as_str(), l.name.as_str())),
+                id
+            )
+        ),
+        A::StartLoopGroupByIndex { index } => format!("Loop #{}", index + 1),
+        A::StopLoopGroup => "Detener loop".into(),
+        A::ToggleSnapshot { id } => format!(
+            "Snapshot: {}",
+            name_of(
+                show.snapshots
+                    .iter()
+                    .map(|s| (s.id.as_str(), s.name.as_str())),
+                id
+            )
+        ),
+        A::ToggleSnapshotByIndex { index } => format!("Snapshot #{}", index + 1),
+        A::Blackout => "Blackout".into(),
+        A::Blind => "Blind".into(),
+        A::Tap => "Tap tempo".into(),
+        A::ToggleOverallBpm => "BPM general on/off".into(),
+        A::BumpActiveChaserBpm { delta } => format!("BPM chaser {delta:+}"),
+        A::ToggleAutopilot => "Modo Mágico".into(),
+        A::AutopilotEnergy { level } => format!("Modo Mágico · energía {:.0}%", level * 100.0),
+        A::AutopilotNudge { kind } => match kind {
+            crate::show::button_bindings::AutopilotNudgeKind::Next => {
+                "Modo Mágico · siguiente look".into()
+            }
+            crate::show::button_bindings::AutopilotNudgeKind::Back => {
+                "Modo Mágico · look anterior".into()
+            }
+        },
+        A::AutopilotHold => "Modo Mágico · mantener look".into(),
+        A::AutopilotBurst => "Modo Mágico · ráfaga de strobo".into(),
+        A::AutopilotDrop => "Modo Mágico · drop".into(),
+        A::AutopilotPalette { style } => format!("Modo Mágico · paleta {style:?}"),
+        A::AutopilotMovement => "Modo Mágico · cabezales on/off".into(),
+    }
+}
+
 // ---- helpers + error type ------------------------------------------------
 
 #[allow(clippy::too_many_arguments)]
@@ -2880,6 +3653,9 @@ pub fn apply_outputs(
     }
     engine.write().reconcile_universes(&universes);
 
+    // Header chips: rebuild the health table before instantiating so open
+    // failures land on the right row.
+    crate::output::health::configure(outputs);
     let new_bindings = instantiate(outputs);
     let mut guard = output_thread.0.lock().unwrap();
     if let Some(handle) = guard.as_ref() {
@@ -3149,18 +3925,240 @@ pub fn ai_apply_draft_scene(
 /// survives a restart; additionally writes the user-named file (with rotating
 /// backups) when one is set. Errors writing the user path are propagated;
 /// autosave failures are logged so a missing config dir doesn't block edits.
-pub(crate) fn persist_show(show: &ShowState, _app: &AppHandle) -> Result<(), CommandError> {
-    let (snapshot, target_path) = {
-        let s = show.read();
+/// Startup health probe for the config directory: verifies we can actually
+/// create files there and open the two autosave files for writing. Catches
+/// root-owned leftovers (sudo runs) and permission trouble *before* the
+/// operator loses an evening of edits to silent write failures. Returns one
+/// human-readable problem string per finding; empty = healthy.
+#[tauri::command]
+pub fn config_health() -> Vec<String> {
+    let mut problems = Vec::new();
+    let Some(dir) = dirs::config_dir().map(|d| d.join("dmx-control")) else {
+        problems.push("no config directory available".to_string());
+        return problems;
+    };
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        problems.push(format!("{}: {e}", dir.display()));
+        return problems;
+    }
+    let probe = dir.join(".write-probe");
+    match std::fs::write(&probe, b"ok") {
+        Ok(()) => {
+            let _ = std::fs::remove_file(&probe);
+        }
+        Err(e) => problems.push(format!("{}: {e}", dir.display())),
+    }
+    // The autosaves are replaced via tmp+rename (which only needs the dir),
+    // but an unwritable existing file is still a red flag worth surfacing:
+    // it means some past run wrote it as another user.
+    for name in ["autosave.json", "engine.json"] {
+        let path = dir.join(name);
+        if path.exists() {
+            if let Err(e) = std::fs::OpenOptions::new().append(true).open(&path) {
+                problems.push(format!("{}: {e}", path.display()));
+            }
+        }
+    }
+    if !problems.is_empty() {
+        tracing::error!(?problems, "config directory health check failed");
+    }
+    problems
+}
+
+/// Fix ownership of the config + log directories after an accidental `sudo`
+/// launch left root-owned files behind (the recurring disease on this rig:
+/// root files make every save fail on normal launches, which pushes the
+/// operator back to sudo, which mints more root files…). macOS-only: runs
+/// `chown -R <user>` through osascript's admin-privileges dialog, so the OS
+/// itself asks for the password — the app never sees it. Returns the fresh
+/// `config_health` problem list (empty = cured).
+#[tauri::command]
+pub fn repair_config_permissions() -> Result<Vec<String>, CommandError> {
+    #[cfg(not(target_os = "macos"))]
+    {
+        return Err(CommandError::Other(
+            "la reparación automática solo está disponible en macOS".into(),
+        ));
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let user = std::process::Command::new("whoami")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| CommandError::Other("no pude determinar el usuario actual".into()))?;
+
+        let mut dirs_to_fix: Vec<std::path::PathBuf> = Vec::new();
+        if let Some(cfg) = dirs::config_dir().map(|d| d.join("dmx-control")) {
+            if cfg.exists() {
+                dirs_to_fix.push(cfg);
+            }
+        }
+        if let Some(home) = std::env::var_os("HOME").map(std::path::PathBuf::from) {
+            let logs = home.join("Library/Logs/dmx-control");
+            if logs.exists() {
+                dirs_to_fix.push(logs);
+            }
+        }
+        if dirs_to_fix.is_empty() {
+            return Ok(config_health());
+        }
+
+        // Shell-quote each path (they contain spaces: "Application Support").
+        let quoted: Vec<String> = dirs_to_fix
+            .iter()
+            .map(|p| format!("'{}'", p.display()))
+            .collect();
+        let paths = quoted.join(" ");
+        let shell = format!("/usr/sbin/chown -R {user} {paths} && /bin/chmod -R u+rwX {paths}");
+        // Escape for embedding inside an AppleScript double-quoted string.
+        let escaped = shell.replace('\\', "\\\\").replace('"', "\\\"");
+        let script = format!("do shell script \"{escaped}\" with administrator privileges");
+
+        let out = std::process::Command::new("osascript")
+            .arg("-e")
+            .arg(&script)
+            .output()
+            .map_err(|e| CommandError::Other(format!("no pude lanzar osascript: {e}")))?;
+        if !out.status.success() {
+            let err = String::from_utf8_lossy(&out.stderr);
+            // "User canceled" is the password dialog's cancel button.
+            return Err(CommandError::Other(format!(
+                "la reparación no se completó: {}",
+                err.trim()
+            )));
+        }
+        tracing::info!(target: "dmx::health", %user, "config ownership repaired via admin prompt");
+        Ok(config_health())
+    }
+}
+
+/// Edge-triggered "saves are failing" flag so the frontend banner gets one
+/// event per transition instead of one per mutation. Failing silently here is
+/// how a whole event's worth of edits can evaporate on restart, so any write
+/// error must reach the operator's eyes, not just the log.
+static SAVE_FAILING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub(crate) const SAVE_ERROR_EVENT: &str = "save:error";
+pub(crate) const SAVE_OK_EVENT: &str = "save:ok";
+
+pub(crate) fn report_save_result(app: &AppHandle, result: Result<(), String>) {
+    use std::sync::atomic::Ordering;
+    match result {
+        Ok(()) => {
+            if SAVE_FAILING.swap(false, Ordering::Relaxed) {
+                let _ = app.emit(SAVE_OK_EVENT, ());
+            }
+        }
+        Err(msg) => {
+            tracing::error!(error = %msg, "show persist failed");
+            // Always re-emit on failure (not edge-triggered): the banner may
+            // have been mounted after the first transition.
+            SAVE_FAILING.store(true, Ordering::Relaxed);
+            let _ = app.emit(SAVE_ERROR_EVENT, msg);
+        }
+    }
+}
+
+// ---- Background show writer -------------------------------------------
+//
+// Live actions (a cue from VirtualDJ, a pad, a slider) must never wait on
+// the disk: `persist_show` snapshots the show and hands it to one writer
+// thread, which coalesces bursts (only the newest snapshot is written),
+// serialises the file I/O and reports through the save banner. The
+// explicit "Guardar" in `save_show` still writes synchronously.
+
+struct SaveJob {
+    app: AppHandle,
+    show: ShowState,
+}
+
+/// Burst settle time before the writer snapshots the show: cues and pad
+/// hits come in flurries, one file write per flurry is plenty.
+const SAVE_SETTLE: std::time::Duration = std::time::Duration::from_millis(150);
+
+fn save_queue() -> &'static Mutex<std::sync::mpsc::Sender<SaveJob>> {
+    static Q: std::sync::OnceLock<Mutex<std::sync::mpsc::Sender<SaveJob>>> =
+        std::sync::OnceLock::new();
+    Q.get_or_init(|| {
+        let (tx, rx) = std::sync::mpsc::channel::<SaveJob>();
+        std::thread::Builder::new()
+            .name("dmx-show-writer".into())
+            .spawn(move || {
+                // Disk work yields to the live threads (output, cues, OS2L).
+                let _ = thread_priority::set_current_thread_priority(
+                    thread_priority::ThreadPriority::Min,
+                );
+                let mut pending: Option<SaveJob> = None;
+                loop {
+                    let job = match pending.take() {
+                        Some(j) => j,
+                        None => match rx.recv() {
+                            Ok(j) => j,
+                            Err(_) => break,
+                        },
+                    };
+                    std::thread::sleep(SAVE_SETTLE);
+                    while rx.try_recv().is_ok() {}
+                    let clean = write_job(&job);
+                    // A change that landed while writing → go again, and
+                    // the show stays dirty until that pass succeeds.
+                    match rx.try_recv() {
+                        Ok(newer) => pending = Some(newer),
+                        Err(_) => {
+                            if clean {
+                                job.show.write().dirty = false;
+                            }
+                        }
+                    }
+                }
+            })
+            .expect("spawn show writer");
+        Mutex::new(tx)
+    })
+}
+
+/// Snapshot the show *now* (newest state wins) and write it. Returns
+/// whether both the autosave and the named file (if any) succeeded.
+fn write_job(job: &SaveJob) -> bool {
+    let (snapshot, path) = {
+        let s = job.show.read();
         (s.show.clone(), s.path.clone())
     };
-    if let Err(e) = crate::show::session::write_autosave(&snapshot, target_path.as_deref()) {
-        tracing::warn!(error = %e, "autosave failed");
+    let autosave = crate::show::session::write_autosave(&snapshot, path.as_deref())
+        .map_err(|e| format!("autosave.json: {e}"));
+    // A named show file that can't be written must NOT brick every mutation
+    // command (that's how the Intel went unresponsive after restoring a
+    // backup whose path pointed at the other machine's Documents): the
+    // autosave above is the real safety net, so put the failure on the
+    // banner and keep going.
+    let mut named_error: Option<String> = None;
+    if let Some(p) = &path {
+        if let Err(e) = save_show_file(p, &snapshot) {
+            named_error = Some(format!("{}: {e}", p.display()));
+        }
     }
-    if let Some(p) = target_path {
-        save_show_file(&p, &snapshot).map_err(CommandError::from)?;
+    match &named_error {
+        Some(msg) => report_save_result(&job.app, Err(msg.clone())),
+        None => report_save_result(&job.app, autosave.clone()),
     }
-    show.write().dirty = false;
+    named_error.is_none() && autosave.is_ok()
+}
+
+/// Persist after a mutation. Nothing here touches the disk or clones the
+/// show: the writer thread snapshots once the burst settles, so a cue, a
+/// pad or a fader never waits on I/O.
+pub(crate) fn persist_show(show: &ShowState, app: &AppHandle) -> Result<(), CommandError> {
+    // Wake the live→mirror replicator (no-op on mirrors / before setup).
+    crate::mirror::notify_show_changed(app);
+    if let Ok(tx) = save_queue().lock() {
+        let _ = tx.send(SaveJob {
+            app: app.clone(),
+            show: show.clone(),
+        });
+    }
     Ok(())
 }
 
@@ -3611,6 +4609,7 @@ fn capture_live_state(
         blackout,
         overall_bpm_enabled,
         overall_bpm,
+        fade_in_ms: 0,
     }
 }
 
@@ -3646,12 +4645,34 @@ fn apply_snapshot_values(
     {
         let mut e = engine.write();
         e.master = snap.master;
-        for su in &snap.universes {
-            // Universes that no longer exist (output re-config since the
-            // capture) are skipped; new universes keep their current data.
-            if let Some(u) = e.universes.iter_mut().find(|u| u.id == su.id) {
-                for (i, v) in su.data.iter().take(DMX_CHANNELS).enumerate() {
-                    u.data[i] = *v;
+        if snap.fade_in_ms > 0 {
+            // Glide the base layer from wherever it is into the snapshot;
+            // the output thread lands it over `fade_in_ms`.
+            let targets: Vec<(u16, [u8; DMX_CHANNELS])> = snap
+                .universes
+                .iter()
+                .map(|su| {
+                    let mut data = [0u8; DMX_CHANNELS];
+                    for (i, v) in su.data.iter().take(DMX_CHANNELS).enumerate() {
+                        data[i] = *v;
+                    }
+                    (su.id, data)
+                })
+                .collect();
+            e.start_base_fade(
+                &targets,
+                std::time::Duration::from_millis(u64::from(snap.fade_in_ms)),
+                std::time::Instant::now(),
+            );
+        } else {
+            e.cancel_base_fade();
+            for su in &snap.universes {
+                // Universes that no longer exist (output re-config since the
+                // capture) are skipped; new universes keep their current data.
+                if let Some(u) = e.universes.iter_mut().find(|u| u.id == su.id) {
+                    for (i, v) in su.data.iter().take(DMX_CHANNELS).enumerate() {
+                        u.data[i] = *v;
+                    }
                 }
             }
         }
@@ -3788,15 +4809,15 @@ pub fn update_snapshot_from_state(
     loops_pb: State<'_, SharedLoopPlayback>,
     id: String,
 ) -> Result<Snapshot, CommandError> {
-    let name = show
+    let (name, fade_in_ms) = show
         .read()
         .show
         .snapshots
         .iter()
         .find(|s| s.id == id)
-        .map(|s| s.name.clone())
+        .map(|s| (s.name.clone(), s.fade_in_ms))
         .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
-    let snap = capture_live_state(
+    let mut snap = capture_live_state(
         engine.inner(),
         &show,
         scenes_pb.inner(),
@@ -3804,6 +4825,7 @@ pub fn update_snapshot_from_state(
         id.clone(),
         name,
     );
+    snap.fade_in_ms = fade_in_ms;
     {
         let mut s = show.write();
         if let Some(entry) = s.show.snapshots.iter_mut().find(|s| s.id == id) {
@@ -3836,6 +4858,31 @@ pub fn rename_snapshot(
             .find(|s| s.id == id)
             .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
         entry.name = name;
+        s.dirty = true;
+    }
+    persist_show(&show, &app)?;
+    let _ = app.emit(SHOW_EVENT, ());
+    Ok(())
+}
+
+/// Crossfade time used whenever this snapshot is activated (pad, cue,
+/// loop group, OS2L). `0` = hard cut.
+#[tauri::command]
+pub fn set_snapshot_fade(
+    app: AppHandle,
+    show: State<'_, ShowState>,
+    id: String,
+    fade_in_ms: u32,
+) -> Result<(), CommandError> {
+    {
+        let mut s = show.write();
+        let entry = s
+            .show
+            .snapshots
+            .iter_mut()
+            .find(|s| s.id == id)
+            .ok_or_else(|| CommandError::Other(format!("snapshot {id} not found")))?;
+        entry.fade_in_ms = fade_in_ms.min(60_000);
         s.dirty = true;
     }
     persist_show(&show, &app)?;
@@ -3970,8 +5017,22 @@ pub fn deactivate_snapshot_impl(
     loops_pb: &SharedLoopPlayback,
     snapshots_rt: &SharedSnapshotRuntime,
 ) -> Result<(), CommandError> {
+    // Leave the way we came in: the restore glides with the fade of the
+    // snapshot being deactivated.
+    let active = snapshots_rt.lock().active_id().map(str::to_string);
+    let fade_in_ms = active
+        .and_then(|id| {
+            let s = show.read();
+            s.show
+                .snapshots
+                .iter()
+                .find(|s| s.id == id)
+                .map(|s| s.fade_in_ms)
+        })
+        .unwrap_or(0);
     let saved = snapshots_rt.lock().take_saved();
-    if let Some(saved) = saved {
+    if let Some(mut saved) = saved {
+        saved.fade_in_ms = fade_in_ms;
         apply_snapshot_state(
             app, engine, show, chasers, movement, globals, scenes_pb, loops_pb, &saved,
         )?;
@@ -4041,6 +5102,12 @@ pub fn update_button_bindings(
 
 /// Factory defaults exposed as a command so the UI can offer "Load
 /// defaults" without having to re-encode the layout client-side.
+/// The Modo Mágico Launchpad rows, for the "add the Magic strip" button.
+#[tauri::command]
+pub fn magic_launchpad_rows() -> Vec<crate::show::button_bindings::LaunchpadBinding> {
+    crate::show::button_bindings::magic_launchpad_rows()
+}
+
 #[tauri::command]
 pub fn get_default_button_bindings() -> ButtonBindings {
     ButtonBindings {
@@ -4050,5 +5117,92 @@ pub fn get_default_button_bindings() -> ButtonBindings {
         // MIDI-learn mappings have no factory layout — the caller is
         // expected to preserve the user's list when loading defaults.
         generic: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_definition;
+    use crate::show::fixture::{
+        ChannelDefinition, ChannelRange, ChannelRole, FixtureDefinition, FixtureMode,
+    };
+
+    fn minimal_def() -> FixtureDefinition {
+        FixtureDefinition {
+            id: "test-fixture".into(),
+            manufacturer: "Test".into(),
+            name: "Fixture".into(),
+            modes: vec![FixtureMode {
+                name: "8ch".into(),
+                channels: vec![ChannelDefinition::new(ChannelRole::Intensity, 0)],
+                pan_range: None,
+                tilt_range: None,
+                presets: Vec::new(),
+            }],
+            image: None,
+        }
+    }
+
+    #[test]
+    fn valid_definition_passes() {
+        assert!(validate_definition(&minimal_def()).is_ok());
+    }
+
+    #[test]
+    fn rejects_no_modes() {
+        let mut def = minimal_def();
+        def.modes.clear();
+        assert!(validate_definition(&def).is_err());
+    }
+
+    #[test]
+    fn rejects_empty_mode_name_and_no_channels() {
+        let mut def = minimal_def();
+        def.modes[0].name = "  ".into();
+        assert!(validate_definition(&def).is_err());
+
+        let mut def = minimal_def();
+        def.modes[0].channels.clear();
+        assert!(validate_definition(&def).is_err());
+    }
+
+    #[test]
+    fn rejects_inverted_range() {
+        let mut def = minimal_def();
+        def.modes[0].channels[0].ranges.push(ChannelRange {
+            from: 100,
+            to: 50,
+            label: "backwards".into(),
+            image: None,
+            image_path: None,
+        });
+        assert!(validate_definition(&def).is_err());
+    }
+
+    #[test]
+    fn accepts_editor_style_json_payload() {
+        // The editor sends `null` for optional fields and `[]` for
+        // empty ranges (ts-rs types them non-optional); make sure the
+        // serde model keeps accepting that shape.
+        let json = r#"{
+            "id": "test-fixture",
+            "manufacturer": "Test",
+            "name": "Fixture",
+            "image": null,
+            "modes": [{
+                "name": "1ch",
+                "pan_range": null,
+                "tilt_range": null,
+                "channels": [{
+                    "role": "intensity",
+                    "name": null,
+                    "description": null,
+                    "ranges": [],
+                    "default": 0
+                }]
+            }]
+        }"#;
+        let def: FixtureDefinition = serde_json::from_str(json).expect("editor payload parses");
+        assert!(validate_definition(&def).is_ok());
     }
 }

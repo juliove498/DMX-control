@@ -87,6 +87,52 @@ pub enum ButtonAction {
     ToggleSnapshotByIndex {
         index: u8,
     },
+    /// Toggle Modo Mágico (the autopilot).
+    ToggleAutopilot,
+    /// Set Modo Mágico's energy (0..1) from a pad: chill / groove / party.
+    AutopilotEnergy {
+        level: f32,
+    },
+    /// Modo Mágico: jump to the next look / back to the previous one.
+    AutopilotNudge {
+        kind: AutopilotNudgeKind,
+    },
+    /// Modo Mágico: keep the current look (no changes while on).
+    AutopilotHold,
+    /// Modo Mágico: a beat-locked strobe burst — one bar on press, or
+    /// while held when the button is in Flash mode.
+    AutopilotBurst,
+    /// Modo Mágico: one-beat blackout on the next beat.
+    AutopilotDrop,
+    /// Modo Mágico: pick the palette family.
+    AutopilotPalette {
+        style: crate::autopilot::PaletteStyle,
+    },
+    /// Modo Mágico: toggle head movement.
+    AutopilotMovement,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+#[serde(rename_all = "snake_case")]
+pub enum AutopilotNudgeKind {
+    Next,
+    Back,
+}
+
+/// How a surface button behaves while pressed — grandMA executor styles.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, TS, PartialEq, Eq, Default)]
+#[ts(export, export_to = "../bindings/")]
+#[serde(rename_all = "snake_case")]
+pub enum ButtonMode {
+    /// Press toggles / fires; release does nothing.
+    #[default]
+    Toggle,
+    /// Momentary: active while held, back to what it was on release.
+    Flash,
+    /// Exclusive momentary: like Flash, and every fixture the action does
+    /// not drive goes dark while held (Modo Mágico steps aside too).
+    Swop,
 }
 
 /// How the LED / tile should reflect the action's "is it running" state.
@@ -120,6 +166,9 @@ pub struct LaunchpadBinding {
     #[serde(default)]
     pub is_cc: bool,
     pub action: ButtonAction,
+    /// Toggle / Flash / Swop (see `ButtonMode`).
+    #[serde(default)]
+    pub mode: ButtonMode,
     /// Free-text human label. Not drawn on hardware (the MK2 is just
     /// LEDs) but shown in the binding list UI so the operator can
     /// document what's wired up.
@@ -169,6 +218,9 @@ pub enum ButtonIcon {
 pub struct StreamDeckBinding {
     pub key: u8,
     pub action: ButtonAction,
+    /// Toggle / Flash / Swop (see `ButtonMode`).
+    #[serde(default)]
+    pub mode: ButtonMode,
     /// Short label drawn near the top of the tile. Empty = no label.
     #[serde(default)]
     pub label: String,
@@ -311,6 +363,169 @@ const LP_BLIND_PALETTE: (u8, u8) = (1, 3);
 const LP_TAP_PALETTE: (u8, u8) = (37, 33);
 const LP_BPM_TOGGLE_PALETTE: (u8, u8) = (54, 53);
 
+/// Modo Mágico strip on the Launchpad's two top grid rows (notes 8x / 7x).
+/// `(dim, bright)` MK2 palette pairs; the feedback thread paints these
+/// pads itself (beat pulse, energy meter, countdown) — see `launchpad.rs`.
+pub const LP_MAGIC_ROW_NOTES: [u8; 8] = [81, 82, 83, 84, 85, 86, 87, 88];
+pub const LP_MAGIC_ROW2_NOTES: [u8; 8] = [71, 72, 73, 74, 75, 76, 77, 78];
+
+/// The Modo Mágico rows: toggle, three energies, back, next, hold, strobe
+/// burst on row 8; drop, five palettes and movement on row 7.
+pub fn magic_launchpad_rows() -> Vec<LaunchpadBinding> {
+    use crate::autopilot::PaletteStyle;
+    let mk =
+        |note: u8, action: ButtonAction, mode: ButtonMode, label: &str, dim: u8, bright: u8| {
+            LaunchpadBinding {
+                note,
+                is_cc: false,
+                action,
+                mode,
+                label: label.to_string(),
+                color_dim: dim,
+                color_bright: bright,
+                active_mode: ButtonActiveMode::Auto,
+            }
+        };
+    let n = LP_MAGIC_ROW_NOTES;
+    let m = LP_MAGIC_ROW2_NOTES;
+    vec![
+        mk(
+            n[0],
+            ButtonAction::ToggleAutopilot,
+            ButtonMode::Toggle,
+            "Mágico on/off",
+            51,
+            49,
+        ),
+        mk(
+            n[1],
+            ButtonAction::AutopilotEnergy { level: 0.25 },
+            ButtonMode::Toggle,
+            "Tranqui",
+            23,
+            21,
+        ),
+        mk(
+            n[2],
+            ButtonAction::AutopilotEnergy { level: 0.55 },
+            ButtonMode::Toggle,
+            "Groove",
+            11,
+            9,
+        ),
+        mk(
+            n[3],
+            ButtonAction::AutopilotEnergy { level: 0.85 },
+            ButtonMode::Toggle,
+            "Fiesta",
+            7,
+            5,
+        ),
+        mk(
+            n[4],
+            ButtonAction::AutopilotNudge {
+                kind: AutopilotNudgeKind::Back,
+            },
+            ButtonMode::Toggle,
+            "Look anterior",
+            1,
+            3,
+        ),
+        mk(
+            n[5],
+            ButtonAction::AutopilotNudge {
+                kind: AutopilotNudgeKind::Next,
+            },
+            ButtonMode::Toggle,
+            "Look siguiente",
+            1,
+            3,
+        ),
+        mk(
+            n[6],
+            ButtonAction::AutopilotHold,
+            ButtonMode::Toggle,
+            "Mantener look",
+            15,
+            13,
+        ),
+        mk(
+            n[7],
+            ButtonAction::AutopilotBurst,
+            ButtonMode::Flash,
+            "Ráfaga strobo",
+            55,
+            53,
+        ),
+        mk(
+            m[0],
+            ButtonAction::AutopilotDrop,
+            ButtonMode::Toggle,
+            "Drop (1 beat)",
+            1,
+            3,
+        ),
+        mk(
+            m[1],
+            ButtonAction::AutopilotPalette {
+                style: PaletteStyle::Auto,
+            },
+            ButtonMode::Toggle,
+            "Paleta auto",
+            51,
+            49,
+        ),
+        mk(
+            m[2],
+            ButtonAction::AutopilotPalette {
+                style: PaletteStyle::Warm,
+            },
+            ButtonMode::Toggle,
+            "Paleta cálida",
+            11,
+            9,
+        ),
+        mk(
+            m[3],
+            ButtonAction::AutopilotPalette {
+                style: PaletteStyle::Cold,
+            },
+            ButtonMode::Toggle,
+            "Paleta fría",
+            39,
+            37,
+        ),
+        mk(
+            m[4],
+            ButtonAction::AutopilotPalette {
+                style: PaletteStyle::Rainbow,
+            },
+            ButtonMode::Toggle,
+            "Paleta arcoíris",
+            19,
+            17,
+        ),
+        mk(
+            m[5],
+            ButtonAction::AutopilotPalette {
+                style: PaletteStyle::Mono,
+            },
+            ButtonMode::Toggle,
+            "Paleta mono",
+            1,
+            3,
+        ),
+        mk(
+            m[6],
+            ButtonAction::AutopilotMovement,
+            ButtonMode::Toggle,
+            "Cabezales",
+            85,
+            84,
+        ),
+    ]
+}
+
 /// Stream Deck factory key layout — copies the constants from
 /// `streamdeck::layout` so the defaults match the historical UX.
 pub const DEFAULT_SD_CHASER_KEYS: [u8; 4] = [0, 1, 2, 3];
@@ -352,13 +567,15 @@ const SD_BPM_TOGGLE_COLORS: SdColorPair = ((40, 10, 30), (255, 50, 180));
 /// UI action; never read at runtime when `custom_enabled = false`
 /// (the controllers have their own hardcoded fallback).
 pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
-    let mut out = Vec::with_capacity(32);
+    let mut out = Vec::with_capacity(48);
+    out.extend(magic_launchpad_rows());
     for i in 0..8 {
         let (dim, bright) = LP_CHASER_PALETTE[i];
         out.push(LaunchpadBinding {
             note: DEFAULT_LP_CHASER_NOTES[i],
             is_cc: false,
             action: ButtonAction::ToggleChaserByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("Chaser {}", i + 1),
             color_dim: dim,
             color_bright: bright,
@@ -371,6 +588,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
             note: DEFAULT_LP_MOVEMENT_NOTES[i],
             is_cc: false,
             action: ButtonAction::ToggleMovementByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("Movement {}", i + 1),
             color_dim: dim,
             color_bright: bright,
@@ -383,6 +601,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
             note: DEFAULT_LP_SCENE_NOTES[i],
             is_cc: false,
             action: ButtonAction::RecallSceneByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("Scene {}", i + 1),
             color_dim: dim,
             color_bright: bright,
@@ -394,6 +613,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
             note,
             is_cc: false,
             action: ButtonAction::ToggleSnapshotByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("Snapshot {}", i + 1),
             color_dim: LP_SNAPSHOT_PALETTE.0,
             color_bright: LP_SNAPSHOT_PALETTE.1,
@@ -404,6 +624,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
         note: DEFAULT_LP_BLACKOUT_NOTE,
         is_cc: false,
         action: ButtonAction::Blackout,
+        mode: ButtonMode::Toggle,
         label: "Blackout".to_string(),
         color_dim: LP_BLACKOUT_PALETTE.0,
         color_bright: LP_BLACKOUT_PALETTE.1,
@@ -413,6 +634,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
         note: DEFAULT_LP_BLIND_NOTE,
         is_cc: false,
         action: ButtonAction::Blind,
+        mode: ButtonMode::Toggle,
         label: "Blind".to_string(),
         color_dim: LP_BLIND_PALETTE.0,
         color_bright: LP_BLIND_PALETTE.1,
@@ -422,6 +644,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
         note: DEFAULT_LP_TAP_NOTE,
         is_cc: false,
         action: ButtonAction::Tap,
+        mode: ButtonMode::Toggle,
         label: "TAP".to_string(),
         color_dim: LP_TAP_PALETTE.0,
         color_bright: LP_TAP_PALETTE.1,
@@ -431,6 +654,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
         note: DEFAULT_LP_BPM_TOGGLE_NOTE,
         is_cc: false,
         action: ButtonAction::ToggleOverallBpm,
+        mode: ButtonMode::Toggle,
         label: "BPM Toggle".to_string(),
         color_dim: LP_BPM_TOGGLE_PALETTE.0,
         color_bright: LP_BPM_TOGGLE_PALETTE.1,
@@ -445,6 +669,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
         note: 104,
         is_cc: true,
         action: ButtonAction::BumpActiveChaserBpm { delta: 1.0 },
+        mode: ButtonMode::Toggle,
         label: "BPM +1".to_string(),
         color_dim: 0,
         color_bright: 0,
@@ -454,6 +679,7 @@ pub fn default_launchpad_bindings() -> Vec<LaunchpadBinding> {
         note: 105,
         is_cc: true,
         action: ButtonAction::BumpActiveChaserBpm { delta: -1.0 },
+        mode: ButtonMode::Toggle,
         label: "BPM -1".to_string(),
         color_dim: 0,
         color_bright: 0,
@@ -470,6 +696,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
         out.push(StreamDeckBinding {
             key: DEFAULT_SD_CHASER_KEYS[i],
             action: ButtonAction::ToggleChaserByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("C{}", i + 1),
             color_off: off,
             color_on: on,
@@ -482,6 +709,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
         out.push(StreamDeckBinding {
             key: DEFAULT_SD_MOVEMENT_KEYS[i],
             action: ButtonAction::ToggleMovementByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("M{}", i + 1),
             color_off: off,
             color_on: on,
@@ -494,6 +722,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
         out.push(StreamDeckBinding {
             key: DEFAULT_SD_SCENE_KEYS[i],
             action: ButtonAction::RecallSceneByIndex { index: i as u8 },
+            mode: ButtonMode::Toggle,
             label: format!("S{}", i + 1),
             color_off: off,
             color_on: on,
@@ -504,6 +733,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
     out.push(StreamDeckBinding {
         key: DEFAULT_SD_BLACKOUT_KEY,
         action: ButtonAction::Blackout,
+        mode: ButtonMode::Toggle,
         label: String::new(),
         color_off: SD_BLACKOUT_COLORS.0,
         color_on: SD_BLACKOUT_COLORS.1,
@@ -513,6 +743,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
     out.push(StreamDeckBinding {
         key: DEFAULT_SD_BLIND_KEY,
         action: ButtonAction::Blind,
+        mode: ButtonMode::Toggle,
         label: String::new(),
         color_off: SD_BLIND_COLORS.0,
         color_on: SD_BLIND_COLORS.1,
@@ -522,6 +753,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
     out.push(StreamDeckBinding {
         key: DEFAULT_SD_TAP_KEY,
         action: ButtonAction::Tap,
+        mode: ButtonMode::Toggle,
         label: "TAP".to_string(),
         color_off: SD_TAP_COLORS.0,
         color_on: SD_TAP_COLORS.1,
@@ -531,6 +763,7 @@ pub fn default_streamdeck_bindings() -> Vec<StreamDeckBinding> {
     out.push(StreamDeckBinding {
         key: DEFAULT_SD_BPM_TOGGLE_KEY,
         action: ButtonAction::ToggleOverallBpm,
+        mode: ButtonMode::Toggle,
         label: String::new(),
         color_off: SD_BPM_TOGGLE_COLORS.0,
         color_on: SD_BPM_TOGGLE_COLORS.1,

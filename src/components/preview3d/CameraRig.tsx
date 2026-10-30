@@ -87,6 +87,7 @@ export function CameraRig({
       />
       <OrbitControls
         ref={controlsRef}
+        makeDefault
         target={[presets.front.lookAt.x, presets.front.lookAt.y, presets.front.lookAt.z]}
         enableDamping
         dampingFactor={0.08}

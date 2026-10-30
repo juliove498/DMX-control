@@ -5,7 +5,16 @@ import type { StageConfig } from "./stageConfig";
 /// origin; the floor centre is (0,0,0) and Y is up. Trusses are
 /// rendered as thin elongated boxes — a real ladder-truss visual is
 /// future work; for now the silhouette is enough to feel rigged.
-export function StageGeometry({ config }: { config: StageConfig }) {
+export function StageGeometry({
+  config,
+  onSelectTruss,
+  selectedTrussId,
+}: {
+  config: StageConfig;
+  /// Edit mode: clicking a truss selects it for the gizmo.
+  onSelectTruss?: (id: string) => void;
+  selectedTrussId?: string | null;
+}) {
   const { floor, backWall, trusses } = config;
 
   return (
@@ -17,7 +26,7 @@ export function StageGeometry({ config }: { config: StageConfig }) {
           projections actually appear here. */}
       <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
         <planeGeometry args={[floor.width, floor.depth]} />
-        <meshStandardMaterial color={floor.color} roughness={0.85} metalness={0.05} />
+        <meshStandardMaterial color={floor.color} roughness={0.7} metalness={0.05} />
       </mesh>
 
       {/* Grid lines — drei's <Grid> draws an infinite grid by
@@ -48,13 +57,26 @@ export function StageGeometry({ config }: { config: StageConfig }) {
       ) : null}
 
       {trusses.map((t) => (
-        <TrussSegmentMesh key={t.id} segment={t} />
+        <TrussSegmentMesh
+          key={t.id}
+          segment={t}
+          selected={selectedTrussId === t.id}
+          onSelect={onSelectTruss ? () => onSelectTruss(t.id) : undefined}
+        />
       ))}
     </group>
   );
 }
 
-function TrussSegmentMesh({ segment }: { segment: StageConfig["trusses"][number] }) {
+function TrussSegmentMesh({
+  segment,
+  selected,
+  onSelect,
+}: {
+  segment: StageConfig["trusses"][number];
+  selected?: boolean;
+  onSelect?: () => void;
+}) {
   const dx = segment.toX - segment.fromX;
   const dz = segment.toZ - segment.fromZ;
   const length = Math.hypot(dx, dz);
@@ -68,9 +90,25 @@ function TrussSegmentMesh({ segment }: { segment: StageConfig["trusses"][number]
     <group position={[cx, segment.height, cz]} rotation={[0, angleY, 0]}>
       {/* Main truss tube — silvered cylinder. Slightly emissive so
           it's visible even when no fixtures are pointing at it. */}
-      <mesh receiveShadow>
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: three.js mesh picked by raycast, not a DOM control; Esc/keyboard handled at the view level */}
+      <mesh
+        receiveShadow
+        onClick={
+          onSelect
+            ? (e) => {
+                e.stopPropagation();
+                onSelect();
+              }
+            : undefined
+        }
+      >
         <boxGeometry args={[length, segment.diameter, segment.diameter]} />
-        <meshStandardMaterial color="#7a8088" metalness={0.7} roughness={0.35} emissive="#1a1d22" />
+        <meshStandardMaterial
+          color={selected ? "#f472b6" : "#7a8088"}
+          metalness={0.7}
+          roughness={0.35}
+          emissive={selected ? "#7a2a52" : "#1a1d22"}
+        />
       </mesh>
       {/* End caps — visual hint of where the segment terminates. */}
       <mesh position={[length / 2, 0, 0]} receiveShadow>

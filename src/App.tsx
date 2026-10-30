@@ -2,17 +2,24 @@ import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
+import { BoothView } from "./components/BoothView";
 import { ChaserView } from "./components/ChaserView";
 import { ConfigView } from "./components/ConfigView";
+import { HealthBanner } from "./components/HealthBanner";
 import { LoopsView } from "./components/LoopsView";
+import { MirrorChip } from "./components/MirrorChip";
 import { MovementView } from "./components/MovementView";
 import { OverallBpmControl } from "./components/OverallBpmControl";
 import { Preview3D } from "./components/Preview3D";
 import { ScenesView } from "./components/ScenesView";
 import { StageView } from "./components/StageView";
+import { StatusBar } from "./components/StatusBar";
+import { AutopilotView } from "./components/autopilot/AutopilotView";
+import { CueEditorView } from "./components/cues/CueEditorView";
 import { useT } from "./i18n";
 import type { Translation } from "./i18n/translations";
 import { isDocMode } from "./lib/docMode";
+import { useFeatures } from "./lib/features";
 import {
   type PopoutView,
   closeAppCascade,
@@ -25,17 +32,22 @@ import { useShowStore } from "./stores/show";
 type Tab = PopoutView;
 
 const TABS: { id: Tab; labelKey: keyof Translation }[] = [
+  { id: "booth", labelKey: "app.tab.booth" },
   { id: "stage", labelKey: "app.tab.stage" },
   { id: "scenes", labelKey: "app.tab.scenes" },
   { id: "loops", labelKey: "app.tab.loops" },
   { id: "chaser", labelKey: "app.tab.chaser" },
   { id: "movement", labelKey: "app.tab.movement" },
+  { id: "cues", labelKey: "app.tab.cues" },
+  { id: "magic", labelKey: "app.tab.magic" },
   { id: "preview3d", labelKey: "app.tab.preview3d" },
   { id: "config", labelKey: "app.tab.config" },
 ];
 
 function renderTab(tab: Tab) {
   switch (tab) {
+    case "booth":
+      return <BoothView />;
     case "stage":
       return <StageView />;
     case "scenes":
@@ -46,6 +58,10 @@ function renderTab(tab: Tab) {
       return <ChaserView />;
     case "movement":
       return <MovementView />;
+    case "cues":
+      return <CueEditorView />;
+    case "magic":
+      return <AutopilotView />;
     case "preview3d":
       return <Preview3D />;
     case "config":
@@ -60,6 +76,17 @@ function App() {
   // collapse into a minimal header pinned to that view.
   const popoutView = useMemo(readPopoutView, []);
   const [tab, setTab] = useState<Tab>(popoutView ?? "stage");
+  // The cue editor is a per-machine opt-in module: without the flag its
+  // tab doesn't exist, so nothing of it (audio, waveforms) ever mounts.
+  const features = useFeatures();
+  const tabs = TABS.filter(
+    (m) => (m.id !== "cues" || features.cue_editor) && (m.id !== "preview3d" || features.preview3d),
+  );
+  useEffect(() => {
+    if (popoutView) return;
+    if (tab === "cues" && !features.cue_editor) setTab("stage");
+    if (tab === "preview3d" && !features.preview3d) setTab("stage");
+  }, [tab, features.cue_editor, features.preview3d, popoutView]);
   const refresh = useShowStore((s) => s.refresh);
   const initListeners = useShowStore((s) => s.initListeners);
   const renameShow = useShowStore((s) => s.renameShow);
@@ -68,6 +95,7 @@ function App() {
   const blackoutActive = useShowStore((s) => s.show?.globals?.blackout.active ?? false);
   const setBlackout = useShowStore((s) => s.setBlackout);
   const setBlind = useShowStore((s) => s.setBlind);
+  const requestConfigTab = useShowStore((s) => s.requestConfigTab);
 
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
@@ -188,9 +216,19 @@ function App() {
     <div className={`app-root${popoutView ? " app-root--popout" : ""}`}>
       <nav className="tabs">
         <div className="tabs-left">
-          <span className="brand">{popoutLabel ? `DMX · ${popoutLabel}` : t("app.brand")}</span>
+          <span className="brand">
+            {popoutLabel ? (
+              `DMX · ${popoutLabel}`
+            ) : (
+              <>
+                <span className="brand-full">{t("app.brand")}</span>
+                <span className="brand-short">DMX</span>
+              </>
+            )}
+          </span>
+          <MirrorChip />
           {!popoutView &&
-            TABS.map((meta) => {
+            tabs.map((meta) => {
               const label = t(meta.labelKey);
               return (
                 <span key={meta.id} className={`tab-group${tab === meta.id ? " active" : ""}`}>
@@ -292,6 +330,15 @@ function App() {
         </div>
       </nav>
       <div className="tab-body">{renderTab(tab)}</div>
+      {popoutView ? null : (
+        <StatusBar
+          onOpen={(section) => {
+            requestConfigTab(section);
+            setTab("config");
+          }}
+        />
+      )}
+      <HealthBanner />
       {toast ? (
         // <output> is the semantic element for transient status text;
         // matches what biome's a11y rule wants instead of `role="status"`

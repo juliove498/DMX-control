@@ -60,6 +60,11 @@ pub struct Snapshot {
     pub overall_bpm_enabled: bool,
     #[serde(default = "default_overall_bpm")]
     pub overall_bpm: f32,
+    /// Crossfade into this snapshot's channel values, in ms. `0` = hard
+    /// cut (the original behaviour). Master, FX state and blackout still
+    /// switch at once; only the base channel values glide.
+    #[serde(default)]
+    pub fade_in_ms: u32,
 }
 
 fn default_overall_bpm() -> f32 {

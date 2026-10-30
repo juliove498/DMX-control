@@ -3,7 +3,7 @@ import type { D2xxDeviceInfo } from "@bindings/D2xxDeviceInfo";
 import type { OutputBindingConfig } from "@bindings/OutputBindingConfig";
 import type { OutputsConfig } from "@bindings/OutputsConfig";
 import type { SerialPortInfo } from "@bindings/SerialPortInfo";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useT } from "../i18n";
 import type { Translation } from "../i18n/translations";
 import { useShowStore } from "../stores/show";
@@ -228,6 +228,17 @@ export function OutputsView() {
   const refreshFtdiDevices = useShowStore((s) => s.refreshFtdiDevices);
   const artnetScan = useShowStore((s) => s.artnetScan);
   const rdmDiscover = useShowStore((s) => s.rdmDiscover);
+  const outputSuspended = useShowStore((s) => s.outputSuspended);
+  const suspendOutput = useShowStore((s) => s.suspendOutput);
+  const resumeOutput = useShowStore((s) => s.resumeOutput);
+  const refreshOutputSuspended = useShowStore((s) => s.refreshOutputSuspended);
+
+  // The suspend flag lives in backend runtime state; re-sync on mount so
+  // the toggle reflects reality after tab switches (or an RDM discovery
+  // that rebuilt the thread behind our back).
+  useEffect(() => {
+    refreshOutputSuspended().catch(() => {});
+  }, [refreshOutputSuspended]);
 
   const [draft, setDraft] = useState<OutputsConfig | null>(null);
   // RDM discovery over the FTDI line. One run at a time (it pauses the
@@ -320,6 +331,16 @@ export function OutputsView() {
         <div className="actions">
           <button
             type="button"
+            className={`output-suspend-btn${outputSuspended ? " suspended" : ""}`}
+            onClick={() => {
+              (outputSuspended ? resumeOutput() : suspendOutput()).catch(() => {});
+            }}
+            title={t("outputs.suspendHint")}
+          >
+            {outputSuspended ? t("outputs.resume") : t("outputs.suspend")}
+          </button>
+          <button
+            type="button"
             onClick={() => {
               refreshSerialPorts();
               refreshFtdiDevices();
@@ -356,6 +377,12 @@ export function OutputsView() {
           </button>
         </div>
       </header>
+
+      {outputSuspended ? (
+        <div className="output-suspended-banner" role="alert">
+          {t("outputs.suspendedBanner")}
+        </div>
+      ) : null}
 
       {scanOpen ? (
         <section className="artnet-scan-panel" data-doc="artnet-scan">

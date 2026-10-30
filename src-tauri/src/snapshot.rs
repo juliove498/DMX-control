@@ -85,6 +85,7 @@ mod tests {
             blackout: false,
             overall_bpm_enabled: false,
             overall_bpm: 120.0,
+            fade_in_ms: 0,
         }
     }
 

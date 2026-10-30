@@ -43,6 +43,7 @@ pub fn read_autosave() -> Option<(ShowFileV1, Option<PathBuf>)> {
 }
 
 fn write_to(target: &Path, show: &ShowFileV1, path: Option<&Path>) -> Result<(), ShowError> {
+    let _serial = super::file::io_lock().lock();
     if let Some(parent) = target.parent() {
         fs::create_dir_all(parent)?;
     }

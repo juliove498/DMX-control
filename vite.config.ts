@@ -9,6 +9,17 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react()],
 
+  build: {
+    // Vite 7's default target is Safari 16+. The 2015 Intel MacBook's
+    // WKWebView is whatever Safari its last macOS shipped, so transpile
+    // down far enough that the bundle at least *parses* there. Safari 15
+    // is the floor esbuild can actually hit (it refuses to lower
+    // destructuring for safari14 and below), and every macOS we support
+    // (10.15+) can update Safari to at least 15.6. Runtime APIs aren't
+    // polyfilled by esbuild — see src/lib/compat.ts.
+    target: ["es2020", "safari15"],
+  },
+
   resolve: {
     alias: {
       "@bindings": path.resolve(__dirname, "src-tauri/bindings"),

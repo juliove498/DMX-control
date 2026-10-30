@@ -3,6 +3,7 @@ pub mod config;
 pub mod d2xx;
 pub mod discovery;
 pub mod enttec;
+pub mod health;
 pub mod mock;
 pub mod open_dmx;
 pub mod sacn;

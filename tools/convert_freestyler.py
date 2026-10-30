@@ -205,14 +205,38 @@ def convert(pff_path, out_path=None):
     lines = entries[fxt_name].decode("latin-1").replace("\r\n", "\n").split("\n")
 
     manufacturer = lines[0].strip()
-    name = lines[3].strip()
-    channel_count = int(lines[4].strip())
-    fixture_icon = lines[7].strip()
+
+    # Header layout: manufacturer, "Comments:", the comment itself, then
+    # name / channel count / two reserved fields / fixture icon. The
+    # comment is usually one line, but Freestyler wraps multi-line
+    # comments in double quotes ("Para el modo de 11CH\n...\n...com"),
+    # so consume lines until the closing quote in that case.
+    idx = 2
+    first = lines[idx].strip()
+    if first.startswith('"'):
+        closed = len(first) >= 2 and first.endswith('"')
+        idx += 1
+        while not closed and idx < len(lines):
+            if lines[idx].rstrip().endswith('"'):
+                closed = True
+            idx += 1
+    else:
+        idx += 1
+
+    name = lines[idx].strip()
+    channel_count = int(lines[idx + 1].strip())
+    fixture_icon = lines[idx + 4].strip()
 
     # Range tables: <channel> <count> then count × (<value>, <icon path>).
-    i = 8
+    # Newer exports (DarioFreije V2 files) put a lone '0' separator line
+    # after each table; older ones pack tables back-to-back. Skipping
+    # zero lines before each header handles both — a real table never
+    # starts with channel 0.
+    i = idx + 5
     tables = {}
     while True:
+        while i < len(lines) and lines[i].strip() == "0":
+            i += 1
         try:
             ch = int(lines[i].strip())
             cnt = int(lines[i + 1].strip())
@@ -235,8 +259,26 @@ def convert(pff_path, out_path=None):
         tables[ch] = parsed
         i = j
 
-    i += 6  # sentinel block
-    names = [lines[i + k].strip() for k in range(channel_count)]
+    # Channel names: the sentinel block between the tables and the name
+    # list varies in length between exporter versions (6 lines in the
+    # old files; 8 in the V2 ones, which also stash the RGB channel
+    # numbers there). Instead of a fixed offset, scan for the first run
+    # of `channel_count` lines that read as names: the first contains a
+    # letter, and none of the run is an icon path.
+    def _is_icon(s):
+        return "\\" in s or s.lower().endswith((".gif", ".bmp", ".png"))
+
+    def _wordy(s):
+        return bool(re.search(r"[A-Za-z]", s)) and not _is_icon(s)
+
+    names = None
+    for k in range(i, len(lines) - channel_count + 1):
+        cand = [lines[k + n].strip() for n in range(channel_count)]
+        if _wordy(cand[0]) and not any(_is_icon(x) for x in cand):
+            names = cand
+            break
+    if names is None:
+        raise SystemExit("could not locate the channel-name block")
 
     # Macros.
     macros = []
@@ -321,11 +363,25 @@ def convert(pff_path, out_path=None):
         channels.append(c)
 
     # Single-channel macros -> ranges on that channel (if it has none yet).
+    # Multi-channel macros -> mode presets: one-click looks (the app
+    # renders them as tiles in the Stage channel editor). `values` keys
+    # are 1-based channel numbers, matching FixturePreset in fixture.rs.
     by_ch = {}
+    presets = []
     for sets, img in macros:
         if len(sets) == 1:
             ch_n, v = sets[0]
             by_ch.setdefault(ch_n, []).append((v, prettify(base_of(img)), img))
+        elif len(sets) > 1:
+            preset = {
+                "name": prettify(base_of(img)),
+                "values": {str(ch_n): v for ch_n, v in sets},
+            }
+            url = data_url(entries, img)
+            if url:
+                preset["image"] = url
+                preset["image_path"] = img.replace("\\", "/")
+            presets.append(preset)
     for ch_n, pts in by_ch.items():
         c = channels[ch_n - 1]
         if not c.get("ranges"):
@@ -342,8 +398,17 @@ def convert(pff_path, out_path=None):
             {
                 "name": f"{channel_count}ch",
                 "channels": channels,
-                "pan_range": {"min": 0, "max": 65535, "physical_degrees": pan_deg},
-                "tilt_range": {"min": 0, "max": 65535, "physical_degrees": tilt_deg},
+                # Pan/tilt ranges only make sense on movers; a static
+                # wash/blinder shouldn't carry mover defaults.
+                **(
+                    {
+                        "pan_range": {"min": 0, "max": 65535, "physical_degrees": pan_deg},
+                        "tilt_range": {"min": 0, "max": 65535, "physical_degrees": tilt_deg},
+                    }
+                    if any(c["role"] in ("pan", "tilt") for c in channels)
+                    else {}
+                ),
+                **({"presets": presets} if presets else {}),
             }
         ],
         "image": data_url(entries, fixture_icon),

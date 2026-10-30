@@ -8,4 +8,9 @@ address: number, label: string | null,
 /**
  * Position on the 2D stage grid in arbitrary units.
  */
-position: [number, number], };
+position: [number, number], 
+/**
+ * False when the fixture stays home for this event: hidden on Stage,
+ * left out of Modo Mágico and the fixture check, still in the patch.
+ */
+in_use: boolean, };

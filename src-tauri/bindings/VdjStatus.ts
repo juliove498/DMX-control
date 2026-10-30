@@ -9,6 +9,10 @@ export type VdjStatus = { running: boolean,
  */
 last_bpm: number | null, 
 /**
+ * VDJ's VU meter for the playing deck (0..1), when the verb answers.
+ */
+last_level: number | null, 
+/**
  * Last error string from the polling loop. Cleared on the next
  * successful poll.
  */

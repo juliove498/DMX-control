@@ -15,6 +15,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "devtools"] }
 tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
@@ -35,6 +36,9 @@ if-addrs = "0.13"
 # macOS, WASAPI on Windows). cpal does device enumeration + capture;
 # rustfft powers the multiband spectral-flux onset detector (pure Rust).
 cpal = "0.15"
+# Audio file decoding for the cue editor's waveform view (mp3/aac/flac/
+# ogg/wav). Pure Rust, no system codecs needed.
+symphonia = { version = "0.5", features = ["mp3", "aac", "isomp4"] }
 rustfft = "6"
 dirs = "5"
 uuid = { version = "1", features = ["v4", "serde"] }

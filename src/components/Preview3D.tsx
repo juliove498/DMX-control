@@ -1,20 +1,29 @@
-import { Canvas } from "@react-three/fiber";
+import type { FixtureInstance } from "@bindings/FixtureInstance";
+import { Canvas, useThree } from "@react-three/fiber";
 import { Bloom, EffectComposer, ToneMapping } from "@react-three/postprocessing";
 import { BlendFunction, ToneMappingMode } from "postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
+import { useT } from "../i18n";
+import { saveFeatures, useFeatures } from "../lib/features";
 import { useShowStore } from "../stores/show";
 import { Audience } from "./preview3d/Audience";
 import { type CameraPreset, CameraRig, type PresetTransition } from "./preview3d/CameraRig";
 import { Fixture3D } from "./preview3d/Fixture3D";
+import { type EditTool, RigEditor, type RigSelection } from "./preview3d/RigEditor";
 import { StageConfigPanel } from "./preview3d/StageConfigPanel";
 import { StageGeometry } from "./preview3d/StageGeometry";
+import { type QualityLevel, qualityFor } from "./preview3d/quality";
 import { type StageConfig, loadStageConfig, saveStageConfig } from "./preview3d/stageConfig";
 import {
   fixtureHasGoboWheel,
   fixtureIsSpotKind,
   useFixtureLightStates,
 } from "./preview3d/useFixtureLightStates";
+
+// Stable fallback so effects keyed on `fixtures` don't re-run every
+// render while no show is loaded.
+const EMPTY_FIXTURES: FixtureInstance[] = [];
 
 const P3D_PANEL_WIDTH_KEY = "preview3d.panelWidth";
 const P3D_PANEL_MIN = 220;
@@ -30,7 +39,43 @@ function clampPanelWidth(w: number): number {
 /// camera + sidebar. The actual rendering happens inside the
 /// `<Canvas>` so React Three Fiber can manage the WebGL context;
 /// everything outside the canvas is plain DOM.
+/// Caps the frame rate in demand mode: instead of rendering on every
+/// vsync, we ask for a frame N times a second. Cheap machines get a
+/// smooth-enough preview without pinning the GPU.
+function FrameLimiter({ fps }: { fps: number | null }) {
+  const invalidate = useThree((s) => s.invalidate);
+  useEffect(() => {
+    if (!fps) return;
+    const id = window.setInterval(() => invalidate(), 1000 / fps);
+    return () => window.clearInterval(id);
+  }, [fps, invalidate]);
+  return null;
+}
+
 export function Preview3D() {
+  const t = useT();
+  const features = useFeatures();
+  const quality = useMemo(
+    () => qualityFor(features.preview3d_quality),
+    [features.preview3d_quality],
+  );
+  const setQuality = (level: QualityLevel) => {
+    saveFeatures({ ...features, preview3d_quality: level }).catch(() => {});
+  };
+  const [editMode, setEditMode] = useState(false);
+  const [tool, setTool] = useState<EditTool>("translate");
+  const [selection, setSelection] = useState<RigSelection>(null);
+  useEffect(() => {
+    if (!editMode) {
+      setSelection(null);
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSelection(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [editMode]);
   const show = useShowStore((s) => s.show);
   const showPath = useShowStore((s) => s.showPath);
   const library = useShowStore((s) => s.library);
@@ -92,7 +137,11 @@ export function Preview3D() {
     document.addEventListener("pointerup", onUp);
   };
 
-  const fixtures = show?.fixtures ?? [];
+  // Fixtures left home for this event don't exist in the room either.
+  const fixtures = useMemo(
+    () => (show ? show.fixtures.filter((f) => f.in_use !== false) : EMPTY_FIXTURES),
+    [show],
+  );
   const lightStates = useFixtureLightStates(fixtures, library);
 
   // Stable plane instances reused by every beam material's
@@ -185,14 +234,69 @@ export function Preview3D() {
     config.definitionOverrides,
   ]);
 
+  const positionsById = useMemo(() => {
+    const m: Record<string, [number, number, number]> = {};
+    for (const p of placements) m[p.id] = p.position;
+    return m;
+  }, [placements]);
+  const selectedFixtureId = selection?.kind === "fixture" ? selection.id : null;
+  const attachedTo =
+    selectedFixtureId && config.fixturePlacements[selectedFixtureId]?.mode === "truss"
+      ? config.trusses.find(
+          (tr) => tr.id === config.fixturePlacements[selectedFixtureId]?.truss.trussId,
+        )
+      : undefined;
+
   return (
     <main className="page p3d-page">
       <header className="page-head">
         <h2>Preview 3D</h2>
         <span className="meta">
-          {fixtures.length} fixtures · live DMX 30fps · cone+bloom volumetric
+          {fixtures.length} fixtures · {quality.level}
+          {editMode ? ` · ${t("p3d.edit.hint")}` : ""}
+          {attachedTo
+            ? ` · ${t("p3d.edit.snapped", { truss: attachedTo.name ?? attachedTo.id })}`
+            : ""}
         </span>
         <div className="actions">
+          <label className="p3d-quality">
+            {t("p3d.quality")}
+            <select
+              value={quality.level}
+              onChange={(e) => setQuality(e.currentTarget.value as QualityLevel)}
+            >
+              <option value="low">{t("general.quality.low")}</option>
+              <option value="medium">{t("general.quality.medium")}</option>
+              <option value="high">{t("general.quality.high")}</option>
+            </select>
+          </label>
+          <span className="p3d-edit-tools">
+            <button
+              type="button"
+              className={editMode ? "active" : ""}
+              onClick={() => setEditMode((v) => !v)}
+            >
+              ✥ {t("p3d.edit")}
+            </button>
+            {editMode ? (
+              <>
+                <button
+                  type="button"
+                  className={tool === "translate" ? "active" : ""}
+                  onClick={() => setTool("translate")}
+                >
+                  {t("p3d.edit.move")}
+                </button>
+                <button
+                  type="button"
+                  className={tool === "rotate" ? "active" : ""}
+                  onClick={() => setTool("rotate")}
+                >
+                  {t("p3d.edit.rotate")}
+                </button>
+              </>
+            ) : null}
+          </span>
           <CameraButtons request={cameraReq.preset} onPick={requestCamera} />
           <button
             type="button"
@@ -218,10 +322,12 @@ export function Preview3D() {
             // shadows on geometry (no mesh has receiveShadow); we
             // just need the shader path active so the gobo texture
             // gets projected through the light frustum.
-            shadows="basic"
-            dpr={[1, 2]}
+            shadows={quality.shadows ? "basic" : false}
+            dpr={quality.dpr}
+            frameloop={quality.fpsCap ? "demand" : "always"}
+            onPointerMissed={() => setSelection(null)}
             gl={{
-              antialias: true,
+              antialias: quality.level !== "low",
               powerPreference: "high-performance",
               toneMapping: THREE.ACESFilmicToneMapping,
               toneMappingExposure: 1.1,
@@ -256,13 +362,18 @@ export function Preview3D() {
                 12 m, ~50 % at 25 m — visible but breathable. */}
             <fogExp2 attach="fog" args={["#0a0e15", config.atmosphere * 0.028]} />
 
+            <FrameLimiter fps={quality.fpsCap} />
             <CameraRig
               request={cameraReq}
               dims={{ width: config.floor.width, depth: config.floor.depth }}
             />
 
-            <StageGeometry config={config} />
-            <Audience config={config.audience} />
+            <StageGeometry
+              config={config}
+              selectedTrussId={selection && selection.kind !== "fixture" ? selection.id : null}
+              onSelectTruss={editMode ? (id) => setSelection({ kind: "truss", id }) : undefined}
+            />
+            {quality.audience ? <Audience config={config.audience} /> : null}
 
             {placements.map((p) => (
               <Fixture3D
@@ -277,25 +388,42 @@ export function Preview3D() {
                 overrides={p.overrides}
                 hasGobo={p.hasGobo}
                 isSpot={p.isSpot}
+                quality={quality}
+                stage={{ depth: config.floor.depth, wallEnabled: config.backWall.enabled }}
+                selected={selectedFixtureId === p.id}
+                onSelect={editMode ? () => setSelection({ kind: "fixture", id: p.id }) : undefined}
               />
             ))}
 
-            <EffectComposer multisampling={2}>
-              {/* Bloom is what makes the cones look like real
+            {editMode ? (
+              <RigEditor
+                config={config}
+                onChange={setConfig}
+                selection={selection}
+                onSelect={setSelection}
+                tool={tool}
+                positions={positionsById}
+              />
+            ) : null}
+
+            {quality.bloom ? (
+              <EffectComposer multisampling={quality.msaa}>
+                {/* Bloom is what makes the cones look like real
                   beams. Threshold low so emissives glow even when
                   the colour isn't saturated. */}
-              <Bloom
-                intensity={1.4}
-                luminanceThreshold={0.18}
-                luminanceSmoothing={0.85}
-                mipmapBlur
-                blendFunction={BlendFunction.SCREEN}
-              />
-              {/* ACES tone mapping inside the composer keeps colours
+                <Bloom
+                  intensity={1.4}
+                  luminanceThreshold={0.18}
+                  luminanceSmoothing={0.85}
+                  mipmapBlur
+                  blendFunction={BlendFunction.SCREEN}
+                />
+                {/* ACES tone mapping inside the composer keeps colours
                   smooth at high intensity instead of clipping to
                   white. */}
-              <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-            </EffectComposer>
+                <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+              </EffectComposer>
+            ) : null}
           </Canvas>
         </div>
         {showPanel ? (

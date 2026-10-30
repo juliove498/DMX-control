@@ -4,6 +4,7 @@ import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { useMemo, useState } from "react";
 import { useT } from "../i18n";
+import { deepClone } from "../lib/compat";
 import { fixtureImageSrc } from "../lib/fixtureImage";
 import { useShowStore } from "../stores/show";
 
@@ -15,10 +16,11 @@ export function LibraryView() {
   const setFixtureImage = useShowStore((s) => s.setFixtureImage);
   const setChannelRangeImage = useShowStore((s) => s.setChannelRangeImage);
   const [filter, setFilter] = useState("");
-  // Which fixture has its gobo / range editor expanded. Single-row
-  // expansion (rather than per-row toggles) keeps the panel scroll
-  // predictable when the operator hops between fixtures.
-  const [openId, setOpenId] = useState<string | null>(null);
+  // Which fixture has a sub-panel expanded, and which panel: the gobo
+  // thumbnail grid or the full definition editor. Single-row expansion
+  // (rather than per-row toggles) keeps the panel scroll predictable
+  // when the operator hops between fixtures.
+  const [openPanel, setOpenPanel] = useState<{ id: string; kind: "gobos" | "edit" } | null>(null);
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -112,7 +114,7 @@ export function LibraryView() {
       <div className="lib-list">
         {filtered.map((d) => {
           const imageUrl = fixtureImageSrc(d.image, libraryDir);
-          const open = openId === d.id;
+          const open = openPanel?.id === d.id ? openPanel.kind : null;
           return (
             <div key={d.id} className={`lib-item${open ? " expanded" : ""}`}>
               <div className="lib-item-row">
@@ -146,20 +148,33 @@ export function LibraryView() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setOpenId(open ? null : d.id)}
-                    title={open ? t("library.gobosCollapse") : t("library.gobosToggle")}
+                    onClick={() =>
+                      setOpenPanel(open === "gobos" ? null : { id: d.id, kind: "gobos" })
+                    }
+                    title={open === "gobos" ? t("library.gobosCollapse") : t("library.gobosToggle")}
                   >
-                    {open ? "▾" : "▸"}{" "}
-                    {open ? t("library.gobosCollapse") : t("library.gobosToggle")}
+                    {open === "gobos" ? "▾" : "▸"}{" "}
+                    {open === "gobos" ? t("library.gobosCollapse") : t("library.gobosToggle")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setOpenPanel(open === "edit" ? null : { id: d.id, kind: "edit" })
+                    }
+                  >
+                    {open === "edit" ? "▾" : "▸"} {t("library.edit")}
                   </button>
                 </div>
               </div>
-              {open ? (
+              {open === "gobos" ? (
                 <RangesEditor
                   def={d}
                   libraryDir={libraryDir}
                   onPick={(mi, ci, ri) => pickRangeImage(d.id, mi, ci, ri)}
                 />
+              ) : null}
+              {open === "edit" ? (
+                <DefinitionEditor key={d.id} def={d} onClose={() => setOpenPanel(null)} />
               ) : null}
             </div>
           );
@@ -296,6 +311,389 @@ function ChannelRangeList({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+/// Every non-`other` role the backend understands, in the order the
+/// role dropdown lists them. Mirrors `ChannelRole` in fixture.rs —
+/// keep in sync when adding roles there.
+const STANDARD_ROLES = [
+  "intensity",
+  "red",
+  "green",
+  "blue",
+  "white",
+  "amber",
+  "uv",
+  "cyan",
+  "magenta",
+  "yellow",
+  "pan",
+  "pan_fine",
+  "tilt",
+  "tilt_fine",
+  "color_wheel",
+  "gobo",
+  "strobe",
+  "zoom",
+  "focus",
+  "iris",
+  "shutter",
+] as const;
+
+/// Sentinel value for the role <select> meaning "custom role" — the
+/// actual string then lives in a free-text input next to it.
+const ROLE_OTHER = "__other";
+
+/// Deep-copy a definition and materialise the fields serde may have
+/// dropped from the IPC payload (`ranges` when empty, `name` /
+/// `description` when null) so the form can bind to them directly.
+function normalizeDef(def: FixtureDefinition): FixtureDefinition {
+  const d = deepClone(def);
+  for (const m of d.modes) {
+    for (const c of m.channels) {
+      c.ranges = c.ranges ?? [];
+      c.name = c.name ?? null;
+      c.description = c.description ?? null;
+    }
+  }
+  return d;
+}
+
+function clampDmx(v: string): number {
+  const n = Math.round(Number(v));
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(255, n));
+}
+
+/// In-place editor for one fixture definition: a friendly form for the
+/// common edits (names, roles, defaults, range labels/limits) plus a
+/// raw-JSON tab for anything the form doesn't cover (adding channels,
+/// modes, pan/tilt ranges…). Both tabs save through the same backend
+/// command, which validates and rewrites the library JSON atomically.
+function DefinitionEditor({ def, onClose }: { def: FixtureDefinition; onClose: () => void }) {
+  const t = useT();
+  const updateFixtureDefinition = useShowStore((s) => s.updateFixtureDefinition);
+  const [draft, setDraft] = useState<FixtureDefinition>(() => normalizeDef(def));
+  const [tab, setTab] = useState<"form" | "json">("form");
+  const [jsonText, setJsonText] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  /// All form edits funnel through here: clone, mutate, set. Cloning
+  /// per keystroke is fine — the biggest definitions are a few hundred
+  /// KB of base64 image and clone in well under a millisecond.
+  const patchDraft = (fn: (d: FixtureDefinition) => void) => {
+    setDraft((prev) => {
+      const next = deepClone(prev);
+      fn(next);
+      return next;
+    });
+  };
+
+  const switchTab = (next: "form" | "json") => {
+    if (next === tab) return;
+    setError(null);
+    if (next === "json") {
+      setJsonText(JSON.stringify(draft, null, 2));
+      setTab("json");
+      return;
+    }
+    // Leaving the raw tab: parse it back into the draft so the form
+    // shows the manual edits. A broken buffer keeps you on the raw tab
+    // with the error visible instead of silently discarding your text.
+    try {
+      setDraft(normalizeDef(JSON.parse(jsonText) as FixtureDefinition));
+      setTab("form");
+    } catch (e) {
+      setError(t("library.editSaveError", { err: stringifyError(e) }));
+    }
+  };
+
+  const save = async () => {
+    setError(null);
+    setSaving(true);
+    try {
+      const body = tab === "json" ? jsonText : JSON.stringify(draft, null, 2);
+      await updateFixtureDefinition(def.id, body);
+      onClose();
+    } catch (e) {
+      setError(t("library.editSaveError", { err: stringifyError(e) }));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="lib-editor">
+      <div className="lib-editor-tabs">
+        <button
+          type="button"
+          className={tab === "form" ? "active" : ""}
+          onClick={() => switchTab("form")}
+        >
+          {t("library.editTabForm")}
+        </button>
+        <button
+          type="button"
+          className={tab === "json" ? "active" : ""}
+          onClick={() => switchTab("json")}
+        >
+          {t("library.editTabJson")}
+        </button>
+        <span className="lib-editor-id">{t("library.editIdNote", { id: def.id })}</span>
+      </div>
+      {error ? (
+        <div className="lib-error" role="alert">
+          {error}
+        </div>
+      ) : null}
+      {tab === "form" ? (
+        <div className="lib-editor-form">
+          <div className="lib-editor-head">
+            <label>
+              {t("library.editManufacturer")}
+              <input
+                value={draft.manufacturer}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  patchDraft((d) => {
+                    d.manufacturer = v;
+                  });
+                }}
+              />
+            </label>
+            <label>
+              {t("library.editName")}
+              <input
+                value={draft.name}
+                onChange={(e) => {
+                  const v = e.currentTarget.value;
+                  patchDraft((d) => {
+                    d.name = v;
+                  });
+                }}
+              />
+            </label>
+          </div>
+          {draft.modes.map((mode, mi) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: modes are positional and edited in place
+            <div key={mi} className="lib-editor-mode">
+              <label className="lib-editor-modename">
+                {t("library.editModeName")}
+                <input
+                  value={mode.name}
+                  onChange={(e) => {
+                    const v = e.currentTarget.value;
+                    patchDraft((d) => {
+                      d.modes[mi].name = v;
+                    });
+                  }}
+                />
+              </label>
+              <div className="lib-editor-chan-head" aria-hidden="true">
+                <span />
+                <span>{t("library.editColName")}</span>
+                <span>{t("library.editColRole")}</span>
+                <span>{t("library.editColDefault")}</span>
+                <span>{t("library.editColDescription")}</span>
+              </div>
+              {mode.channels.map((ch, ci) => (
+                <ChannelEditorRow
+                  // biome-ignore lint/suspicious/noArrayIndexKey: channels are positional and edited in place
+                  key={ci}
+                  channel={ch}
+                  modeIndex={mi}
+                  channelIndex={ci}
+                  patchDraft={patchDraft}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="lib-editor-json">
+          <p className="hint">{t("library.editJsonHint")}</p>
+          <textarea
+            value={jsonText}
+            onChange={(e) => setJsonText(e.currentTarget.value)}
+            spellCheck={false}
+            rows={22}
+          />
+        </div>
+      )}
+      <div className="lib-editor-actions">
+        <button type="button" onClick={onClose}>
+          {t("common.cancel")}
+        </button>
+        <button type="button" className="primary" disabled={saving} onClick={save}>
+          {t("common.save")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ChannelEditorRow({
+  channel,
+  modeIndex,
+  channelIndex,
+  patchDraft,
+}: {
+  channel: ChannelDefinition;
+  modeIndex: number;
+  channelIndex: number;
+  patchDraft: (fn: (d: FixtureDefinition) => void) => void;
+}) {
+  const t = useT();
+  const patchChannel = (fn: (c: ChannelDefinition) => void) =>
+    patchDraft((d) => {
+      fn(d.modes[modeIndex].channels[channelIndex]);
+    });
+  const roleValue = typeof channel.role === "string" ? channel.role : ROLE_OTHER;
+  const ranges = channel.ranges ?? [];
+
+  return (
+    <div className="lib-editor-ch">
+      <div className="lib-editor-ch-main">
+        <span className="chnum">{channelIndex + 1}</span>
+        <input
+          value={channel.name ?? ""}
+          placeholder={roleString(channel.role)}
+          onChange={(e) => {
+            const v = e.currentTarget.value;
+            patchChannel((c) => {
+              c.name = v.length > 0 ? v : null;
+            });
+          }}
+        />
+        <div className="lib-editor-role">
+          <select
+            value={roleValue}
+            onChange={(e) => {
+              const v = e.currentTarget.value;
+              patchChannel((c) => {
+                c.role = v === ROLE_OTHER ? { other: "" } : (v as ChannelRole);
+              });
+            }}
+          >
+            {STANDARD_ROLES.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+            <option value={ROLE_OTHER}>{t("library.editRoleCustom")}</option>
+          </select>
+          {typeof channel.role !== "string" ? (
+            <input
+              value={channel.role.other}
+              placeholder="custom_role"
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                patchChannel((c) => {
+                  c.role = { other: v };
+                });
+              }}
+            />
+          ) : null}
+        </div>
+        <input
+          type="number"
+          min={0}
+          max={255}
+          value={channel.default}
+          onChange={(e) => {
+            const v = clampDmx(e.currentTarget.value);
+            patchChannel((c) => {
+              c.default = v;
+            });
+          }}
+        />
+        <input
+          value={channel.description ?? ""}
+          onChange={(e) => {
+            const v = e.currentTarget.value;
+            patchChannel((c) => {
+              c.description = v.length > 0 ? v : null;
+            });
+          }}
+        />
+      </div>
+      <div className="lib-editor-ranges">
+        {ranges.length > 0 ? <span className="ranges-label">{t("library.editRanges")}</span> : null}
+        {ranges.map((range, ri) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: ranges are positional and edited in place
+          <div key={ri} className="lib-editor-range">
+            <input
+              type="number"
+              min={0}
+              max={255}
+              value={range.from}
+              onChange={(e) => {
+                const v = clampDmx(e.currentTarget.value);
+                patchChannel((c) => {
+                  c.ranges[ri].from = v;
+                });
+              }}
+            />
+            <span aria-hidden="true">–</span>
+            <input
+              type="number"
+              min={0}
+              max={255}
+              value={range.to}
+              onChange={(e) => {
+                const v = clampDmx(e.currentTarget.value);
+                patchChannel((c) => {
+                  c.ranges[ri].to = v;
+                });
+              }}
+            />
+            <input
+              className="range-label"
+              value={range.label}
+              onChange={(e) => {
+                const v = e.currentTarget.value;
+                patchChannel((c) => {
+                  c.ranges[ri].label = v;
+                });
+              }}
+            />
+            <button
+              type="button"
+              className="range-remove"
+              title={t("library.editRemoveRange")}
+              onClick={() =>
+                patchChannel((c) => {
+                  c.ranges.splice(ri, 1);
+                })
+              }
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="lib-editor-addrange"
+          onClick={() =>
+            patchChannel((c) => {
+              const last = c.ranges[c.ranges.length - 1];
+              const from = last ? Math.min(255, last.to + 1) : 0;
+              c.ranges.push({
+                from,
+                to: Math.min(255, from + 49),
+                label: "",
+                image: null,
+                image_path: null,
+              });
+            })
+          }
+        >
+          {t("library.editAddRange")}
+        </button>
       </div>
     </div>
   );

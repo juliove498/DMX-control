@@ -1,7 +1,12 @@
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
 import { FixturesPanel } from "./FixturesPanel";
-import type { StageConfig, TrussSegment } from "./stageConfig";
+import {
+  type StageConfig,
+  type StagePreset,
+  type TrussSegment,
+  applyStagePreset,
+} from "./stageConfig";
 
 /// Sidebar to tweak stage dimensions and rigging. Persists via the
 /// parent's onChange callback (which writes to localStorage). All
@@ -50,6 +55,17 @@ export function StageConfigPanel({
   return (
     <aside className="p3d-panel">
       <h3>Escenario</h3>
+
+      <section className="p3d-section">
+        <h4>Ambiente</h4>
+        <div className="p3d-presets">
+          {(["club", "theatre", "rehearsal"] as StagePreset[]).map((p) => (
+            <button key={p} type="button" onClick={() => onChange(applyStagePreset(config, p))}>
+              {p === "club" ? "Club" : p === "theatre" ? "Teatro" : "Sala de ensayo"}
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className="p3d-section">
         <h4>Piso</h4>

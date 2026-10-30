@@ -298,6 +298,7 @@ fn run_listener(
     // True while WE are feeding beat anchors — so we can clear them
     // (and only ours) when sync turns off / signal drops / we exit.
     let mut anchoring = false;
+    let mut last_energy_at = Instant::now();
 
     while !stop_flag.load(Ordering::Relaxed) {
         if let Some(e) = err_flag.lock().take() {
@@ -311,6 +312,15 @@ fn run_listener(
             }
             Err(crossbeam_channel::RecvTimeoutError::Timeout) => {}
             Err(crossbeam_channel::RecvTimeoutError::Disconnected) => break,
+        }
+
+        // Modo Mágico energy, 10×/s (already enveloped inside the detector).
+        if last_energy_at.elapsed() >= Duration::from_millis(100) {
+            last_energy_at = Instant::now();
+            crate::autopilot::set_energy_sample(
+                crate::autopilot::EnergySource::Mic,
+                detector.energy(),
+            );
         }
 
         if last_estimate_at.elapsed() >= Duration::from_millis(500) {
@@ -374,11 +384,16 @@ fn run_listener(
                             };
                             chasers.lock().set_beat_anchor(Some(anchor));
                             movement.lock().set_beat_anchor(Some(anchor));
+                            crate::autopilot::set_beat_anchor(
+                                Some(anchor),
+                                crate::autopilot::ClockSource::Mic,
+                            );
                             anchoring = true;
                         }
                     } else if anchoring && (!phase || vdj_owns) {
                         chasers.lock().set_beat_anchor(None);
                         movement.lock().set_beat_anchor(None);
+                        crate::autopilot::set_beat_anchor(None, crate::autopilot::ClockSource::Mic);
                         anchoring = false;
                     }
                 }
@@ -394,6 +409,7 @@ fn run_listener(
                     if anchoring {
                         chasers.lock().set_beat_anchor(None);
                         movement.lock().set_beat_anchor(None);
+                        crate::autopilot::set_beat_anchor(None, crate::autopilot::ClockSource::Mic);
                         anchoring = false;
                     }
                 }
@@ -404,6 +420,7 @@ fn run_listener(
     if anchoring {
         chasers.lock().set_beat_anchor(None);
         movement.lock().set_beat_anchor(None);
+        crate::autopilot::set_beat_anchor(None, crate::autopilot::ClockSource::Mic);
     }
     shared.lock().running = false;
     tracing::info!("audio bpm listener stopped");
@@ -477,6 +494,13 @@ pub struct OnsetDetector {
     rms_acc: f64,
     rms_fill: usize,
     rms_smooth: f32,
+    /// Kick band (≈40–160 Hz) bins, envelope and slow peak for the
+    /// musical energy; broadband peak likewise.
+    bass_bins: (usize, usize),
+    bass_env: f32,
+    bass_peak: f32,
+    broad_peak: f32,
+    energy_smooth: f32,
     frame_count: usize,
     last_beat_frame: usize,
     scratch: Vec<rustfft::num_complex::Complex<f32>>,
@@ -510,6 +534,8 @@ impl OnsetDetector {
             start = end;
         }
         let n_bands = band_bins.len();
+        let bass_lo = bin_of(40.0).min(FRAME / 2 - 1);
+        let bass_hi = bin_of(160.0).max(bass_lo + 1).min(FRAME / 2);
         Self {
             sample_rate,
             fft,
@@ -524,6 +550,11 @@ impl OnsetDetector {
             rms_acc: 0.0,
             rms_fill: 0,
             rms_smooth: 0.0,
+            bass_bins: (bass_lo, bass_hi),
+            bass_env: 0.0,
+            bass_peak: 1e-4,
+            broad_peak: 1e-4,
+            energy_smooth: 0.0,
             frame_count: 0,
             last_beat_frame: 0,
             scratch: vec![rustfft::num_complex::Complex::new(0.0, 0.0); FRAME],
@@ -546,6 +577,14 @@ impl OnsetDetector {
 
     pub fn is_silent(&self) -> bool {
         self.rms_smooth < SILENCE_RMS
+    }
+
+    /// Musical energy 0..1 for Modo Mágico: how loud the kick band and the
+    /// whole mix are compared to this set's loudest moments (dB, against
+    /// peaks that decay over a minute). Independent of mic gain/distance;
+    /// an intro without drums reads low, the drop reads full.
+    pub fn energy(&self) -> f32 {
+        self.energy_smooth
     }
 
     /// Feed mono samples. Returns true when a beat tick (onset above the
@@ -587,6 +626,44 @@ impl OnsetDetector {
             c.im = 0.0;
         }
         self.fft.process(&mut self.scratch);
+
+        // Musical energy: kick band + broadband, each measured in dB
+        // against its own slow-decaying peak.
+        {
+            let rate = self.env_rate();
+            let coef = |tau: f32| 1.0 - (-1.0 / (rate * tau)).exp();
+            let (lo, hi) = self.bass_bins;
+            let mut b = 0.0f32;
+            for bin in lo..hi {
+                b += self.scratch[bin].norm_sqr();
+            }
+            let bass = (b / (hi - lo).max(1) as f32).sqrt();
+            let a = if bass > self.bass_env {
+                coef(0.05)
+            } else {
+                coef(0.6)
+            };
+            self.bass_env += (bass - self.bass_env) * a;
+            let decay = 0.5f32.powf(1.0 / (rate * 60.0));
+            self.bass_peak = (self.bass_peak * decay).max(self.bass_env).max(1e-4);
+            self.broad_peak = (self.broad_peak * decay).max(self.rms_smooth).max(1e-4);
+            let norm = |x: f32, peak: f32| {
+                let db = 20.0 * (x.max(1e-7) / peak).log10();
+                (1.0 + db / 24.0).clamp(0.0, 1.0)
+            };
+            let target = if self.rms_smooth < SILENCE_RMS {
+                0.0
+            } else {
+                0.65 * norm(self.bass_env, self.bass_peak)
+                    + 0.35 * norm(self.rms_smooth, self.broad_peak)
+            };
+            let a = if target > self.energy_smooth {
+                coef(0.15)
+            } else {
+                coef(1.0)
+            };
+            self.energy_smooth += (target - self.energy_smooth) * a;
+        }
 
         // Multiband positive log-energy flux. Gain shifts every band's
         // log by the same constant, so the difference is level-proof;

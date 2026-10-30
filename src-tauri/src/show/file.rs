@@ -10,9 +10,11 @@ use super::fixture::{FixtureDefinition, FixtureInstance};
 use super::loop_group::SceneLoopGroup;
 use super::scene::Scene;
 use super::snapshot::Snapshot;
+use super::track_cues::TrackCueSet;
 use crate::chaser::AmbientChaser;
 use crate::globals::GlobalsConfig;
 use crate::movement::MovementGenerator;
+use crate::os2l::Os2lConfig;
 use crate::output::config::OutputsConfig;
 use crate::vdj::VdjConfig;
 
@@ -85,6 +87,17 @@ pub struct ShowFileV1 {
     /// re-arms the poller at boot.
     #[serde(default)]
     pub vdj: VdjConfig,
+    /// OS2L server config (VirtualDJ cues → actions). Same persistence
+    /// rationale as `vdj`.
+    #[serde(default)]
+    pub os2l: Os2lConfig,
+    /// Per-track cue lists (the app's own POI system, fired by the
+    /// VDJ cue follower). Keyed by VDJ file path.
+    #[serde(default)]
+    pub track_cues: Vec<TrackCueSet>,
+    /// Modo Mágico (autopilot) settings — the looks it improvises are never persisted.
+    #[serde(default)]
+    pub autopilot: crate::autopilot::AutopilotConfig,
 }
 
 impl Default for ShowFileV1 {
@@ -104,6 +117,9 @@ impl Default for ShowFileV1 {
             button_bindings: ButtonBindings::default(),
             library: Vec::new(),
             vdj: VdjConfig::default(),
+            os2l: Os2lConfig::default(),
+            track_cues: Vec::new(),
+            autopilot: crate::autopilot::AutopilotConfig::default(),
         }
     }
 }
@@ -163,7 +179,16 @@ pub fn load(path: &Path) -> Result<ShowFileV1, ShowError> {
 ///
 /// On each save we rotate `.bak.2 → .bak.3`, `.bak.1 → .bak.2`, current → `.bak.1`,
 /// then write the new contents atomically (write to temp, rename).
+/// One writer at a time: the show file, its backups and the autosave share
+/// temp names, and two concurrent saves (a cue from VirtualDJ while the UI
+/// persists) raced each other's rename into "No such file or directory".
+pub(crate) fn io_lock() -> &'static parking_lot::Mutex<()> {
+    static L: std::sync::OnceLock<parking_lot::Mutex<()>> = std::sync::OnceLock::new();
+    L.get_or_init(|| parking_lot::Mutex::new(()))
+}
+
 pub fn save(path: &Path, show: &ShowFileV1) -> Result<(), ShowError> {
+    let _serial = io_lock().lock();
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent)?;

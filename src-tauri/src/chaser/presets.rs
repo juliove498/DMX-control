@@ -206,6 +206,7 @@ mod tests {
             address: 1,
             label: None,
             position: [0.0, 0.0],
+            in_use: true,
         }];
         let presets = example_chasers(&fixtures);
         for p in presets {

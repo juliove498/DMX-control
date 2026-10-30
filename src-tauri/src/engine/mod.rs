@@ -7,6 +7,7 @@ use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use ts_rs::TS;
 
 pub const DMX_CHANNELS: usize = 512;
@@ -76,9 +77,28 @@ impl Universe {
     }
 }
 
+/// Crossfade of the base layer toward a full-universe target (a
+/// snapshot with a fade). Ticked by the output thread each frame; a
+/// scene recall or a hard snapshot cancels it.
+#[derive(Debug, Clone)]
+pub struct BaseFade {
+    universes: Vec<BaseFadeUniverse>,
+    started: Instant,
+    duration: Duration,
+}
+
+#[derive(Debug, Clone)]
+struct BaseFadeUniverse {
+    id: u16,
+    from: [u8; DMX_CHANNELS],
+    to: [u8; DMX_CHANNELS],
+}
+
 #[derive(Debug)]
 pub struct EngineInner {
     pub universes: Vec<Universe>,
+    /// Snapshot crossfade in flight, if any (see `start_base_fade`).
+    pub base_fade: Option<BaseFade>,
     pub master: u8,
     /// Animated blackout factor in `[0, 1]`. `0` = no blackout; `1` = full
     /// blackout. Driven by `globals::runtime` so the user gets configurable
@@ -114,6 +134,14 @@ pub struct EngineInner {
     /// engine-only contexts (tests, mid-startup) from suddenly losing
     /// their master before the runtime has populated the mask.
     pub master_mask: HashMap<u16, ChannelMask>,
+    /// Safe-boot hold: channels forced to 0 with absolute priority,
+    /// after every other layer. Used while a fixture powers up — cheap
+    /// moving heads read DMX during their homing sweep, and a non-zero
+    /// pan/tilt frame corrupts their end-stop reference (they then slam
+    /// the physical stops). Holding the fixture's whole footprint at 0
+    /// reproduces what a manual console with all faders down sends,
+    /// which is the condition under which these fixtures home cleanly.
+    pub safe_boot_mask: HashMap<u16, ChannelMask>,
 }
 
 impl EngineInner {
@@ -121,6 +149,7 @@ impl EngineInner {
         let universes = (0..universe_count).map(Universe::new).collect();
         Self {
             universes,
+            base_fade: None,
             master: 255,
             blackout_factor: 0.0,
             effects_overlay: HashMap::new(),
@@ -128,6 +157,7 @@ impl EngineInner {
             blind_factor: 0.0,
             blackout_overlay: HashMap::new(),
             master_mask: HashMap::new(),
+            safe_boot_mask: HashMap::new(),
         }
     }
 
@@ -137,6 +167,7 @@ impl EngineInner {
         universes.dedup_by_key(|u| u.id);
         Self {
             universes,
+            base_fade: None,
             master: 255,
             blackout_factor: 0.0,
             effects_overlay: HashMap::new(),
@@ -144,6 +175,7 @@ impl EngineInner {
             blind_factor: 0.0,
             blackout_overlay: HashMap::new(),
             master_mask: HashMap::new(),
+            safe_boot_mask: HashMap::new(),
         }
     }
 
@@ -180,6 +212,78 @@ impl EngineInner {
         }
         u.data[idx] = value;
         Ok(())
+    }
+
+    /// Glide the base layer of the given universes from where it is now
+    /// to `targets` over `duration`. Universes unknown to the engine are
+    /// skipped. Replaces any fade in flight — the current values are the
+    /// new start, so the glide stays continuous.
+    pub fn start_base_fade(
+        &mut self,
+        targets: &[(u16, [u8; DMX_CHANNELS])],
+        duration: Duration,
+        now: Instant,
+    ) {
+        let universes: Vec<BaseFadeUniverse> = targets
+            .iter()
+            .filter_map(|(id, to)| {
+                let from = self.snapshot_base(*id)?;
+                Some(BaseFadeUniverse {
+                    id: *id,
+                    from,
+                    to: *to,
+                })
+            })
+            .collect();
+        self.base_fade = (!universes.is_empty()).then_some(BaseFade {
+            universes,
+            started: now,
+            duration,
+        });
+    }
+
+    pub fn cancel_base_fade(&mut self) {
+        self.base_fade = None;
+    }
+
+    pub fn base_fade_active(&self) -> bool {
+        self.base_fade.is_some()
+    }
+
+    /// Advance the base fade, writing the interpolated values into the
+    /// universes. Drops itself once the target has landed.
+    pub fn tick_base_fade(&mut self, now: Instant) {
+        let Self {
+            universes,
+            base_fade,
+            ..
+        } = self;
+        let Some(fade) = base_fade.as_ref() else {
+            return;
+        };
+        let t = if fade.duration.is_zero() {
+            1.0
+        } else {
+            (now.saturating_duration_since(fade.started).as_secs_f32()
+                / fade.duration.as_secs_f32())
+            .clamp(0.0, 1.0)
+        };
+        for fu in &fade.universes {
+            let Some(u) = universes.iter_mut().find(|u| u.id == fu.id) else {
+                continue;
+            };
+            for i in 0..DMX_CHANNELS {
+                let (a, b) = (fu.from[i], fu.to[i]);
+                u.data[i] = if a == b {
+                    b
+                } else {
+                    (a as f32 + (b as f32 - a as f32) * t).round() as u8
+                };
+            }
+        }
+        if t >= 1.0 {
+            *base_fade = None;
+        }
     }
 
     /// Raw base-layer snapshot — what `set_channel` last wrote, with
@@ -267,6 +371,16 @@ impl EngineInner {
                 }
             }
         }
+        // 5. Safe-boot hold: absolute. A fixture that is powering up
+        // must see all-zero on its footprint no matter what scenes /
+        // effects / blind are doing, so this runs after everything.
+        if let Some(mask) = self.safe_boot_mask.get(&universe) {
+            for (i, v) in out.iter_mut().enumerate() {
+                if mask[i] {
+                    *v = 0;
+                }
+            }
+        }
         Some(out)
     }
 
@@ -289,6 +403,12 @@ impl EngineInner {
 
     pub fn replace_master_mask(&mut self, next: HashMap<u16, ChannelMask>) {
         self.master_mask = next;
+    }
+
+    /// Replace the safe-boot hold mask. Rebuilt by the commands layer
+    /// from the set of fixtures currently flagged as booting.
+    pub fn replace_safe_boot_mask(&mut self, next: HashMap<u16, ChannelMask>) {
+        self.safe_boot_mask = next;
     }
 }
 
@@ -471,6 +591,29 @@ mod tests {
         s.blind_factor = 0.0;
         let snap = s.snapshot_universe(0).unwrap();
         assert_eq!(snap[0], 50);
+    }
+
+    #[test]
+    fn safe_boot_mask_zeroes_over_everything() {
+        // Base at 127 (mover parked centre), an effect writing 200, and
+        // blind punching 255 — the safe-boot hold must still force 0 on
+        // the held channel and leave the neighbour untouched.
+        let mut s = EngineInner::new(1);
+        s.set_channel(0, 0, 127).unwrap();
+        s.set_channel(0, 1, 127).unwrap();
+        let mut effects = empty_overlay();
+        effects[0] = Some(200);
+        s.effects_overlay.insert(0, effects);
+        let mut blind = empty_overlay();
+        blind[0] = Some(255);
+        s.blind_overlay.insert(0, blind);
+        s.blind_factor = 1.0;
+        let mut mask = empty_mask();
+        mask[0] = true;
+        s.safe_boot_mask.insert(0, mask);
+        let snap = s.snapshot_universe(0).unwrap();
+        assert_eq!(snap[0], 0, "held channel must be forced to 0");
+        assert_eq!(snap[1], 127, "unheld channel must pass through");
     }
 
     #[test]

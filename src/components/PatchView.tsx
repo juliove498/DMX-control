@@ -90,6 +90,7 @@ function AddFixtureForm({
       built.push({
         id,
         definition_id: def.id,
+        in_use: true,
         mode_index: modeIndex,
         universe,
         address: address + i * channelCount,

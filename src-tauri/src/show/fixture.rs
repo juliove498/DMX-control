@@ -155,6 +155,28 @@ impl PanTiltRange {
     }
 }
 
+/// A named one-click look bundled with the fixture definition
+/// (Freestyler-style "presets"): a partial set of channel writes like
+/// "All White" or "Strobe High — Full". Applying one writes every entry
+/// in `values` and leaves the rest of the fixture untouched.
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export, export_to = "../bindings/")]
+pub struct FixturePreset {
+    pub name: String,
+    /// Thumbnail as a base64 data URL, same convention as
+    /// [`ChannelRange::image`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    /// Original on-disk path when imported from another app. Informational.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_path: Option<String>,
+    /// 1-based channel number → DMX value. 1-based because that's how
+    /// manuals (and the imported Freestyler files) number channels;
+    /// consumers subtract 1 to index into `FixtureMode::channels`.
+    /// JSON object keys are strings — serde maps them onto `u16` for us.
+    pub values: HashMap<u16, u8>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq)]
 #[ts(export, export_to = "../bindings/")]
 pub struct FixtureMode {
@@ -168,6 +190,10 @@ pub struct FixtureMode {
     pub pan_range: Option<PanTiltRange>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tilt_range: Option<PanTiltRange>,
+    /// One-click looks shipped with the definition. Empty for fixtures
+    /// that don't declare any.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub presets: Vec<FixturePreset>,
 }
 
 impl FixtureMode {
@@ -220,6 +246,14 @@ pub struct FixtureInstance {
     pub label: Option<String>,
     /// Position on the 2D stage grid in arbitrary units.
     pub position: [f32; 2],
+    /// False when the fixture stays home for this event: hidden on Stage,
+    /// left out of Modo Mágico and the fixture check, still in the patch.
+    #[serde(default = "default_in_use")]
+    pub in_use: bool,
+}
+
+fn default_in_use() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -349,6 +383,7 @@ mod tests {
                 name: "3ch".into(),
                 pan_range: None,
                 tilt_range: None,
+                presets: Vec::new(),
                 channels: vec![
                     ChannelDefinition::new(ChannelRole::Red, 0),
                     ChannelDefinition::new(ChannelRole::Green, 0),
@@ -373,6 +408,7 @@ mod tests {
             address,
             label: None,
             position: [0.0, 0.0],
+            in_use: true,
         }
     }
 

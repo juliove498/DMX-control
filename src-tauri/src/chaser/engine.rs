@@ -602,6 +602,7 @@ mod tests {
                 name: "3ch".into(),
                 pan_range: None,
                 tilt_range: None,
+                presets: Vec::new(),
                 channels: vec![
                     ChannelDefinition::new(ChannelRole::Red, 0),
                     ChannelDefinition::new(ChannelRole::Green, 0),
@@ -621,6 +622,7 @@ mod tests {
                 name: "1ch".into(),
                 pan_range: None,
                 tilt_range: None,
+                presets: Vec::new(),
                 channels: vec![ChannelDefinition::new(ChannelRole::Intensity, 0)],
             }],
         }
@@ -635,6 +637,7 @@ mod tests {
             address,
             label: None,
             position: [0.0, 0.0],
+            in_use: true,
         }
     }
 

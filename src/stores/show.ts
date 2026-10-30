@@ -46,6 +46,22 @@ interface ShowStoreState {
     rangeIndex: number,
     sourcePath: string,
   ) => Promise<void>;
+  updateFixtureDefinition: (definitionId: string, definitionJson: string) => Promise<void>;
+  /** Fixture ids whose DMX footprint is currently forced to 0 so the
+   *  head can power up and home cleanly ("inicialización segura"). */
+  safeBootIds: string[];
+  setFixtureSafeBoot: (fixtureId: string, on: boolean) => Promise<void>;
+  refreshSafeBoot: () => Promise<void>;
+  /** True while the DMX output thread is stopped (line idle, no frames).
+   *  Diagnostic switch — see the Outputs view toggle. */
+  outputSuspended: boolean;
+  suspendOutput: () => Promise<void>;
+  resumeOutput: () => Promise<void>;
+  refreshOutputSuspended: () => Promise<void>;
+  /** Config sub-tab requested from elsewhere (header chips); ConfigView
+   *  consumes it and clears it. */
+  configTabRequest: string | null;
+  requestConfigTab: (tab: string | null) => void;
 
   newShow: () => Promise<void>;
   openShow: (path: string) => Promise<void>;
@@ -114,6 +130,7 @@ interface ShowStoreState {
   deleteSnapshot: (id: string) => Promise<void>;
   activateSnapshot: (id: string) => Promise<void>;
   deactivateSnapshot: () => Promise<void>;
+  setSnapshotFade: (id: string, fadeInMs: number) => Promise<void>;
   activeSnapshotId: () => Promise<string | null>;
 
   // Sequence loop groups (playlists of scenes)
@@ -259,6 +276,48 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
       sourcePath,
     });
     await get().reloadLibrary();
+  },
+
+  async updateFixtureDefinition(definitionId, definitionJson) {
+    await invoke<FixtureDefinition>("update_fixture_definition", {
+      definitionId,
+      definitionJson,
+    });
+    await get().reloadLibrary();
+  },
+
+  safeBootIds: [],
+
+  async setFixtureSafeBoot(fixtureId, on) {
+    const safeBootIds = await invoke<string[]>("set_fixture_safe_boot", { fixtureId, on });
+    set({ safeBootIds });
+  },
+
+  async refreshSafeBoot() {
+    // Doc mode / stubbed IPC answers null: keep the array shape.
+    const safeBootIds = (await invoke<string[]>("list_safe_boot_fixtures")) ?? [];
+    set({ safeBootIds });
+  },
+
+  outputSuspended: false,
+  configTabRequest: null,
+  requestConfigTab(tab) {
+    set({ configTabRequest: tab });
+  },
+
+  async suspendOutput() {
+    await invoke<boolean>("suspend_output");
+    set({ outputSuspended: true });
+  },
+
+  async resumeOutput() {
+    await invoke("resume_output");
+    set({ outputSuspended: false });
+  },
+
+  async refreshOutputSuspended() {
+    const outputSuspended = await invoke<boolean>("output_suspended");
+    set({ outputSuspended });
   },
 
   async newShow() {
@@ -495,6 +554,10 @@ export const useShowStore = create<ShowStoreState>((set, get) => ({
   },
   async deleteSnapshot(id) {
     await invoke("delete_snapshot", { id });
+    await get().refresh();
+  },
+  async setSnapshotFade(id, fadeInMs) {
+    await invoke("set_snapshot_fade", { id, fadeInMs });
     await get().refresh();
   },
   async activateSnapshot(id) {

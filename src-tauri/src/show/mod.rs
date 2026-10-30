@@ -7,6 +7,7 @@ pub mod scene;
 pub mod session;
 pub mod snapshot;
 pub mod state;
+pub mod track_cues;
 
 pub use file::{load, save, ShowError, ShowFileV1, SHOW_FILE_VERSION};
 pub use fixture::{

@@ -45,3 +45,4 @@ src-tauri/icons/icon-master.png
 *.bak.1
 *.bak.2
 *.bak.3
+_rootjunk_*

@@ -85,6 +85,21 @@ const BREAK_DURATION: Duration = Duration::from_micros(120);
 const MAB_DURATION: Duration = Duration::from_micros(12);
 const FRAME_LEN: usize = DMX_CHANNELS + 1;
 
+/// Wire time of one full DMX frame: 513 slots × 11 bits × 4 µs = 22.6 ms,
+/// plus 1 ms of slack for USB scheduling jitter.
+///
+/// `write_bulk` returns as soon as the FTDI has *accepted* the bytes, but
+/// the chip's ~256-byte TX FIFO keeps shifting them onto the wire for
+/// another ~11 ms. If the next frame's BREAK is asserted during that
+/// drain, the FIFO freezes; on BREAK-off the residual bytes transmit
+/// FIRST, the receiver reads them as the new frame's start code + first
+/// channels, and every real channel lands shifted by the residue length.
+/// A moving head then sees other fixtures' data on its pan/tilt slots —
+/// which is catastrophic while it runs its power-on homing sweep. So a
+/// new BREAK must never start until a full frame time has passed since
+/// the previous write began.
+const FRAME_DRAIN_TIME: Duration = Duration::from_micros(513 * 44 + 1_000);
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../bindings/")]
 pub struct D2xxDeviceInfo {
@@ -145,6 +160,10 @@ pub struct D2xxOpenDmxDriver {
     warned_disconnected: bool,
     frames_sent: u32,
     last_heartbeat: Instant,
+    /// When the previous frame's `write_bulk` started. Gates the next
+    /// BREAK so it can't land while the TX FIFO is still draining
+    /// (see `FRAME_DRAIN_TIME`).
+    last_write_start: Option<Instant>,
 }
 
 impl D2xxOpenDmxDriver {
@@ -160,6 +179,7 @@ impl D2xxOpenDmxDriver {
             warned_disconnected: false,
             frames_sent: 0,
             last_heartbeat: Instant::now(),
+            last_write_start: None,
         };
         d.try_open();
         d
@@ -297,7 +317,19 @@ impl OutputDriver for D2xxOpenDmxDriver {
         // frame[0] = DMX start code (0x00). frame[1..] = the 512 channels.
         frame[1..].copy_from_slice(data);
 
-        let result = (|| -> Result<usize, String> {
+        // Drain guard: hold the BREAK until the previous frame has fully
+        // left the chip. At the nominal frame rate this never waits; it
+        // only bites when frames bunch up (late tick, USB stall) — the
+        // exact case that used to put a channel-shifted frame on the wire.
+        if let Some(start) = self.last_write_start {
+            let elapsed = start.elapsed();
+            if elapsed < FRAME_DRAIN_TIME {
+                std::thread::sleep(FRAME_DRAIN_TIME - elapsed);
+            }
+        }
+
+        let out_endpoint = self.out_endpoint;
+        let result = (|| -> Result<(usize, Instant), String> {
             // BREAK on
             ftdi_control(handle, FTDI_REQ_SET_LINE_PROP, LINE_8N2_BREAK, 0)?;
             spin_for(BREAK_DURATION);
@@ -305,14 +337,18 @@ impl OutputDriver for D2xxOpenDmxDriver {
             ftdi_control(handle, FTDI_REQ_SET_LINE_PROP, LINE_8N2, 0)?;
             spin_for(MAB_DURATION);
             // 513-byte frame via bulk OUT.
+            let write_start = Instant::now();
             let bytes = handle
-                .write_bulk(self.out_endpoint, &frame, USB_TIMEOUT)
+                .write_bulk(out_endpoint, &frame, USB_TIMEOUT)
                 .map_err(|e| format!("write_bulk: {e}"))?;
-            Ok(bytes)
+            Ok((bytes, write_start))
         })();
 
         let bytes = match result {
-            Ok(n) => n,
+            Ok((n, write_start)) => {
+                self.last_write_start = Some(write_start);
+                n
+            }
             Err(err) => {
                 tracing::warn!(
                     target: "dmx::ftdi",

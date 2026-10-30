@@ -30,4 +30,10 @@ active_scene_id: string | null,
  * over `active_scene_id` on apply (the group recalls its own
  * scenes).
  */
-active_loop_group_id: string | null, blackout: boolean, overall_bpm_enabled: boolean, overall_bpm: number, };
+active_loop_group_id: string | null, blackout: boolean, overall_bpm_enabled: boolean, overall_bpm: number, 
+/**
+ * Crossfade into this snapshot's channel values, in ms. `0` = hard
+ * cut (the original behaviour). Master, FX state and blackout still
+ * switch at once; only the base channel values glide.
+ */
+fade_in_ms: number, };

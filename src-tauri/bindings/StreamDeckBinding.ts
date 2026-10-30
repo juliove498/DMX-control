@@ -2,12 +2,17 @@
 import type { ButtonAction } from "./ButtonAction";
 import type { ButtonActiveMode } from "./ButtonActiveMode";
 import type { ButtonIcon } from "./ButtonIcon";
+import type { ButtonMode } from "./ButtonMode";
 
 /**
  * Per-button binding for the Stream Deck MK2 / OriginalV2 5×3 grid.
  * `key` is the 0..=14 index used by elgato-streamdeck.
  */
 export type StreamDeckBinding = { key: number, action: ButtonAction, 
+/**
+ * Toggle / Flash / Swop (see `ButtonMode`).
+ */
+mode: ButtonMode, 
 /**
  * Short label drawn near the top of the tile. Empty = no label.
  */

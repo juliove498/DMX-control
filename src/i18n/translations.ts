@@ -12,6 +12,324 @@ export type Translation = {
   // ---- App shell --------------------------------------------------------
   "app.brand": string;
   "app.tab.stage": string;
+  "general.features.preview3d": string;
+  "general.features.preview3dHint": string;
+  "general.features.preview3dQuality": string;
+  "general.quality.low": string;
+  "general.quality.medium": string;
+  "general.quality.high": string;
+  "p3d.edit": string;
+  "p3d.edit.hint": string;
+  "p3d.edit.move": string;
+  "p3d.edit.rotate": string;
+  "p3d.edit.snapped": string;
+  "p3d.quality": string;
+  "vdj.os2l.kind.autopilot": string;
+  "vdj.os2l.mode.toggle": string;
+  "vdj.os2l.mode.flash": string;
+  "vdj.os2l.mode.swop": string;
+  "vdj.os2l.modeHint": string;
+  "vdj.os2l.kind.energy_low": string;
+  "vdj.os2l.kind.energy_mid": string;
+  "vdj.os2l.kind.energy_high": string;
+  "vdj.os2l.kind.magic_next": string;
+  "vdj.os2l.kind.magic_back": string;
+  "vdj.os2l.kind.magic_hold": string;
+  "vdj.os2l.kind.magic_burst": string;
+  "vdj.os2l.kind.magic_drop": string;
+  "vdj.os2l.kind.magic_movement": string;
+  "vdj.os2l.kind.magic_palette_auto": string;
+  "vdj.os2l.kind.magic_palette_warm": string;
+  "vdj.os2l.kind.magic_palette_cold": string;
+  "vdj.os2l.kind.magic_palette_rainbow": string;
+  "vdj.os2l.kind.magic_palette_mono": string;
+  "app.tab.magic": string;
+  "app.tab.booth": string;
+  "booth.rig": string;
+  "booth.snapshots": string;
+  "booth.scenes": string;
+  "booth.chasers": string;
+  "booth.movements": string;
+  "booth.loops": string;
+  "booth.magic": string;
+  "booth.empty": string;
+  "booth.showAll": string;
+  "booth.onlyInUse": string;
+  "cues.kind.autopilot": string;
+  "cues.kind.energy_low": string;
+  "cues.kind.energy_mid": string;
+  "cues.kind.energy_high": string;
+  "cues.kind.magic_next": string;
+  "cues.kind.magic_back": string;
+  "cues.kind.magic_hold": string;
+  "cues.kind.magic_burst": string;
+  "cues.kind.magic_drop": string;
+  "cues.kind.magic_movement": string;
+  "cues.kind.magic_palette_auto": string;
+  "cues.kind.magic_palette_warm": string;
+  "cues.kind.magic_palette_cold": string;
+  "cues.kind.magic_palette_rainbow": string;
+  "cues.kind.magic_palette_mono": string;
+  "magic.title": string;
+  "magic.toggleHint": string;
+  "magic.state.off": string;
+  "magic.state.on": string;
+  "magic.state.ducked": string;
+  "magic.state.noFixtures": string;
+  "magic.participantsCount": string;
+  "magic.clock.os2l": string;
+  "magic.clock.vdj": string;
+  "magic.clock.mic": string;
+  "magic.clock.free": string;
+  "magic.nextChange": string;
+  "magic.cadenceLabel": string;
+  "magic.band.low": string;
+  "magic.band.mid": string;
+  "magic.band.high": string;
+  "magic.energyFrom.vdj_vu": string;
+  "magic.energyFrom.manual": string;
+  "magic.energyFrom.mic": string;
+  "magic.energyFrom.os2l": string;
+  "status.out.ok": string;
+  "status.out.idle": string;
+  "status.out.error": string;
+  "status.out.noNode": string;
+  "status.out.portClosed": string;
+  "status.out.suspended": string;
+  "status.out.hint": string;
+  "status.out.none": string;
+  "status.vdj.off": string;
+  "status.vdj.waiting": string;
+  "status.vdj.poll": string;
+  "status.vdj.os2lPeer": string;
+  "status.vdj.os2lListening": string;
+  "status.vdj.hint": string;
+  "status.vdj.source": string;
+  "magic.energyFrom.none": string;
+  "magic.state.silent": string;
+  "magic.state.fallback": string;
+  "magic.how.gain": string;
+  "magic.how.gainHint": string;
+  "magic.now.title": string;
+  "magic.now.waiting": string;
+  "magic.now.off": string;
+  "magic.now.history": string;
+  "magic.now.noHistory": string;
+  "magic.now.vocabTag": string;
+  "magic.nudge.back": string;
+  "magic.nudge.hold": string;
+  "magic.nudge.next": string;
+  "magic.who.title": string;
+  "magic.who.hint": string;
+  "magic.who.empty": string;
+  "magic.who.all": string;
+  "magic.who.none": string;
+  "magic.kind.par": string;
+  "magic.kind.mover": string;
+  "magic.kind.strobe": string;
+  "magic.kind.other": string;
+  "magic.how.title": string;
+  "magic.how.cadence": string;
+  "magic.how.cadenceHint": string;
+  "magic.how.variety": string;
+  "magic.how.varietyScale": string;
+  "magic.how.palette": string;
+  "magic.palette.auto": string;
+  "magic.palette.warm": string;
+  "magic.palette.cold": string;
+  "magic.palette.rainbow": string;
+  "magic.palette.mono": string;
+  "magic.how.energy": string;
+  "magic.how.manualEnergy": string;
+  "magic.how.preset.low": string;
+  "magic.how.preset.mid": string;
+  "magic.how.preset.high": string;
+  "magic.how.latency": string;
+  "magic.how.latencyHint": string;
+  "magic.how.calibrate": string;
+  "magic.how.calibrateStop": string;
+  "magic.how.calibrateHint": string;
+  "magic.state.calibrating": string;
+  "magic.how.energyHint": string;
+  "magic.how.movement": string;
+  "magic.how.strobe": string;
+  "magic.how.drops": string;
+  "magic.how.stopOnSilence": string;
+  "magic.how.stopOnSilenceHint": string;
+  "magic.how.floor": string;
+  "magic.how.maxLevel": string;
+  "magic.how.ducking": string;
+  "magic.vocab.title": string;
+  "magic.vocab.hint": string;
+  "magic.vocab.use": string;
+  "magic.vocab.useGenerator": string;
+  "magic.vocab.empty": string;
+  "magic.vocab.weight": string;
+  "magic.zones.title": string;
+  "magic.zones.hint": string;
+  "magic.zones.empty": string;
+  "magic.zones.copyAll": string;
+  "magic.zones.copyAllHint": string;
+  "magic.zones.test": string;
+  "magic.color.solid": string;
+  "magic.color.alternate": string;
+  "magic.color.sweep": string;
+  "magic.color.chase": string;
+  "magic.color.sparkle": string;
+  "magic.dim.static": string;
+  "magic.dim.pulse_beat": string;
+  "magic.dim.pulse_half": string;
+  "magic.dim.swell": string;
+  "magic.dim.chase_lr": string;
+  "magic.dim.sparkle": string;
+  "magic.dim.breathe": string;
+  "magic.mover.static": string;
+  "magic.mover.circle": string;
+  "magic.mover.figure8": string;
+  "magic.mover.sweep_h": string;
+  "magic.mover.sweep_v": string;
+  "magic.mover.wave": string;
+  "magic.mover.fan": string;
+  "magic.mover.cross": string;
+  "magic.mover.scan": string;
+  "magic.mover.stab": string;
+  "magic.mover.lissajous": string;
+  "magic.mover.drift": string;
+  "magic.mover.nod": string;
+  "magic.mover.ballyhoo": string;
+  "magic.mover.relay": string;
+  "mirror.chip.mirror": string;
+  "mirror.chip.lost": string;
+  "cues.unassigned": string;
+  "cues.unassignedCount": string;
+  "cues.scope.own": string;
+  "cues.scope.all": string;
+  "cues.pickTarget": string;
+  "cues.reused": string;
+  "cues.adopt": string;
+  "cues.createScene": string;
+  "cues.createSnapshot": string;
+  "cues.createHint": string;
+  "cues.created": string;
+  "cues.deleteOwnedConfirm": string;
+  "app.tab.cues": string;
+  "general.features.title": string;
+  "general.features.cueEditor": string;
+  "general.features.cueEditorHint": string;
+  "vdj.cues.editHint": string;
+  "cues.setlist": string;
+  "cues.addTrack": string;
+  "cues.addTrackHint": string;
+  "cues.addVdjTrack": string;
+  "cues.noTracks": string;
+  "cues.cueCount": string;
+  "cues.removeTrackConfirm": string;
+  "cues.export": string;
+  "cues.exportSheet": string;
+  "cues.exportSheetDone": string;
+  "cues.exportPois": string;
+  "cues.exportPoisDone": string;
+  "cues.exportPoisMissing": string;
+  "cues.source.audio": string;
+  "cues.source.vdj": string;
+  "cues.vdjIdle": string;
+  "cues.vdjPlaying": string;
+  "cues.vdjOtherTrack": string;
+  "cues.vdjPlayingOs2l": string;
+  "cues.vdjAssumed": string;
+  "cues.vdjHttpDown": string;
+  "cues.play": string;
+  "cues.pause": string;
+  "cues.toStart": string;
+  "cues.rate": string;
+  "cues.loop": string;
+  "cues.loopSetA": string;
+  "cues.loopSetB": string;
+  "cues.loopClear": string;
+  "cues.snap": string;
+  "cues.grid": string;
+  "cues.preview": string;
+  "cues.zoomIn": string;
+  "cues.zoomOut": string;
+  "cues.zoomFit": string;
+  "cues.mark": string;
+  "cues.markAt": string;
+  "cues.noWave": string;
+  "cues.waveError": string;
+  "cues.audioError": string;
+  "cues.selectTrack": string;
+  "cues.shortcuts": string;
+  "cues.copied": string;
+  "cues.pasted": string;
+  "cues.moveUp": string;
+  "cues.moveDown": string;
+  "cues.remove": string;
+  "cues.inspector.title": string;
+  "cues.inspector.name": string;
+  "cues.inspector.namePh": string;
+  "cues.inspector.kind": string;
+  "cues.inspector.target": string;
+  "cues.inspector.filter": string;
+  "cues.inspector.color": string;
+  "cues.inspector.colorAuto": string;
+  "cues.inspector.time": string;
+  "cues.inspector.beat": string;
+  "cues.inspector.go": string;
+  "cues.inspector.fire": string;
+  "cues.inspector.duplicate": string;
+  "cues.inspector.delete": string;
+  "cues.inspector.multi": string;
+  "cues.inspector.nudge": string;
+  "cues.inspector.none": string;
+  "cues.arm.title": string;
+  "cues.grid.title": string;
+  "cues.grid.bpm": string;
+  "cues.grid.firstBeat": string;
+  "cues.grid.setHere": string;
+  "cues.grid.detect": string;
+  "cues.grid.detecting": string;
+  "cues.grid.detected": string;
+  "cues.grid.fromVdj": string;
+  "cues.grid.none": string;
+  "cues.grid.clear": string;
+  "cues.sections.title": string;
+  "cues.sections.add": string;
+  "cues.sections.namePh": string;
+  "cues.sections.none": string;
+  "cues.list.title": string;
+  "cues.list.empty": string;
+  "cues.kind.scene": string;
+  "cues.kind.loop": string;
+  "cues.kind.loop_stop": string;
+  "cues.kind.chaser": string;
+  "cues.kind.movement": string;
+  "cues.kind.snapshot": string;
+  "cues.kind.blackout": string;
+  "cues.kind.blind": string;
+  "cues.kind.tap": string;
+  "health.repair": string;
+  "health.repairing": string;
+  "health.repairOk": string;
+  "mirror.chip.live": string;
+  "mirror.chip.mirrors": string;
+  "mirror.chip.mirrorOf": string;
+  "mirror.chip.mirrorAlone": string;
+  "mirror.chip.noSignal": string;
+  "mirror.chip.hint": string;
+  "mirror.takeControl": string;
+  "mirror.confirmTake": string;
+  "mirror.confirmMirror": string;
+  "mirror.liveLostTitle": string;
+  "mirror.liveLostDetail": string;
+  "health.bothLiveTitle": string;
+  "health.bothLiveDetail": string;
+  "health.peersTitle": string;
+  "health.peersDetail": string;
+  "health.secondLaunch": string;
+  "health.configProblems": string;
+  "health.saveError": string;
+  "health.opFailed": string;
+  "health.dismiss": string;
   "app.tab.scenes": string;
   "app.tab.loops": string;
   "app.tab.chaser": string;
@@ -99,6 +417,26 @@ export type Translation = {
   "vdj.title": string;
   "vdj.intro": string;
   "vdj.section.connection": string;
+  "vdj.inst.title": string;
+  "vdj.inst.intro": string;
+  "vdj.inst.scan": string;
+  "vdj.inst.scanning": string;
+  "vdj.inst.use": string;
+  "vdj.inst.useHint": string;
+  "vdj.inst.inUse": string;
+  "vdj.inst.thisMachine": string;
+  "vdj.inst.labelPlaceholder": string;
+  "vdj.inst.httpUnknown": string;
+  "vdj.inst.httpPlaying": string;
+  "vdj.inst.httpIdle": string;
+  "vdj.inst.httpDown": string;
+  "vdj.inst.os2lBeating": string;
+  "vdj.inst.os2lConnected": string;
+  "vdj.inst.os2lOff": string;
+  "vdj.inst.forget": string;
+  "vdj.inst.empty": string;
+  "vdj.inst.auto": string;
+  "vdj.inst.autoHint": string;
   "vdj.section.behavior": string;
   "vdj.host": string;
   "vdj.hostHint": string;
@@ -111,6 +449,80 @@ export type Translation = {
   "vdj.enabled": string;
   "vdj.enabledHint": string;
   "vdj.save": string;
+  "vdj.os2l.title": string;
+  "vdj.os2l.intro": string;
+  "vdj.os2l.section.server": string;
+  "vdj.os2l.enabled": string;
+  "vdj.os2l.enabledHint": string;
+  "vdj.os2l.port": string;
+  "vdj.os2l.portHint": string;
+  "vdj.os2l.status.connected": string;
+  "vdj.os2l.status.listening": string;
+  "vdj.os2l.status.stopped": string;
+  "vdj.os2l.status.lastBeat": string;
+  "vdj.os2l.section.buttons": string;
+  "vdj.os2l.conventionsHint": string;
+  "vdj.os2l.recent": string;
+  "vdj.os2l.clearRecent": string;
+  "vdj.cues.title": string;
+  "vdj.cues.intro": string;
+  "vdj.cues.enabled": string;
+  "vdj.cues.enabledHint": string;
+  "vdj.cues.tracking": string;
+  "vdj.cues.waiting": string;
+  "vdj.cues.position": string;
+  "vdj.cues.noTrack": string;
+  "vdj.cues.empty": string;
+  "vdj.cues.mark": string;
+  "vdj.cues.snap": string;
+  "vdj.cues.colBeat": string;
+  "vdj.cues.colTime": string;
+  "vdj.cues.colName": string;
+  "vdj.cues.namePlaceholder": string;
+  "vdj.cues.delete": string;
+  "vdj.net.title": string;
+  "vdj.net.dbPath": string;
+  "vdj.net.dbPathHint": string;
+  "vdj.net.mapFrom": string;
+  "vdj.net.mapTo": string;
+  "vdj.net.mapHint": string;
+  "vdj.cues.waveLoading": string;
+  "vdj.cues.waveUnavailable": string;
+  "vdj.cues.waveHint": string;
+  "vdj.cues.export": string;
+  "vdj.cues.exportHint": string;
+  "vdj.cues.exportDone": string;
+  "vdj.cues.exportMissing": string;
+  "vdj.cues.exportNoSecs": string;
+  "vdj.cues.exportBackup": string;
+  "vdj.os2l.quantize": string;
+  "vdj.os2l.quantizeHint": string;
+  "vdj.os2l.latencyOffset": string;
+  "vdj.os2l.latencyOffsetHint": string;
+  "vdj.os2l.beatOffsetTitle": string;
+  "vdj.os2l.quantizedTitle": string;
+  "vdj.os2l.recentEmpty": string;
+  "vdj.os2l.unresolved": string;
+  "vdj.os2l.testPlaceholder": string;
+  "vdj.os2l.testFire": string;
+  "vdj.os2l.section.mappings": string;
+  "vdj.os2l.mappingsHint": string;
+  "vdj.os2l.mapName": string;
+  "vdj.os2l.mapAction": string;
+  "vdj.os2l.mapTarget": string;
+  "vdj.os2l.addMapping": string;
+  "vdj.os2l.removeMapping": string;
+  "vdj.os2l.kind.scene": string;
+  "vdj.os2l.kind.loop": string;
+  "vdj.os2l.kind.loop_stop": string;
+  "vdj.os2l.kind.chaser": string;
+  "vdj.os2l.kind.movement": string;
+  "vdj.os2l.kind.snapshot": string;
+  "vdj.os2l.kind.blackout": string;
+  "vdj.os2l.kind.blind": string;
+  "vdj.os2l.kind.tap": string;
+  "vdj.os2l.apply": string;
+  "vdj.os2l.errSave": string;
   "vdj.statusSection": string;
   "vdj.status.running": string;
   "vdj.status.stopped": string;
@@ -296,9 +708,30 @@ export type Translation = {
   "library.gobosReplace": string;
   "library.gobosRangeFmt": string;
   "library.gobosErrorOversize": string;
+  "library.edit": string;
+  "library.editIdNote": string;
+  "library.editTabForm": string;
+  "library.editTabJson": string;
+  "library.editManufacturer": string;
+  "library.editName": string;
+  "library.editModeName": string;
+  "library.editColName": string;
+  "library.editColRole": string;
+  "library.editColDefault": string;
+  "library.editColDescription": string;
+  "library.editRoleCustom": string;
+  "library.editRanges": string;
+  "library.editAddRange": string;
+  "library.editRemoveRange": string;
+  "library.editJsonHint": string;
+  "library.editSaveError": string;
 
   // ---- Outputs ---------------------------------------------------------
   "outputs.title": string;
+  "outputs.suspend": string;
+  "outputs.resume": string;
+  "outputs.suspendHint": string;
+  "outputs.suspendedBanner": string;
   "outputs.kind.mock": string;
   "outputs.kind.artNet": string;
   "outputs.kind.sacn": string;
@@ -522,6 +955,8 @@ export type Translation = {
   "snapshots.deleteConfirm": string;
   "snapshots.deleteHint": string;
   "snapshots.activeBadge": string;
+  "snapshots.fade": string;
+  "snapshots.fadeHint": string;
   "scenes.step.fade": string;
   "scenes.step.hold": string;
   "scenes.step.ms": string;
@@ -715,6 +1150,17 @@ export type Translation = {
   "stage.title": string;
   "stage.meta": string;
   "stage.metaSelected": string;
+  "stage.metaAway": string;
+  "stage.inUse.showAll": string;
+  "stage.inUse.onlyInUse": string;
+  "stage.inUse.hint": string;
+  "stage.test": string;
+  "stage.test.hint": string;
+  "stage.test.all": string;
+  "stage.test.step": string;
+  "stage.test.now": string;
+  "stage.test.count": string;
+  "stage.test.remaining": string;
   "stage.empty": string;
   "stage.sidebar.placeholder": string;
   "stage.fixture.untouchAria": string;
@@ -731,6 +1177,7 @@ export type Translation = {
   "stage.editor.fxTooltipMovement": string;
   "stage.editor.center": string;
   "stage.editor.home": string;
+  "stage.editor.section.presets": string;
   "stage.editor.section.intStrobe": string;
   "stage.editor.section.color": string;
   "stage.editor.section.extras": string;
@@ -797,6 +1244,11 @@ export type Translation = {
   "stage.menu.fixturePlural": string;
   "stage.menu.centerPanTilt": string;
   "stage.menu.park": string;
+  "stage.menu.safeBootOn": string;
+  "stage.menu.markOutOfUse": string;
+  "stage.menu.markInUse": string;
+  "stage.menu.safeBootOff": string;
+  "stage.fixture.safeBootTitle": string;
   "stage.menu.fullIntensity": string;
   "stage.menu.blackoutFixture": string;
   "stage.menu.rename": string;
@@ -863,6 +1315,348 @@ export type Translation = {
 export const en: Translation = {
   "app.brand": "DMX Control",
   "app.tab.stage": "Stage",
+  "general.features.preview3d": "3D preview",
+  "general.features.preview3dHint":
+    "The 3D stage tab (WebGL: volumetric beams, bloom). Switch it off on the small laptop to save CPU/GPU.",
+  "general.features.preview3dQuality": "3D quality",
+  "general.quality.low": "Low (24 fps, no bloom)",
+  "general.quality.medium": "Medium",
+  "general.quality.high": "High (bloom + antialias)",
+  "p3d.edit": "Edit rig",
+  "p3d.edit.hint": "Click a fixture or a truss and drag the gizmo. Esc deselects.",
+  "p3d.edit.move": "Move",
+  "p3d.edit.rotate": "Aim",
+  "p3d.edit.snapped": "Attached to {truss}",
+  "p3d.quality": "Quality",
+  "vdj.os2l.kind.autopilot": "Magic mode",
+  "vdj.os2l.mode.toggle": "Toggle",
+  "vdj.os2l.mode.flash": "Flash (while held)",
+  "vdj.os2l.mode.swop": "Swop (held, everything else dark)",
+  "vdj.os2l.modeHint":
+    "How the pad behaves: Toggle fires on press; Flash holds the action while the pad is down and restores on release; Swop also darkens every fixture the action does not drive.",
+  "vdj.os2l.kind.energy_low": "Magic: chill energy",
+  "vdj.os2l.kind.energy_mid": "Magic: groove energy",
+  "vdj.os2l.kind.energy_high": "Magic: party energy",
+  "vdj.os2l.kind.magic_next": "Magic: next look",
+  "vdj.os2l.kind.magic_back": "Magic: previous look",
+  "vdj.os2l.kind.magic_hold": "Magic: hold look",
+  "vdj.os2l.kind.magic_burst": "Magic: strobe burst",
+  "vdj.os2l.kind.magic_drop": "Magic: drop",
+  "vdj.os2l.kind.magic_movement": "Magic: head movement",
+  "vdj.os2l.kind.magic_palette_auto": "Magic: palette auto",
+  "vdj.os2l.kind.magic_palette_warm": "Magic: palette warm",
+  "vdj.os2l.kind.magic_palette_cold": "Magic: palette cold",
+  "vdj.os2l.kind.magic_palette_rainbow": "Magic: palette rainbow",
+  "vdj.os2l.kind.magic_palette_mono": "Magic: palette mono",
+  "app.tab.magic": "Magic",
+  "app.tab.booth": "Booth",
+  "booth.rig": "Rig",
+  "booth.snapshots": "Snapshots",
+  "booth.scenes": "Scenes",
+  "booth.chasers": "Chasers",
+  "booth.movements": "Movements",
+  "booth.loops": "Loop groups",
+  "booth.magic": "Magic Mode",
+  "booth.empty": "Nothing here yet",
+  "booth.showAll": "Show all",
+  "booth.onlyInUse": "Only in use",
+  "cues.kind.autopilot": "Magic mode",
+  "cues.kind.energy_low": "Magic: chill energy",
+  "cues.kind.energy_mid": "Magic: groove energy",
+  "cues.kind.energy_high": "Magic: party energy",
+  "cues.kind.magic_next": "Magic: next look",
+  "cues.kind.magic_back": "Magic: previous look",
+  "cues.kind.magic_hold": "Magic: hold look",
+  "cues.kind.magic_burst": "Magic: strobe burst",
+  "cues.kind.magic_drop": "Magic: drop",
+  "cues.kind.magic_movement": "Magic: head movement",
+  "cues.kind.magic_palette_auto": "Magic: palette auto",
+  "cues.kind.magic_palette_warm": "Magic: palette warm",
+  "cues.kind.magic_palette_cold": "Magic: palette cold",
+  "cues.kind.magic_palette_rainbow": "Magic: palette rainbow",
+  "cues.kind.magic_palette_mono": "Magic: palette mono",
+  "magic.title": "MAGIC MODE",
+  "magic.toggleHint":
+    "Turn the autopilot on or off (also mappable to a button or an OS2L POI named 'auto')",
+  "magic.state.off": "Off — the console is yours.",
+  "magic.state.on": "Improvising on the beat.",
+  "magic.state.ducked": "Paused: you took the console (back in {s} s).",
+  "magic.state.noFixtures": "On, but no fixtures take part yet — pick some below.",
+  "magic.participantsCount": "{n} fixtures · {m} moving heads",
+  "magic.clock.os2l": "beat from VDJ (OS2L)",
+  "magic.clock.vdj": "beat from VDJ (polling)",
+  "magic.clock.mic": "beat from the mic",
+  "magic.clock.free": "free-running clock",
+  "magic.nextChange": "changes in {n} beats",
+  "magic.cadenceLabel": "every {n} beats",
+  "magic.band.low": "chill",
+  "magic.band.mid": "medium",
+  "magic.band.high": "party",
+  "magic.energyFrom.vdj_vu": "VDJ VU meter",
+  "magic.energyFrom.manual": "manual",
+  "magic.energyFrom.mic": "microphone",
+  "magic.energyFrom.os2l": "VDJ beat strength (OS2L)",
+  "status.out.ok": "Sending frames",
+  "status.out.idle": "No universe patched on this output yet",
+  "status.out.error": "Output error",
+  "status.out.noNode": "Art-Net node not answering polls",
+  "status.out.portClosed": "Port not open",
+  "status.out.suspended": "DMX output suspended",
+  "status.out.hint": "Click: Config → Outputs",
+  "status.out.none": "No DMX outputs configured",
+  "status.vdj.off": "VirtualDJ integration is off in Config",
+  "status.vdj.waiting": "Waiting for VirtualDJ (nothing playing / OS2L not connected)",
+  "status.vdj.poll": "Polling OK · {bpm} BPM",
+  "status.vdj.os2lPeer": "OS2L connected ({peer})",
+  "status.vdj.os2lListening": "OS2L listening on :{port}",
+  "status.vdj.hint": "Click: Config → VirtualDJ",
+  "status.vdj.source": "Following {label} ({ip})",
+  "magic.energyFrom.none": "no signal",
+  "magic.state.silent": "No signal from VirtualDJ — faded to black until the music is back.",
+  "magic.state.fallback":
+    "No VirtualDJ signal for this source — following the manual energy slider.",
+  "magic.how.gain": "VU sensitivity",
+  "magic.how.gainHint":
+    "Raise it if the meter sits low on your setup: an intro should read low, the drop high.",
+  "magic.now.title": "Now playing",
+  "magic.now.waiting": "Waiting for the first beat…",
+  "magic.now.off": "Turn it on and the current look shows up here.",
+  "magic.now.history": "Recent looks",
+  "magic.now.noHistory": "Nothing yet.",
+  "magic.now.vocabTag": "yours",
+  "magic.nudge.back": "Back",
+  "magic.nudge.hold": "Hold",
+  "magic.nudge.next": "Change now",
+  "magic.who.title": "Who takes part",
+  "magic.who.hint": "Only these fixtures get improvised; the rest stay as you left them.",
+  "magic.who.empty": "No fixtures patched yet.",
+  "magic.who.all": "all",
+  "magic.who.none": "none",
+  "magic.kind.par": "Washes / PARs",
+  "magic.kind.mover": "Moving heads",
+  "magic.kind.strobe": "Strobes",
+  "magic.kind.other": "Others",
+  "magic.how.title": "How it improvises",
+  "magic.how.cadence": "Change every",
+  "magic.how.cadenceHint": "beats — bigger changes land on phrase boundaries (32 beats).",
+  "magic.how.variety": "Variety",
+  "magic.how.varietyScale": "sober ↔ surprise me",
+  "magic.how.palette": "Palette",
+  "magic.palette.auto": "Auto",
+  "magic.palette.warm": "Warm",
+  "magic.palette.cold": "Cold",
+  "magic.palette.rainbow": "Rainbow",
+  "magic.palette.mono": "Mono",
+  "magic.how.energy": "Energy",
+  "magic.how.manualEnergy":
+    "Manual energy (used when the source is manual, or when VirtualDJ is off in Config)",
+  "magic.how.preset.low": "Chill 25%",
+  "magic.how.preset.mid": "Groove 55%",
+  "magic.how.preset.high": "Party 85%",
+  "magic.how.latency": "Latency offset",
+  "magic.how.latencyHint":
+    "Positive if the lights run ahead of the sound, negative if they lag. Calibrate with the white pulse.",
+  "magic.how.calibrate": "Calibrate",
+  "magic.how.calibrateStop": "Stop calibrating",
+  "magic.how.calibrateHint":
+    "Every participant flashes white on each beat; move the slider until flash and kick coincide.",
+  "magic.state.calibrating": "Calibrating: white pulse on every beat.",
+  "magic.how.energyHint":
+    "Energy sets how bold it gets: pulses, speed, strobes. Manual: you drive the slider. Microphone: the console listens to the room (kick band + overall level, normalised) — VirtualDJ is not involved.",
+  "magic.how.movement": "Move the heads",
+  "magic.how.strobe": "Allow strobes (only at party energy, short bursts)",
+  "magic.how.drops": "Allow one-beat blackout drops on phrase changes",
+  "magic.how.stopOnSilence": "Fade to black when VirtualDJ reports no music (needs a stable link)",
+  "magic.how.stopOnSilenceHint":
+    "Off by default: a VirtualDJ link that stalls produces blackouts mid-track. Turn it on only if the HTTP ▶ readout stays steady while a track plays.",
+  "magic.how.floor": "Minimum light",
+  "magic.how.maxLevel": "Maximum light",
+  "magic.how.ducking": "Step aside when I take over, for",
+  "magic.vocab.title": "Your vocabulary",
+  "magic.vocab.hint":
+    "Tag your scenes and snapshots by energy and it will mix them into the improvisation. Untagged ones are never used.",
+  "magic.vocab.use": "Use my scenes and snapshots",
+  "magic.vocab.useGenerator": "Also invent looks (generator)",
+  "magic.vocab.empty": "No scenes or snapshots in this show yet.",
+  "magic.vocab.weight": "How often (weight)",
+  "magic.zones.title": "Moving-head zones",
+  "magic.zones.hint":
+    "Where each head may aim in THIS venue. Drag the box; ⌥-click aims the real head there. Save as part of the show.",
+  "magic.zones.empty": "No participating moving heads — add some in “Who takes part”.",
+  "magic.zones.copyAll": "Copy to all",
+  "magic.zones.copyAllHint": "Apply this zone to every participating head",
+  "magic.zones.test": "Test:",
+  "magic.color.solid": "solid",
+  "magic.color.alternate": "alternating",
+  "magic.color.sweep": "sweep",
+  "magic.color.chase": "chase",
+  "magic.color.sparkle": "sparkle",
+  "magic.dim.static": "steady",
+  "magic.dim.pulse_beat": "pulse",
+  "magic.dim.pulse_half": "half pulse",
+  "magic.dim.swell": "swell",
+  "magic.dim.chase_lr": "chase L→R",
+  "magic.dim.sparkle": "sparkle",
+  "magic.dim.breathe": "breathe",
+  "magic.mover.static": "still",
+  "magic.mover.circle": "circle",
+  "magic.mover.figure8": "figure 8",
+  "magic.mover.sweep_h": "sweep",
+  "magic.mover.sweep_v": "nod",
+  "magic.mover.wave": "wave",
+  "magic.mover.fan": "fan",
+  "magic.mover.cross": "cross",
+  "magic.mover.scan": "scan",
+  "magic.mover.stab": "stab",
+  "magic.mover.lissajous": "lissajous",
+  "magic.mover.drift": "drift",
+  "magic.mover.nod": "nod",
+  "magic.mover.ballyhoo": "ballyhoo",
+  "magic.mover.relay": "relay",
+  "mirror.chip.mirror": "MIRROR",
+  "mirror.chip.lost": "NO SIGNAL",
+  "cues.unassigned": "No action",
+  "cues.unassignedCount": "⚠ {n} without action",
+  "cues.scope.own": "This track",
+  "cues.scope.all": "All (reuse)",
+  "cues.pickTarget": "— not assigned —",
+  "cues.reused": "↗ Reused from “{title}”.",
+  "cues.adopt": "Adopt into this track",
+  "cues.createScene": "+ Capture a new scene",
+  "cues.createSnapshot": "+ Capture a new snapshot",
+  "cues.createHint":
+    "Build the look on the Stage tab, then capture it here: it becomes this track's own scene, assigned to the cue.",
+  "cues.created": "Created “{name}” and assigned it to the cue",
+  "cues.deleteOwnedConfirm":
+    "“{title}” owns {n} scenes/snapshots created from its cues. Delete those too?",
+  "app.tab.cues": "Cues",
+  "general.features.title": "Optional modules",
+  "general.features.cueEditor": "Cue editor (planning mode)",
+  "general.features.cueEditorHint":
+    "Adds the Cues tab: own audio transport and a zoomable waveform to author cues with the organiser. Uses memory while open — keep it off on the show console if you don't need it.",
+  "vdj.cues.editHint":
+    "Cues are authored in the Cues tab (enable it in Config → General if you don't see it).",
+  "cues.setlist": "Setlist",
+  "cues.addTrack": "+ Track",
+  "cues.addTrackHint": "Add an audio file to the setlist",
+  "cues.addVdjTrack": "Add the track VDJ is playing: {title}",
+  "cues.noTracks": "No tracks yet. Add one with + Track, or play one in VirtualDJ.",
+  "cues.cueCount": "{n} cues",
+  "cues.removeTrackConfirm": "Remove “{title}” from the setlist? Its cues are lost.",
+  "cues.export": "Export",
+  "cues.exportSheet": "Cue sheet (CSV)",
+  "cues.exportSheetDone": "Cue sheet saved: {n} rows",
+  "cues.exportPois": "POIs to VirtualDJ",
+  "cues.exportPoisDone": "POIs exported: {tracks} tracks, {cues} cues",
+  "cues.exportPoisMissing": "({n} tracks not found in VDJ)",
+  "cues.source.audio": "Own audio",
+  "cues.source.vdj": "Follow VDJ",
+  "cues.vdjIdle": "VirtualDJ is not playing",
+  "cues.vdjPlaying": "VDJ ▶ {title}",
+  "cues.vdjOtherTrack": "Open VDJ's track",
+  "cues.vdjPlayingOs2l": "VDJ ▶ {title} · via OS2L beats",
+  "cues.vdjAssumed": "track assumed from the editor — cues won't fire until VDJ confirms it",
+  "cues.vdjHttpDown":
+    "VDJ's Network Control (HTTP) is not answering at {endpoint}. In VDJ, switch the Network Control plugin on (Master FX → Auto-Start) so it survives a restart.",
+  "cues.play": "Play (space)",
+  "cues.pause": "Pause (space)",
+  "cues.toStart": "Back to start",
+  "cues.rate": "Speed",
+  "cues.loop": "Loop A/B",
+  "cues.loopSetA": "A",
+  "cues.loopSetB": "B",
+  "cues.loopClear": "Clear loop",
+  "cues.snap": "Snap to beat",
+  "cues.grid": "Grid",
+  "cues.preview": "Fire lights while playing",
+  "cues.zoomIn": "Zoom in (+)",
+  "cues.zoomOut": "Zoom out (−)",
+  "cues.zoomFit": "Fit track (F)",
+  "cues.mark": "Mark a cue at the playhead (M)",
+  "cues.markAt": "Mark at {time}",
+  "cues.noWave": "Decoding waveform…",
+  "cues.waveError": "Could not read the audio: {err}",
+  "cues.audioError": "Audio: {err}",
+  "cues.selectTrack": "Pick a track from the setlist to start.",
+  "cues.shortcuts":
+    "Space play/pause · M mark · ←→ ±1 s (⇧ ±0.1 s) · , . move cue ±10 ms (⇧ ±100 ms) · ⌘Z undo · ⌘C/⌘V copy/paste · I/O loop A/B · L loop · G grid · S snap · +/− zoom · F fit · ⇧-drag select · double-click mark",
+  "cues.copied": "{n} cues copied",
+  "cues.pasted": "{n} cues pasted",
+  "cues.moveUp": "Move up",
+  "cues.moveDown": "Move down",
+  "cues.remove": "Remove",
+  "cues.inspector.title": "Cue",
+  "cues.inspector.name": "Name",
+  "cues.inspector.namePh": "e.g. Dancers enter",
+  "cues.inspector.kind": "Action",
+  "cues.inspector.target": "Target",
+  "cues.inspector.filter": "Filter…",
+  "cues.inspector.color": "Colour",
+  "cues.inspector.colorAuto": "Auto",
+  "cues.inspector.time": "Time",
+  "cues.inspector.beat": "Beat",
+  "cues.inspector.go": "Go",
+  "cues.inspector.fire": "Fire now",
+  "cues.inspector.duplicate": "Duplicate",
+  "cues.inspector.delete": "Delete",
+  "cues.inspector.multi": "{n} cues selected",
+  "cues.inspector.nudge": "Move",
+  "cues.inspector.none": "No cue selected — mark one with M or double-click the waveform.",
+  "cues.arm.title": "Next cue",
+  "cues.grid.title": "Beat grid",
+  "cues.grid.bpm": "BPM",
+  "cues.grid.firstBeat": "First beat",
+  "cues.grid.setHere": "First beat here",
+  "cues.grid.detect": "Detect BPM",
+  "cues.grid.detecting": "Detecting…",
+  "cues.grid.detected": "Detected {bpm} BPM ({conf}% confidence)",
+  "cues.grid.fromVdj": "Take from VDJ",
+  "cues.grid.none":
+    "No grid yet: snap and the beat view need one (detect, take it from VDJ, or type the BPM).",
+  "cues.grid.clear": "Clear",
+  "cues.sections.title": "Sections",
+  "cues.sections.add": "Section here",
+  "cues.sections.namePh": "Intro / Chorus…",
+  "cues.sections.none": "No sections.",
+  "cues.list.title": "Cues in this track",
+  "cues.list.empty": "No cues in this track yet.",
+  "cues.kind.scene": "Scene",
+  "cues.kind.loop": "Loop",
+  "cues.kind.loop_stop": "Stop loop",
+  "cues.kind.chaser": "Chaser",
+  "cues.kind.movement": "Movement",
+  "cues.kind.snapshot": "Snapshot",
+  "cues.kind.blackout": "Blackout",
+  "cues.kind.blind": "Blind",
+  "cues.kind.tap": "Tap",
+  "health.repair": "🔧 Repair permissions",
+  "health.repairing": "Repairing…",
+  "health.repairOk": "Permissions repaired — saves work again",
+  "mirror.chip.live": "LIVE",
+  "mirror.chip.mirrors": "{n} mirror(s)",
+  "mirror.chip.mirrorOf": "MIRROR of {name}",
+  "mirror.chip.mirrorAlone": "MIRROR — searching for the live console…",
+  "mirror.chip.noSignal": "MIRROR — live console SIGNAL LOST",
+  "mirror.chip.hint": "Switch this console's role",
+  "mirror.takeControl": "Take control",
+  "mirror.confirmTake":
+    "TAKE CONTROL on this console? DMX outputs and VDJ services start here, and the current live console (if reachable) becomes a mirror.",
+  "mirror.confirmMirror":
+    "Switch this console to MIRROR? DMX outputs and VDJ listeners stop; it will follow the live console over the network.",
+  "mirror.liveLostTitle": "Live console lost",
+  "mirror.liveLostDetail":
+    "This mirror stopped receiving data. If the main console died, take control here.",
+  "health.bothLiveTitle": "TWO LIVE consoles on the network!",
+  "health.bothLiveDetail":
+    "Detected: {names}. Both may be driving the same lights — switch one to mirror.",
+  "health.peersTitle": "Another DMX Control is on the network",
+  "health.peersDetail":
+    "Detected: {names}. Make sure only ONE app drives the lights (outputs and OS2L).",
+  "health.secondLaunch": "A second launch was blocked — this is the only running window",
+  "health.configProblems": "Config folder is not writable — changes may NOT be saved",
+  "health.saveError": "The show could not be saved to disk",
+  "health.opFailed": "That action failed",
+  "health.dismiss": "Dismiss",
   "app.tab.scenes": "Scenes",
   "app.tab.loops": "Loops",
   "app.tab.chaser": "Chaser",
@@ -956,6 +1750,29 @@ export const en: Translation = {
   "vdj.intro":
     "Polls the Network Control Plugin running inside VirtualDJ for the current track's BPM and drives the overall tempo override. Requires VDJ 2023+ with a Pro license.",
   "vdj.section.connection": "Connection",
+  "vdj.inst.title": "VirtualDJ instances",
+  "vdj.inst.intro":
+    "Two DJs in the booth = two VirtualDJs on the router. Name them by IP and pick the one the rig follows: HTTP and OS2L switch together; the other one is ignored.",
+  "vdj.inst.scan": "Scan the network",
+  "vdj.inst.scanning": "Scanning…",
+  "vdj.inst.use": "Use",
+  "vdj.inst.useHint": "Follow this VirtualDJ (beats, cues, buttons)",
+  "vdj.inst.inUse": "In use",
+  "vdj.inst.thisMachine": "this Mac",
+  "vdj.inst.labelPlaceholder": "Name (Julio, Rafa…)",
+  "vdj.inst.httpUnknown": "HTTP…",
+  "vdj.inst.httpPlaying": "HTTP ▶ playing",
+  "vdj.inst.httpIdle": "HTTP ✓ idle",
+  "vdj.inst.httpDown": "HTTP —",
+  "vdj.inst.os2lBeating": "OS2L ♪ {bpm}",
+  "vdj.inst.os2lConnected": "OS2L connected",
+  "vdj.inst.os2lOff": "OS2L —",
+  "vdj.inst.forget": "Forget this instance",
+  "vdj.inst.empty":
+    "Scan to find the VirtualDJs on the router (Bonjour, the HTTP port, the OS2L connections).",
+  "vdj.inst.auto": "Hand over by itself",
+  "vdj.inst.autoHint":
+    "When the selected VirtualDJ stops sending beats for 5 s and another known one is playing, switch to it.",
   "vdj.section.behavior": "Tempo behaviour",
   "vdj.host": "Host",
   "vdj.hostHint": "Usually 127.0.0.1 — VirtualDJ on the same machine as this app.",
@@ -968,6 +1785,96 @@ export const en: Translation = {
   "vdj.enabled": "Enabled",
   "vdj.enabledHint": "When on, polls VDJ continuously and applies the BPM. Survives restart.",
   "vdj.save": "Save",
+  "vdj.os2l.title": "OS2L — Cues from VirtualDJ",
+  "vdj.os2l.intro":
+    "VirtualDJ connects here over its native OS2L protocol and pushes beats plus button events. Drop action POIs in your tracks with os2l_button 'name' and each cue fires an action in this app when playback crosses it.",
+  "vdj.os2l.section.server": "Server",
+  "vdj.os2l.enabled": "OS2L server enabled",
+  "vdj.os2l.enabledHint":
+    "Announced via mDNS on the local network — VirtualDJ's OS2L auto-detection finds it by itself (VDJ 2018+; in VDJ settings, set os2l to 'auto').",
+  "vdj.os2l.port": "Port",
+  "vdj.os2l.portHint":
+    "If auto-detection fails, set os2lNetworkAddress in VDJ to this machine's IP:port.",
+  "vdj.os2l.status.connected": "VirtualDJ connected: {peer}",
+  "vdj.os2l.status.listening": "Listening — waiting for VirtualDJ",
+  "vdj.os2l.status.stopped": "Stopped",
+  "vdj.os2l.status.lastBeat": "Last beat",
+  "vdj.os2l.section.buttons": "Cues / buttons",
+  "vdj.os2l.conventionsHint":
+    "Zero-config names: escena:Intro, scene:2, loop:Drop, loop:stop, chaser:Amber, mov:Circle, snap:Hit, blackout, blind, tap. Values match the item's name first, then a 1-based number.",
+  "vdj.os2l.recent": "Recent buttons received",
+  "vdj.os2l.clearRecent": "Clear",
+  "vdj.cues.title": "Cues per track",
+  "vdj.cues.intro":
+    "The app's own POI system: play the track in VirtualDJ, arm the action, and hit 'Mark cue' at the right moment — no VDJ POI editor, no scripts. The follower tracks the playhead and fires each cue on its beat.",
+  "vdj.cues.enabled": "Cue follower enabled",
+  "vdj.cues.enabledHint":
+    "Tracks the playing deck through the Network Control HTTP endpoint (same host/port as the tempo bridge above).",
+  "vdj.cues.tracking": "Tracking: {title}",
+  "vdj.cues.waiting": "Waiting for a playing deck…",
+  "vdj.cues.position": "beat {beat} · {time}",
+  "vdj.cues.noTrack": "Play a track in VirtualDJ and it will show up here with its cue list.",
+  "vdj.cues.empty": "No cues for this track yet. Arm an action and hit 'Mark cue' while it plays.",
+  "vdj.cues.mark": "🎯 Mark cue",
+  "vdj.cues.snap": "Snap to beat",
+  "vdj.cues.colBeat": "Beat",
+  "vdj.cues.colTime": "≈ Time",
+  "vdj.cues.colName": "Name",
+  "vdj.cues.namePlaceholder": "e.g. Dancers enter",
+  "vdj.cues.delete": "Delete cue",
+  "vdj.net.title": "Network / paths (VDJ on another machine)",
+  "vdj.net.dbPath": "VDJ database.xml path",
+  "vdj.net.dbPathHint":
+    "Empty = auto-detect locally. If VDJ runs elsewhere, mount its disk (SMB) and point this at its database.xml for the POI export.",
+  "vdj.net.mapFrom": "Map music path — from (VDJ)",
+  "vdj.net.mapTo": "to (local)",
+  "vdj.net.mapHint":
+    "Rewrites VDJ's file paths for local access (waveform). E.g. C:\\Musica → /Volumes/Musica. Empty = VDJ runs on this machine.",
+  "vdj.cues.waveLoading": "Decoding waveform…",
+  "vdj.cues.waveUnavailable":
+    "Audio file not reachable locally — waveform unavailable (cue list still works). If VDJ runs on another machine, configure the path mapping above.",
+  "vdj.cues.waveHint":
+    "Click on the waveform to mark a cue at that exact spot (uses the armed action).",
+  "vdj.cues.export": "Write POIs into VirtualDJ",
+  "vdj.cues.exportHint":
+    "Close VirtualDJ first — it saves its database on exit and would overwrite the POIs. On next launch the cues appear on the waveform, named, and fire over OS2L.",
+  "vdj.cues.exportDone":
+    "{cues} POIs written across {tracks} track(s). Open VirtualDJ and they are on the waveform.",
+  "vdj.cues.exportMissing": "Not in VDJ's database (play or scan them in VDJ once): {titles}",
+  "vdj.cues.exportNoSecs": "Skipped (marked with an old build — re-mark them): {names}",
+  "vdj.cues.exportBackup": "Backup: {path}",
+  "vdj.os2l.quantize": "Quantize triggers to the beat",
+  "vdj.os2l.quantizeHint":
+    "Dispatches wait for the next beat of the live grid instead of firing on arrival. Place POIs slightly BEFORE the musical moment and the change lands exactly on the beat. Events just after a beat (20% grace) fire immediately. Synced cue POIs (cue:…) are never quantized: their timeline position is the timing.",
+  "vdj.os2l.latencyOffset": "Compensation (ms)",
+  "vdj.os2l.latencyOffsetHint":
+    "Extra delay added to quantized triggers, to absorb the audio-output latency. Use the '+N ms' readout in the log to calibrate.",
+  "vdj.os2l.beatOffsetTitle": "Arrival offset after the previous beat",
+  "vdj.os2l.quantizedTitle": "Dispatch deferred to the next beat",
+  "vdj.os2l.recentEmpty":
+    "Nothing yet. Create an action POI in VDJ with os2l_button 'escena:Intro' and play across it — it will show up here.",
+  "vdj.os2l.unresolved": "no action matched",
+  "vdj.os2l.testPlaceholder": "Try a name, e.g. escena:Intro…",
+  "vdj.os2l.testFire": "Test",
+  "vdj.os2l.section.mappings": "Explicit mappings",
+  "vdj.os2l.mappingsHint":
+    "For names that don't follow the convention (or to rename cues without touching VDJ): map an exact OS2L name to an action.",
+  "vdj.os2l.mapName": "OS2L name",
+  "vdj.os2l.mapAction": "Action",
+  "vdj.os2l.mapTarget": "Target",
+  "vdj.os2l.addMapping": "+ Add mapping",
+  "vdj.os2l.removeMapping": "Remove mapping",
+  "vdj.os2l.kind.scene": "Scene",
+  "vdj.os2l.kind.loop": "Loop group",
+  "vdj.os2l.kind.loop_stop": "Stop loops",
+  "vdj.os2l.kind.chaser": "Chaser",
+  "vdj.os2l.kind.movement": "Movement",
+  "vdj.os2l.kind.snapshot": "Snapshot",
+  "vdj.os2l.kind.blackout": "Blackout",
+  "vdj.os2l.kind.blind": "Blind",
+  "vdj.os2l.kind.tap": "Tap tempo",
+  "vdj.os2l.apply": "Apply & save",
+  "vdj.os2l.errSave": "Could not apply: {err}",
   "vdj.statusSection": "Status",
   "vdj.status.running": "Running",
   "vdj.status.stopped": "Stopped",
@@ -1157,8 +2064,32 @@ export const en: Translation = {
   "library.gobosReplace": "Replace",
   "library.gobosRangeFmt": "{label} (DMX {from}–{to})",
   "library.gobosErrorOversize": "Image too large for a per-range thumbnail (max 512 KB).",
+  "library.edit": "Edit definition",
+  "library.editIdNote": "id: {id} (cannot be changed)",
+  "library.editTabForm": "Form",
+  "library.editTabJson": "Raw JSON",
+  "library.editManufacturer": "Manufacturer",
+  "library.editName": "Name",
+  "library.editModeName": "Mode name",
+  "library.editColName": "Name",
+  "library.editColRole": "Role",
+  "library.editColDefault": "Default",
+  "library.editColDescription": "Description",
+  "library.editRoleCustom": "Custom…",
+  "library.editRanges": "Ranges",
+  "library.editAddRange": "+ Add range",
+  "library.editRemoveRange": "Remove range",
+  "library.editJsonHint":
+    "Full definition JSON — total control. The image fields hold embedded base64 blobs; leave them alone unless you know what you're doing.",
+  "library.editSaveError": "Could not save: {err}",
 
   "outputs.title": "Outputs",
+  "outputs.suspend": "Suspend DMX output",
+  "outputs.resume": "Resume DMX output",
+  "outputs.suspendHint":
+    "Stops the output thread completely: one final blackout frame, then the line goes idle (no breaks, no data) and the FTDI is released. Use it to isolate hardware issues or while re-wiring.",
+  "outputs.suspendedBanner":
+    "DMX output is SUSPENDED — nothing is being transmitted. Fixtures are running on their own until you resume.",
   "outputs.kind.mock": "Mock (logging)",
   "outputs.kind.artNet": "Art-Net",
   "outputs.kind.sacn": "sACN (E1.31)",
@@ -1398,6 +2329,9 @@ export const en: Translation = {
   "snapshots.deleteConfirm": 'Delete snapshot "{name}"?',
   "snapshots.deleteHint": "Delete snapshot",
   "snapshots.activeBadge": "ACTIVE",
+  "snapshots.fade": "Fade",
+  "snapshots.fadeHint":
+    "Crossfade into this snapshot whenever it is activated — pad, cue or loop group. 0 = hard cut; anything under ~200 ms is invisible, 300–2000 ms is the usual range.",
   "scenes.step.fade": "Fade",
   "scenes.step.hold": "Hold",
   "scenes.step.ms": "ms",
@@ -1595,6 +2529,19 @@ export const en: Translation = {
   "stage.title": "Stage",
   "stage.meta": "{count} fixtures · grid {grid}px",
   "stage.metaSelected": " · {count} selected",
+  "stage.metaAway": " · {n} away",
+  "stage.inUse.showAll": "Show all (+{n} away)",
+  "stage.inUse.onlyInUse": "Only in use",
+  "stage.inUse.hint":
+    "Fixtures marked as not at this event are hidden from Stage, Magic Mode and the test. Right-click a fixture to mark it.",
+  "stage.test": "Test",
+  "stage.test.hint":
+    "Pre-show check: flash every fixture (or the selection) open white at a safe level, or one at a time. Leaves scenes and the programmer alone; stays under blackout and master.",
+  "stage.test.all": "All",
+  "stage.test.step": "One by one",
+  "stage.test.now": "Now: {name}",
+  "stage.test.count": "{n} fixtures",
+  "stage.test.remaining": "auto-off in {m} min",
   "stage.empty": "No fixtures.",
   "stage.sidebar.placeholder":
     "Select a fixture or a type to open its encoders. ⌘/Ctrl-click adds or removes from the selection.",
@@ -1612,6 +2559,7 @@ export const en: Translation = {
   "stage.editor.fxTooltipMovement": "Movement: {name} · affects {touches}/{total}",
   "stage.editor.center": "Center",
   "stage.editor.home": "Home",
+  "stage.editor.section.presets": "Presets",
   "stage.editor.section.intStrobe": "Intensity & strobe",
   "stage.editor.section.color": "Color",
   "stage.editor.section.extras": "Extras",
@@ -1678,6 +2626,12 @@ export const en: Translation = {
   "stage.menu.fixturePlural": "{count} fixtures",
   "stage.menu.centerPanTilt": "Center Pan/Tilt",
   "stage.menu.park": "Park (defaults)",
+  "stage.menu.safeBootOn": "Safe power-up (hold DMX at 0)",
+  "stage.menu.markOutOfUse": "Not at this event (hide)",
+  "stage.menu.markInUse": "Back in use",
+  "stage.menu.safeBootOff": "Release safe power-up",
+  "stage.fixture.safeBootTitle":
+    "Safe power-up active: every channel of this fixture is held at 0. Power the head, wait for homing to finish, then release from the right-click menu.",
   "stage.menu.fullIntensity": "Full intensity",
   "stage.menu.blackoutFixture": "Blackout (intensity 0)",
   "stage.menu.rename": "Rename…",
@@ -1747,6 +2701,350 @@ export const en: Translation = {
 export const es: Translation = {
   "app.brand": "DMX Control",
   "app.tab.stage": "Stage",
+  "general.features.preview3d": "Preview 3D",
+  "general.features.preview3dHint":
+    "La pestaña de escenario 3D (WebGL: haces volumétricos, bloom). Apagalo en la laptop chica para ahorrar CPU/GPU.",
+  "general.features.preview3dQuality": "Calidad 3D",
+  "general.quality.low": "Baja (24 fps, sin bloom)",
+  "general.quality.medium": "Media",
+  "general.quality.high": "Alta (bloom + antialias)",
+  "p3d.edit": "Editar rig",
+  "p3d.edit.hint": "Tocá un fixture o un truss y arrastrá el gizmo. Esc deselecciona.",
+  "p3d.edit.move": "Mover",
+  "p3d.edit.rotate": "Apuntar",
+  "p3d.edit.snapped": "Enganchado a {truss}",
+  "p3d.quality": "Calidad",
+  "vdj.os2l.kind.autopilot": "Modo Mágico",
+  "vdj.os2l.mode.toggle": "Toggle",
+  "vdj.os2l.mode.flash": "Flash (mientras está apretado)",
+  "vdj.os2l.mode.swop": "Swop (apretado, el resto a negro)",
+  "vdj.os2l.modeHint":
+    "Cómo se comporta el pad: Toggle dispara al apretar; Flash sostiene la acción mientras está apretado y vuelve al soltar; Swop además apaga todo fixture que la acción no maneja.",
+  "vdj.os2l.kind.energy_low": "Mágico: energía tranqui",
+  "vdj.os2l.kind.energy_mid": "Mágico: energía groove",
+  "vdj.os2l.kind.energy_high": "Mágico: energía fiesta",
+  "vdj.os2l.kind.magic_next": "Mágico: siguiente look",
+  "vdj.os2l.kind.magic_back": "Mágico: look anterior",
+  "vdj.os2l.kind.magic_hold": "Mágico: mantener look",
+  "vdj.os2l.kind.magic_burst": "Mágico: ráfaga de strobo",
+  "vdj.os2l.kind.magic_drop": "Mágico: drop",
+  "vdj.os2l.kind.magic_movement": "Mágico: cabezales on/off",
+  "vdj.os2l.kind.magic_palette_auto": "Mágico: paleta auto",
+  "vdj.os2l.kind.magic_palette_warm": "Mágico: paleta cálida",
+  "vdj.os2l.kind.magic_palette_cold": "Mágico: paleta fría",
+  "vdj.os2l.kind.magic_palette_rainbow": "Mágico: paleta arcoíris",
+  "vdj.os2l.kind.magic_palette_mono": "Mágico: paleta mono",
+  "app.tab.magic": "Mágico",
+  "app.tab.booth": "Cabina",
+  "booth.rig": "Rig",
+  "booth.snapshots": "Snapshots",
+  "booth.scenes": "Escenas",
+  "booth.chasers": "Chasers",
+  "booth.movements": "Movimientos",
+  "booth.loops": "Listas loop",
+  "booth.magic": "Modo Mágico",
+  "booth.empty": "Nada todavía",
+  "booth.showAll": "Mostrar todos",
+  "booth.onlyInUse": "Solo en uso",
+  "cues.kind.autopilot": "Modo Mágico",
+  "cues.kind.energy_low": "Mágico: energía tranqui",
+  "cues.kind.energy_mid": "Mágico: energía groove",
+  "cues.kind.energy_high": "Mágico: energía fiesta",
+  "cues.kind.magic_next": "Mágico: siguiente look",
+  "cues.kind.magic_back": "Mágico: look anterior",
+  "cues.kind.magic_hold": "Mágico: mantener look",
+  "cues.kind.magic_burst": "Mágico: ráfaga de strobo",
+  "cues.kind.magic_drop": "Mágico: drop",
+  "cues.kind.magic_movement": "Mágico: cabezales on/off",
+  "cues.kind.magic_palette_auto": "Mágico: paleta auto",
+  "cues.kind.magic_palette_warm": "Mágico: paleta cálida",
+  "cues.kind.magic_palette_cold": "Mágico: paleta fría",
+  "cues.kind.magic_palette_rainbow": "Mágico: paleta arcoíris",
+  "cues.kind.magic_palette_mono": "Mágico: paleta mono",
+  "magic.title": "MODO MÁGICO",
+  "magic.toggleHint":
+    "Prender o apagar el autopiloto (también mapeable a un botón o a un POI OS2L llamado 'auto')",
+  "magic.state.off": "Apagado — la consola es tuya.",
+  "magic.state.on": "Improvisando al ritmo.",
+  "magic.state.ducked": "En pausa: tomaste la consola (vuelve en {s} s).",
+  "magic.state.noFixtures": "Prendido, pero ningún fixture participa todavía — elegí abajo.",
+  "magic.participantsCount": "{n} fixtures · {m} cabezales",
+  "magic.clock.os2l": "beat de VDJ (OS2L)",
+  "magic.clock.vdj": "beat de VDJ (polling)",
+  "magic.clock.mic": "beat del micrófono",
+  "magic.clock.free": "reloj libre",
+  "magic.nextChange": "cambia en {n} beats",
+  "magic.cadenceLabel": "cada {n} beats",
+  "magic.band.low": "tranqui",
+  "magic.band.mid": "media",
+  "magic.band.high": "fiesta",
+  "magic.energyFrom.vdj_vu": "VU de VDJ",
+  "magic.energyFrom.manual": "manual",
+  "magic.energyFrom.mic": "micrófono",
+  "magic.energyFrom.os2l": "fuerza de beat (OS2L)",
+  "status.out.ok": "Enviando frames",
+  "status.out.idle": "Sin universos patcheados en este output",
+  "status.out.error": "Error en el output",
+  "status.out.noNode": "El nodo Art-Net no responde al ArtPoll",
+  "status.out.portClosed": "Puerto sin abrir",
+  "status.out.suspended": "Salida DMX suspendida",
+  "status.out.hint": "Clic: Config → Outputs",
+  "status.out.none": "Sin outputs DMX configurados",
+  "status.vdj.off": "Integración VirtualDJ apagada en Config",
+  "status.vdj.waiting": "Esperando a VirtualDJ (nada sonando / OS2L sin conectar)",
+  "status.vdj.poll": "Polling OK · {bpm} BPM",
+  "status.vdj.os2lPeer": "OS2L conectado ({peer})",
+  "status.vdj.os2lListening": "OS2L escuchando en :{port}",
+  "status.vdj.hint": "Clic: Config → VirtualDJ",
+  "status.vdj.source": "Siguiendo a {label} ({ip})",
+  "magic.energyFrom.none": "sin señal",
+  "magic.state.silent": "Sin señal de VirtualDJ — fundido a negro hasta que vuelva la música.",
+  "magic.state.fallback":
+    "Sin señal de VirtualDJ para esta fuente — sigue el slider de energía manual.",
+  "magic.how.gain": "Sensibilidad del VU",
+  "magic.how.gainHint":
+    "Subila si el medidor queda bajo en tu setup: la intro tiene que leer bajo y el drop, alto.",
+  "magic.now.title": "Sonando ahora",
+  "magic.now.waiting": "Esperando el primer beat…",
+  "magic.now.off": "Prendelo y acá aparece el look actual.",
+  "magic.now.history": "Looks recientes",
+  "magic.now.noHistory": "Todavía nada.",
+  "magic.now.vocabTag": "tuyo",
+  "magic.nudge.back": "Volver",
+  "magic.nudge.hold": "Sostener",
+  "magic.nudge.next": "Cambiar ya",
+  "magic.who.title": "Quiénes participan",
+  "magic.who.hint": "Solo estos fixtures se improvisan; el resto queda como lo dejaste.",
+  "magic.who.empty": "Todavía no hay fixtures pacheados.",
+  "magic.who.all": "todos",
+  "magic.who.none": "ninguno",
+  "magic.kind.par": "Washes / PARs",
+  "magic.kind.mover": "Cabezales",
+  "magic.kind.strobe": "Strobos",
+  "magic.kind.other": "Otros",
+  "magic.how.title": "Cómo improvisa",
+  "magic.how.cadence": "Cambia cada",
+  "magic.how.cadenceHint": "beats — los cambios grandes caen en los límites de frase (32 beats).",
+  "magic.how.variety": "Variedad",
+  "magic.how.varietyScale": "sobrio ↔ sorpréndeme",
+  "magic.how.palette": "Paleta",
+  "magic.palette.auto": "Auto",
+  "magic.palette.warm": "Cálida",
+  "magic.palette.cold": "Fría",
+  "magic.palette.rainbow": "Arcoíris",
+  "magic.palette.mono": "Mono",
+  "magic.how.energy": "Energía",
+  "magic.how.manualEnergy":
+    "Energía manual (se usa con fuente manual, o si VirtualDJ está apagado en Config)",
+  "magic.how.preset.low": "Tranqui 25%",
+  "magic.how.preset.mid": "Groove 55%",
+  "magic.how.preset.high": "Fiesta 85%",
+  "magic.how.latency": "Ajuste de latencia",
+  "magic.how.latencyHint":
+    "Positivo si las luces se adelantan al sonido, negativo si llegan tarde. Calibrá con el pulso blanco.",
+  "magic.how.calibrate": "Calibrar",
+  "magic.how.calibrateStop": "Terminar calibración",
+  "magic.how.calibrateHint":
+    "Todos los participantes destellan en blanco en cada beat; mové el slider hasta que destello y bombo coincidan.",
+  "magic.state.calibrating": "Calibrando: pulso blanco en cada beat.",
+  "magic.how.energyHint":
+    "La energía define qué tan a fondo va: pulsos, velocidad, strobos. Manual: manejás vos el slider. Micrófono: la consola escucha la sala (graves + nivel general, normalizados); VirtualDJ no interviene.",
+  "magic.how.movement": "Mover los cabezales",
+  "magic.how.strobe": "Permitir strobos (solo con energía de fiesta, ráfagas cortas)",
+  "magic.how.drops": "Permitir drops a negro de un beat en cambios de frase",
+  "magic.how.stopOnSilence":
+    "Fundir a negro si VirtualDJ reporta que no hay música (requiere enlace estable)",
+  "magic.how.stopOnSilenceHint":
+    "Apagado por defecto: un enlace con VirtualDJ que se cuelga produce apagones en medio del tema. Prendelo solo si el indicador HTTP ▶ se mantiene estable con un tema sonando.",
+  "magic.how.floor": "Piso de luz",
+  "magic.how.maxLevel": "Techo de luz",
+  "magic.how.ducking": "Se aparta cuando intervengo, durante",
+  "magic.vocab.title": "Tu vocabulario",
+  "magic.vocab.hint":
+    "Etiquetá tus escenas y snapshots por energía y los mezcla en la improvisación. Los que no etiquetás nunca se usan.",
+  "magic.vocab.use": "Usar mis escenas y snapshots",
+  "magic.vocab.useGenerator": "También inventar looks (generador)",
+  "magic.vocab.empty": "Todavía no hay escenas ni snapshots en este show.",
+  "magic.vocab.weight": "Qué tan seguido (peso)",
+  "magic.zones.title": "Zonas de cabezales",
+  "magic.zones.hint":
+    "Dónde puede apuntar cada cabezal en ESTE lugar. Arrastrá el recuadro; ⌥-click apunta el cabezal real ahí. Se guarda con el show.",
+  "magic.zones.empty": "No hay cabezales participando — sumá alguno en “Quiénes participan”.",
+  "magic.zones.copyAll": "Copiar a todos",
+  "magic.zones.copyAllHint": "Aplicar esta zona a todos los cabezales participantes",
+  "magic.zones.test": "Probar:",
+  "magic.color.solid": "sólido",
+  "magic.color.alternate": "alternado",
+  "magic.color.sweep": "barrido",
+  "magic.color.chase": "chase",
+  "magic.color.sparkle": "chispas",
+  "magic.dim.static": "fija",
+  "magic.dim.pulse_beat": "pulso",
+  "magic.dim.pulse_half": "pulso ½",
+  "magic.dim.swell": "oleaje",
+  "magic.dim.chase_lr": "chase izq→der",
+  "magic.dim.sparkle": "chispas",
+  "magic.dim.breathe": "respira",
+  "magic.mover.static": "quieto",
+  "magic.mover.circle": "círculo",
+  "magic.mover.figure8": "ocho",
+  "magic.mover.sweep_h": "barrido",
+  "magic.mover.sweep_v": "cabeceo",
+  "magic.mover.wave": "ola",
+  "magic.mover.fan": "abanico",
+  "magic.mover.cross": "cruce",
+  "magic.mover.scan": "rastreo",
+  "magic.mover.stab": "estocada",
+  "magic.mover.lissajous": "lissajous",
+  "magic.mover.drift": "deriva",
+  "magic.mover.nod": "asentir",
+  "magic.mover.ballyhoo": "frenesí",
+  "magic.mover.relay": "posta",
+  "mirror.chip.mirror": "ESPEJO",
+  "mirror.chip.lost": "SIN SEÑAL",
+  "cues.unassigned": "Sin acción",
+  "cues.unassignedCount": "⚠ {n} sin acción",
+  "cues.scope.own": "De este tema",
+  "cues.scope.all": "Todas (reutilizar)",
+  "cues.pickTarget": "— sin asignar —",
+  "cues.reused": "↗ Reutilizada de «{title}».",
+  "cues.adopt": "Adoptar en este tema",
+  "cues.createScene": "+ Capturar escena nueva",
+  "cues.createSnapshot": "+ Capturar snapshot nuevo",
+  "cues.createHint":
+    "Armá el look en la pestaña Stage y capturalo acá: queda como escena de este tema, asignada al cue.",
+  "cues.created": "Creada «{name}» y asignada al cue",
+  "cues.deleteOwnedConfirm":
+    "«{title}» tiene {n} escenas/snapshots propios creados desde sus cues. ¿Borrarlos también?",
+  "app.tab.cues": "Cues",
+  "general.features.title": "Módulos opcionales",
+  "general.features.cueEditor": "Editor de cues (modo planificación)",
+  "general.features.cueEditorHint":
+    "Agrega la pestaña Cues: transporte de audio propio y waveform con zoom para armar los cues con el organizador. Consume memoria mientras está abierta — dejalo apagado en la consola del show si no lo usás.",
+  "vdj.cues.editHint":
+    "Los cues se editan en la pestaña Cues (activala en Config → General si no la ves).",
+  "cues.setlist": "Setlist",
+  "cues.addTrack": "+ Tema",
+  "cues.addTrackHint": "Agregar un archivo de audio al setlist",
+  "cues.addVdjTrack": "Agregar el tema que suena en VDJ: {title}",
+  "cues.noTracks": "Todavía no hay temas. Agregá uno con + Tema, o poné uno en VirtualDJ.",
+  "cues.cueCount": "{n} cues",
+  "cues.removeTrackConfirm": "¿Quitar «{title}» del setlist? Se pierden sus cues.",
+  "cues.export": "Exportar",
+  "cues.exportSheet": "Hoja de cues (CSV)",
+  "cues.exportSheetDone": "Hoja de cues guardada: {n} filas",
+  "cues.exportPois": "POIs a VirtualDJ",
+  "cues.exportPoisDone": "POIs exportados: {tracks} temas, {cues} cues",
+  "cues.exportPoisMissing": "({n} temas no encontrados en VDJ)",
+  "cues.source.audio": "Audio propio",
+  "cues.source.vdj": "Seguir VDJ",
+  "cues.vdjIdle": "VirtualDJ no está reproduciendo",
+  "cues.vdjPlaying": "VDJ ▶ {title}",
+  "cues.vdjOtherTrack": "Abrir el tema de VDJ",
+  "cues.vdjPlayingOs2l": "VDJ ▶ {title} · por beats OS2L",
+  "cues.vdjAssumed": "tema asumido desde el editor: no se disparan cues hasta que VDJ lo confirme",
+  "cues.vdjHttpDown":
+    "El Network Control (HTTP) de VDJ no responde en {endpoint}. En VDJ activá el plugin Network Control (FX master → Auto-Start) para que sobreviva a un reinicio.",
+  "cues.play": "Reproducir (espacio)",
+  "cues.pause": "Pausa (espacio)",
+  "cues.toStart": "Al inicio",
+  "cues.rate": "Velocidad",
+  "cues.loop": "Loop A/B",
+  "cues.loopSetA": "A",
+  "cues.loopSetB": "B",
+  "cues.loopClear": "Quitar loop",
+  "cues.snap": "Snap a beat",
+  "cues.grid": "Grilla",
+  "cues.preview": "Disparar luces al reproducir",
+  "cues.zoomIn": "Acercar (+)",
+  "cues.zoomOut": "Alejar (−)",
+  "cues.zoomFit": "Ajustar tema (F)",
+  "cues.mark": "Marcar un cue en el cursor (M)",
+  "cues.markAt": "Marcar en {time}",
+  "cues.noWave": "Decodificando forma de onda…",
+  "cues.waveError": "No pude leer el audio: {err}",
+  "cues.audioError": "Audio: {err}",
+  "cues.selectTrack": "Elegí un tema del setlist para empezar.",
+  "cues.shortcuts":
+    "Espacio play/pausa · M marcar · ←→ ±1 s (⇧ ±0,1 s) · , . mover cue ±10 ms (⇧ ±100 ms) · ⌘Z deshacer · ⌘C/⌘V copiar/pegar · I/O loop A/B · L loop · G grilla · S snap · +/− zoom · F ajustar · ⇧-arrastrar seleccionar · doble click marcar",
+  "cues.copied": "{n} cues copiados",
+  "cues.pasted": "{n} cues pegados",
+  "cues.moveUp": "Subir",
+  "cues.moveDown": "Bajar",
+  "cues.remove": "Quitar",
+  "cues.inspector.title": "Cue",
+  "cues.inspector.name": "Nombre",
+  "cues.inspector.namePh": "ej: Entran bailarines",
+  "cues.inspector.kind": "Acción",
+  "cues.inspector.target": "Destino",
+  "cues.inspector.filter": "Filtrar…",
+  "cues.inspector.color": "Color",
+  "cues.inspector.colorAuto": "Auto",
+  "cues.inspector.time": "Tiempo",
+  "cues.inspector.beat": "Beat",
+  "cues.inspector.go": "Ir",
+  "cues.inspector.fire": "Disparar ahora",
+  "cues.inspector.duplicate": "Duplicar",
+  "cues.inspector.delete": "Borrar",
+  "cues.inspector.multi": "{n} cues seleccionados",
+  "cues.inspector.nudge": "Mover",
+  "cues.inspector.none": "Sin cue seleccionado — marcá con M o doble click en la onda.",
+  "cues.arm.title": "Próximo cue",
+  "cues.grid.title": "Grilla de beats",
+  "cues.grid.bpm": "BPM",
+  "cues.grid.firstBeat": "Primer beat",
+  "cues.grid.setHere": "Primer beat aquí",
+  "cues.grid.detect": "Detectar BPM",
+  "cues.grid.detecting": "Detectando…",
+  "cues.grid.detected": "Detectado {bpm} BPM (confianza {conf}%)",
+  "cues.grid.fromVdj": "Tomar de VDJ",
+  "cues.grid.none":
+    "Sin grilla: el snap y la vista de beats la necesitan (detectá, tomala de VDJ o escribí el BPM).",
+  "cues.grid.clear": "Quitar",
+  "cues.sections.title": "Secciones",
+  "cues.sections.add": "Sección aquí",
+  "cues.sections.namePh": "Intro / Estribillo…",
+  "cues.sections.none": "Sin secciones.",
+  "cues.list.title": "Cues del tema",
+  "cues.list.empty": "Todavía no hay cues en este tema.",
+  "cues.kind.scene": "Escena",
+  "cues.kind.loop": "Loop",
+  "cues.kind.loop_stop": "Detener loop",
+  "cues.kind.chaser": "Chaser",
+  "cues.kind.movement": "Movimiento",
+  "cues.kind.snapshot": "Snapshot",
+  "cues.kind.blackout": "Blackout",
+  "cues.kind.blind": "Blind",
+  "cues.kind.tap": "Tap",
+  "health.repair": "🔧 Reparar permisos",
+  "health.repairing": "Reparando…",
+  "health.repairOk": "Permisos reparados — el guardado funciona de nuevo",
+  "mirror.chip.live": "EN VIVO",
+  "mirror.chip.mirrors": "{n} espejo(s)",
+  "mirror.chip.mirrorOf": "ESPEJO de {name}",
+  "mirror.chip.mirrorAlone": "ESPEJO — buscando consola en vivo…",
+  "mirror.chip.noSignal": "ESPEJO — ¡SIN SEÑAL de la consola en vivo!",
+  "mirror.chip.hint": "Cambiar el rol de esta consola",
+  "mirror.takeControl": "Tomar control",
+  "mirror.confirmTake":
+    "¿TOMAR EL CONTROL en esta consola? Las salidas DMX y los servicios de VDJ arrancan acá, y la consola en vivo actual (si responde) pasa a espejo.",
+  "mirror.confirmMirror":
+    "¿Pasar esta consola a ESPEJO? Se apagan las salidas DMX y la escucha de VDJ; va a seguir a la consola en vivo por la red.",
+  "mirror.liveLostTitle": "Se perdió la consola en vivo",
+  "mirror.liveLostDetail":
+    "El espejo dejó de recibir señal. Si la principal se cayó, tomá el control acá.",
+  "health.bothLiveTitle": "¡DOS consolas EN VIVO en la red!",
+  "health.bothLiveDetail":
+    "Detectada: {names}. Las dos pueden estar disparando a las mismas luces — pasá una a espejo.",
+  "health.peersTitle": "Hay otra DMX Control en la red",
+  "health.peersDetail":
+    "Detectada: {names}. Asegurate de que UNA sola app maneje las luces (salidas y OS2L).",
+  "health.secondLaunch": "Se bloqueó un segundo arranque — esta es la única ventana activa",
+  "health.configProblems":
+    "La carpeta de configuración no se puede escribir — los cambios podrían NO guardarse",
+  "health.saveError": "No se pudo guardar el show en el disco",
+  "health.opFailed": "Esa acción falló",
+  "health.dismiss": "Cerrar",
   "app.tab.scenes": "Escenas",
   "app.tab.loops": "Loops",
   "app.tab.chaser": "Chaser",
@@ -1841,6 +3139,29 @@ export const es: Translation = {
   "vdj.intro":
     "Pollea al Network Control Plugin de VirtualDJ por el BPM de la canción actual y lo aplica como tempo global. Requiere VDJ 2023+ con licencia Pro.",
   "vdj.section.connection": "Conexión",
+  "vdj.inst.title": "Instancias de VirtualDJ",
+  "vdj.inst.intro":
+    "Dos DJs en la cabina = dos VirtualDJ en el router. Ponele nombre a cada IP y elegí cuál sigue el rig: HTTP y OS2L cambian juntos; el otro se ignora.",
+  "vdj.inst.scan": "Escanear la red",
+  "vdj.inst.scanning": "Escaneando…",
+  "vdj.inst.use": "Usar",
+  "vdj.inst.useHint": "Seguir este VirtualDJ (beats, cues, botones)",
+  "vdj.inst.inUse": "En uso",
+  "vdj.inst.thisMachine": "esta Mac",
+  "vdj.inst.labelPlaceholder": "Nombre (Julio, Rafa…)",
+  "vdj.inst.httpUnknown": "HTTP…",
+  "vdj.inst.httpPlaying": "HTTP ▶ sonando",
+  "vdj.inst.httpIdle": "HTTP ✓ parado",
+  "vdj.inst.httpDown": "HTTP —",
+  "vdj.inst.os2lBeating": "OS2L ♪ {bpm}",
+  "vdj.inst.os2lConnected": "OS2L conectado",
+  "vdj.inst.os2lOff": "OS2L —",
+  "vdj.inst.forget": "Olvidar esta instancia",
+  "vdj.inst.empty":
+    "Escaneá para encontrar los VirtualDJ del router (Bonjour, el puerto HTTP, las conexiones OS2L).",
+  "vdj.inst.auto": "Cambiar solo",
+  "vdj.inst.autoHint":
+    "Si el VirtualDJ elegido deja de mandar beats 5 s y otro conocido está sonando, pasa a ese.",
   "vdj.section.behavior": "Comportamiento del tempo",
   "vdj.host": "Host",
   "vdj.hostHint": "Normalmente 127.0.0.1 — VirtualDJ corriendo en la misma máquina.",
@@ -1854,6 +3175,99 @@ export const es: Translation = {
   "vdj.enabledHint":
     "Cuando está prendido, polea a VDJ continuamente y aplica el BPM. Persiste tras reiniciar.",
   "vdj.save": "Guardar",
+  "vdj.os2l.title": "OS2L — Cues desde VirtualDJ",
+  "vdj.os2l.intro":
+    "VirtualDJ se conecta acá por su protocolo nativo OS2L y manda beats y eventos de botones. Poné POIs de acción en tus canciones con os2l_button 'nombre' y cada cue dispara una acción en la app cuando la reproducción pasa por ese punto.",
+  "vdj.os2l.section.server": "Servidor",
+  "vdj.os2l.enabled": "Servidor OS2L activado",
+  "vdj.os2l.enabledHint":
+    "Se anuncia por mDNS en la red local — la detección automática de OS2L de VirtualDJ lo encuentra solo (VDJ 2018+; en la config de VDJ, poné os2l en 'auto').",
+  "vdj.os2l.port": "Puerto",
+  "vdj.os2l.portHint":
+    "Si la detección automática falla, configurá os2lNetworkAddress en VDJ con IP:puerto de esta máquina.",
+  "vdj.os2l.status.connected": "VirtualDJ conectado: {peer}",
+  "vdj.os2l.status.listening": "Escuchando — esperando a VirtualDJ",
+  "vdj.os2l.status.stopped": "Detenido",
+  "vdj.os2l.status.lastBeat": "Último beat",
+  "vdj.os2l.section.buttons": "Cues / botones",
+  "vdj.os2l.conventionsHint":
+    "Nombres sin configuración: escena:Intro, escena:2, loop:Drop, loop:stop, chaser:Ambar, mov:Circulo, snap:Golpe, blackout, blind, tap. El valor matchea primero por nombre del ítem y si no, por número (arrancando en 1).",
+  "vdj.os2l.recent": "Últimos botones recibidos",
+  "vdj.os2l.clearRecent": "Limpiar",
+  "vdj.cues.title": "Cues por canción",
+  "vdj.cues.intro":
+    "Nuestro propio sistema de POIs: reproducí el tema en VirtualDJ, armá la acción y apretá 'Marcar cue' en el momento justo — sin editor de POIs de VDJ ni scripts. El seguidor sigue la reproducción y dispara cada cue en su beat.",
+  "vdj.cues.enabled": "Seguidor de cues activado",
+  "vdj.cues.enabledHint":
+    "Sigue el deck que suena por el endpoint HTTP de Network Control (mismo host/puerto que el puente de tempo de arriba).",
+  "vdj.cues.tracking": "Siguiendo: {title}",
+  "vdj.cues.waiting": "Esperando un deck en reproducción…",
+  "vdj.cues.position": "beat {beat} · {time}",
+  "vdj.cues.noTrack": "Reproducí un tema en VirtualDJ y va a aparecer acá con su lista de cues.",
+  "vdj.cues.empty":
+    "Este tema todavía no tiene cues. Armá una acción y apretá 'Marcar cue' mientras suena.",
+  "vdj.cues.mark": "🎯 Marcar cue",
+  "vdj.cues.snap": "Ajustar al beat",
+  "vdj.cues.colBeat": "Beat",
+  "vdj.cues.colTime": "≈ Tiempo",
+  "vdj.cues.colName": "Nombre",
+  "vdj.cues.namePlaceholder": "ej: Entran bailarines",
+  "vdj.cues.delete": "Borrar cue",
+  "vdj.net.title": "Red / rutas (VDJ en otra máquina)",
+  "vdj.net.dbPath": "Ruta de database.xml de VDJ",
+  "vdj.net.dbPathHint":
+    "Vacío = detectar localmente. Si VDJ corre en otra máquina, montá su disco (SMB) y apuntá esto a su database.xml para el export de POIs.",
+  "vdj.net.mapFrom": "Mapear ruta de música — de (VDJ)",
+  "vdj.net.mapTo": "a (local)",
+  "vdj.net.mapHint":
+    "Reescribe las rutas de archivos de VDJ para acceso local (forma de onda). Ej: C:\\Musica → /Volumes/Musica. Vacío = VDJ corre en esta máquina.",
+  "vdj.cues.waveLoading": "Decodificando forma de onda…",
+  "vdj.cues.waveUnavailable":
+    "No llego al archivo de audio localmente — sin forma de onda (la lista de cues sigue andando). Si VDJ está en otra máquina, configurá el mapeo de rutas arriba.",
+  "vdj.cues.waveHint":
+    "Click en la onda para marcar un cue en ese punto exacto (usa la acción armada).",
+  "vdj.cues.export": "Escribir POIs en VirtualDJ",
+  "vdj.cues.exportHint":
+    "Cerrá VirtualDJ primero — guarda su base al salir y pisaría los POIs. Al abrirlo de nuevo, los cues aparecen en la forma de onda, con nombre, y disparan por OS2L.",
+  "vdj.cues.exportDone":
+    "{cues} POIs escritos en {tracks} tema(s). Abrí VirtualDJ y los tenés en la forma de onda.",
+  "vdj.cues.exportMissing":
+    "No están en la base de VDJ (reproducilos o escanealos en VDJ una vez): {titles}",
+  "vdj.cues.exportNoSecs":
+    "Salteados (marcados con una versión vieja — volvé a marcarlos): {names}",
+  "vdj.cues.exportBackup": "Backup: {path}",
+  "vdj.os2l.quantize": "Cuantizar disparos al beat",
+  "vdj.os2l.quantizeHint":
+    "Los disparos esperan al próximo beat de la grilla en vivo en vez de ejecutarse al llegar. Poné los POIs un poco ANTES del momento musical y el cambio cae clavado en el beat. Lo que llega justo después de un beat (20% de gracia) dispara al instante. Los POIs de cues sincronizados (cue:…) nunca se cuantizan: su posición en la línea de tiempo es el timing.",
+  "vdj.os2l.latencyOffset": "Compensación (ms)",
+  "vdj.os2l.latencyOffsetHint":
+    "Retardo extra sobre los disparos cuantizados, para absorber la latencia de la salida de audio. Calibralo mirando el '+N ms' del log.",
+  "vdj.os2l.beatOffsetTitle": "Offset de llegada después del beat anterior",
+  "vdj.os2l.quantizedTitle": "Disparo diferido al próximo beat",
+  "vdj.os2l.recentEmpty":
+    "Todavía no llegó ninguno. Creá un POI de acción en VDJ con os2l_button 'escena:Intro' y reproducí sobre ese punto — va a aparecer acá.",
+  "vdj.os2l.unresolved": "sin acción",
+  "vdj.os2l.testPlaceholder": "Probá un nombre, ej: escena:Intro…",
+  "vdj.os2l.testFire": "Probar",
+  "vdj.os2l.section.mappings": "Mapeos explícitos",
+  "vdj.os2l.mappingsHint":
+    "Para nombres que no siguen la convención (o para renombrar cues sin tocar VDJ): mapeá un nombre OS2L exacto a una acción.",
+  "vdj.os2l.mapName": "Nombre OS2L",
+  "vdj.os2l.mapAction": "Acción",
+  "vdj.os2l.mapTarget": "Destino",
+  "vdj.os2l.addMapping": "+ Agregar mapeo",
+  "vdj.os2l.removeMapping": "Quitar mapeo",
+  "vdj.os2l.kind.scene": "Escena",
+  "vdj.os2l.kind.loop": "Grupo de loops",
+  "vdj.os2l.kind.loop_stop": "Parar loops",
+  "vdj.os2l.kind.chaser": "Chaser",
+  "vdj.os2l.kind.movement": "Movimiento",
+  "vdj.os2l.kind.snapshot": "Snapshot",
+  "vdj.os2l.kind.blackout": "Blackout",
+  "vdj.os2l.kind.blind": "Blind",
+  "vdj.os2l.kind.tap": "Tap tempo",
+  "vdj.os2l.apply": "Aplicar y guardar",
+  "vdj.os2l.errSave": "No se pudo aplicar: {err}",
   "vdj.statusSection": "Estado",
   "vdj.status.running": "Corriendo",
   "vdj.status.stopped": "Detenido",
@@ -2044,8 +3458,32 @@ export const es: Translation = {
   "library.gobosReplace": "Reemplazar",
   "library.gobosRangeFmt": "{label} (DMX {from}–{to})",
   "library.gobosErrorOversize": "Imagen muy grande para un thumbnail por range (máx 512 KB).",
+  "library.edit": "Editar definición",
+  "library.editIdNote": "id: {id} (no se puede cambiar)",
+  "library.editTabForm": "Formulario",
+  "library.editTabJson": "JSON crudo",
+  "library.editManufacturer": "Fabricante",
+  "library.editName": "Nombre",
+  "library.editModeName": "Nombre del modo",
+  "library.editColName": "Nombre",
+  "library.editColRole": "Rol",
+  "library.editColDefault": "Default",
+  "library.editColDescription": "Descripción",
+  "library.editRoleCustom": "Personalizado…",
+  "library.editRanges": "Rangos",
+  "library.editAddRange": "+ Agregar rango",
+  "library.editRemoveRange": "Quitar rango",
+  "library.editJsonHint":
+    "JSON completo de la definición — control total. Los campos image llevan blobs base64 embebidos; no los toques salvo que sepas lo que hacés.",
+  "library.editSaveError": "No se pudo guardar: {err}",
 
   "outputs.title": "Outputs",
+  "outputs.suspend": "Suspender salida DMX",
+  "outputs.resume": "Reanudar salida DMX",
+  "outputs.suspendHint":
+    "Frena por completo el hilo de salida: un último frame en blackout y la línea queda muda (sin breaks ni datos), con el FTDI liberado. Usalo para aislar problemas de hardware o mientras recableás.",
+  "outputs.suspendedBanner":
+    "La salida DMX está SUSPENDIDA — no se transmite nada. Los fixtures quedan por su cuenta hasta que la reanudes.",
   "outputs.kind.mock": "Mock (logging)",
   "outputs.kind.artNet": "Art-Net",
   "outputs.kind.sacn": "sACN (E1.31)",
@@ -2286,6 +3724,9 @@ export const es: Translation = {
   "snapshots.deleteConfirm": '¿Eliminar el snapshot "{name}"?',
   "snapshots.deleteHint": "Eliminar snapshot",
   "snapshots.activeBadge": "ACTIVO",
+  "snapshots.fade": "Fade",
+  "snapshots.fadeHint":
+    "Fundido hacia este snapshot cada vez que se activa: pad, cue o lista en loop. 0 = corte seco; por debajo de ~200 ms no se nota, lo habitual es 300 a 2000 ms.",
   "scenes.step.fade": "Fade",
   "scenes.step.hold": "Hold",
   "scenes.step.ms": "ms",
@@ -2483,6 +3924,19 @@ export const es: Translation = {
   "stage.title": "Stage",
   "stage.meta": "{count} fixtures · grid {grid}px",
   "stage.metaSelected": " · {count} seleccionados",
+  "stage.metaAway": " · {n} fuera de uso",
+  "stage.inUse.showAll": "Mostrar todos (+{n} fuera de uso)",
+  "stage.inUse.onlyInUse": "Solo en uso",
+  "stage.inUse.hint":
+    "Los fixtures marcados como no vinieron a este evento se ocultan del Stage, del Modo Mágico y del test. Clic derecho en un fixture para marcarlo.",
+  "stage.test": "Test",
+  "stage.test.hint":
+    "Chequeo pre-show: destella todos los fixtures (o la selección) en blanco a un nivel suave, o de a uno. No toca escenas ni el programador; queda bajo blackout y master.",
+  "stage.test.all": "Todos",
+  "stage.test.step": "Uno por uno",
+  "stage.test.now": "Ahora: {name}",
+  "stage.test.count": "{n} fixtures",
+  "stage.test.remaining": "se apaga solo en {m} min",
   "stage.empty": "Sin fixtures.",
   "stage.sidebar.placeholder":
     "Seleccioná un fixture o un tipo para abrir sus encoders. ⌘/Ctrl-click suma o quita de la selección.",
@@ -2501,6 +3955,7 @@ export const es: Translation = {
   "stage.editor.fxTooltipMovement": "Movement: {name} · afecta {touches}/{total}",
   "stage.editor.center": "Centro",
   "stage.editor.home": "Home",
+  "stage.editor.section.presets": "Presets",
   "stage.editor.section.intStrobe": "Intensidad y estrobo",
   "stage.editor.section.color": "Color",
   "stage.editor.section.extras": "Extras",
@@ -2568,6 +4023,12 @@ export const es: Translation = {
   "stage.menu.fixturePlural": "{count} fixtures",
   "stage.menu.centerPanTilt": "Centrar Pan/Tilt",
   "stage.menu.park": "Park (defaults)",
+  "stage.menu.safeBootOn": "Inicialización segura (DMX en 0)",
+  "stage.menu.markOutOfUse": "No vino a este evento (ocultar)",
+  "stage.menu.markInUse": "Volver a poner en uso",
+  "stage.menu.safeBootOff": "Soltar inicialización segura",
+  "stage.fixture.safeBootTitle":
+    "Inicialización segura activa: todos los canales de este fixture están en 0. Encendé el cabezal, esperá a que termine el homing y soltala desde el menú (clic derecho).",
   "stage.menu.fullIntensity": "Intensidad al máximo",
   "stage.menu.blackoutFixture": "Blackout (intensity 0)",
   "stage.menu.rename": "Renombrar…",

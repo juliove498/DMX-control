@@ -394,6 +394,7 @@ mod tests {
                 name: "16bit".into(),
                 pan_range: None,
                 tilt_range: None,
+                presets: Vec::new(),
                 channels: vec![
                     ChannelDefinition::new(ChannelRole::Pan, 0),
                     ChannelDefinition::new(ChannelRole::PanFine, 0),
@@ -413,6 +414,7 @@ mod tests {
             address,
             label: None,
             position: [0.0, 0.0],
+            in_use: true,
         }
     }
 

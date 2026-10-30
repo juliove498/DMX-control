@@ -90,6 +90,39 @@ pub struct GenericHandles {
     cc_last: Arc<Mutex<HashMap<(u8, u8), u8>>>,
 }
 
+impl GenericHandles {
+    /// Standalone handle set for non-MIDI dispatchers (OS2L buttons,
+    /// future remote surfaces) that want the exact same action
+    /// semantics as the MIDI-learn layer. Fresh latches — the blind
+    /// momentary state is tracked per surface.
+    #[allow(clippy::too_many_arguments)]
+    pub fn standalone(
+        app: AppHandle,
+        chasers: SharedChasers,
+        movement: SharedMovement,
+        globals: SharedGlobals,
+        scenes: SharedScenePlayback,
+        loops: SharedLoopPlayback,
+        engine: EngineState,
+        show: ShowState,
+        snapshots: SharedSnapshotRuntime,
+    ) -> Self {
+        Self {
+            app,
+            chasers,
+            movement,
+            globals,
+            scenes,
+            loops,
+            engine,
+            show,
+            snapshots,
+            blind_held: Arc::new(AtomicBool::new(false)),
+            cc_last: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn install(
     midi: &SharedMidi,
@@ -201,7 +234,7 @@ fn handle_message(msg: &MidiMessage, learn: &SharedMidiLearn, handles: &GenericH
 /// semantics — but driven by learned bindings instead of pad notes.
 /// `edge_pressed` is the debounced "fire now" edge; `raw_pressed` is
 /// the level (used by momentary Blind, which needs the release too).
-fn dispatch_action(
+pub(crate) fn dispatch_action(
     action: ButtonAction,
     edge_pressed: bool,
     raw_pressed: bool,
@@ -225,6 +258,8 @@ fn dispatch_action(
     if !edge_pressed {
         return;
     }
+    // Modo Mágico steps aside when a human fires a look by hand.
+    crate::autopilot::note_manual_action(&action);
     let resolved = {
         let s = handles.show.read();
         match &action {
@@ -259,6 +294,23 @@ fn dispatch_action(
     let Some(action) = resolved else { return };
     match action {
         ButtonAction::None | ButtonAction::Blind => (),
+        ButtonAction::ToggleAutopilot => crate::autopilot::toggle_from_action(&handles.app),
+        ButtonAction::AutopilotEnergy { level } => {
+            crate::autopilot::set_energy_from_action(&handles.app, level)
+        }
+        ButtonAction::AutopilotNudge { kind } => crate::autopilot::nudge(match kind {
+            crate::show::button_bindings::AutopilotNudgeKind::Next => crate::autopilot::Nudge::Next,
+            crate::show::button_bindings::AutopilotNudgeKind::Back => crate::autopilot::Nudge::Back,
+        }),
+        ButtonAction::AutopilotHold => crate::autopilot::toggle_hold(),
+        ButtonAction::AutopilotBurst => crate::autopilot::burst_bar(),
+        ButtonAction::AutopilotDrop => crate::autopilot::drop_next(),
+        ButtonAction::AutopilotPalette { style } => {
+            crate::autopilot::set_palette_from_action(&handles.app, style)
+        }
+        ButtonAction::AutopilotMovement => {
+            crate::autopilot::toggle_movement_from_action(&handles.app)
+        }
         ButtonAction::ToggleChaser { id } => {
             let desired = !handles
                 .show
@@ -440,6 +492,431 @@ fn dispatch_action(
         }
         // *ByIndex resolved above.
         _ => (),
+    }
+}
+
+// ---- Blind as a one-beat hit ------------------------------------------------
+
+/// One beat at the current tempo (the globals' overall BPM), else 500 ms.
+pub fn beat_len(handles: &GenericHandles) -> std::time::Duration {
+    let bpm = handles
+        .globals
+        .lock()
+        .current_overall_bpm()
+        .unwrap_or(120.0);
+    std::time::Duration::from_secs_f32(60.0 / bpm.max(20.0))
+}
+
+/// Blind on now, off after `hold`. Cues and POIs can't say "release", so a
+/// blind fired from them is a blinder bump, not a latch that outlives the
+/// track. A real release arriving earlier still wins (both just set off).
+pub fn blind_pulse(handles: &GenericHandles, hold: std::time::Duration) {
+    dispatch_action(ButtonAction::Blind, true, true, handles);
+    // The release rides its own thread, not the async runtime: a busy
+    // runtime must never leave a blinder stuck on.
+    let h = handles.clone();
+    let spawned = std::thread::Builder::new()
+        .name("dmx-blind-release".into())
+        .spawn(move || {
+            std::thread::sleep(hold);
+            dispatch_action(ButtonAction::Blind, false, false, &h);
+        });
+    if spawned.is_err() {
+        dispatch_action(ButtonAction::Blind, false, false, handles);
+    }
+}
+
+// ---- Button modes: Toggle / Flash / Swop ------------------------------------
+//
+// grandMA executor styles for every surface (Launchpad, Stream Deck, OS2L
+// pads): Toggle fires on press, Flash holds the action while the button is
+// down and puts things back on release, Swop does the same and darkens
+// every fixture the action does not drive meanwhile.
+
+use crate::show::button_bindings::ButtonMode;
+
+/// What a release has to undo.
+enum Restore {
+    ChaserOff(String),
+    MovementOff(String),
+    Snapshot(Option<String>),
+    Scene(Option<String>),
+    Loop(Option<String>),
+    Blackout(bool),
+    Autopilot(bool),
+    Burst,
+    Hold(bool),
+    Nothing,
+}
+
+struct Held {
+    restore: Restore,
+    swop: bool,
+}
+
+fn held() -> &'static parking_lot::Mutex<HashMap<String, Held>> {
+    static H: std::sync::OnceLock<parking_lot::Mutex<HashMap<String, Held>>> =
+        std::sync::OnceLock::new();
+    H.get_or_init(|| parking_lot::Mutex::new(HashMap::new()))
+}
+
+/// Resolve `*ByIndex` variants against the current show.
+pub(crate) fn resolve_indexed(
+    handles: &GenericHandles,
+    action: &ButtonAction,
+) -> Option<ButtonAction> {
+    let s = handles.show.read();
+    Some(match action {
+        ButtonAction::ToggleChaserByIndex { index } => ButtonAction::ToggleChaser {
+            id: s.show.chasers.get(*index as usize)?.id.clone(),
+        },
+        ButtonAction::ToggleMovementByIndex { index } => ButtonAction::ToggleMovement {
+            id: s.show.movements.get(*index as usize)?.id.clone(),
+        },
+        ButtonAction::RecallSceneByIndex { index } => ButtonAction::RecallScene {
+            id: s.show.scenes.get(*index as usize)?.id.clone(),
+        },
+        ButtonAction::StartLoopGroupByIndex { index } => ButtonAction::StartLoopGroup {
+            id: s.show.scene_loop_groups.get(*index as usize)?.id.clone(),
+        },
+        ButtonAction::ToggleSnapshotByIndex { index } => ButtonAction::ToggleSnapshot {
+            id: s.show.snapshots.get(*index as usize)?.id.clone(),
+        },
+        other => other.clone(),
+    })
+}
+
+/// Fixtures an action drives — what a Swop leaves lit. `None` = the whole
+/// rig (snapshots, loop groups, globals).
+fn owned_fixtures(
+    handles: &GenericHandles,
+    action: &ButtonAction,
+) -> Option<std::collections::HashSet<String>> {
+    let s = handles.show.read();
+    match action {
+        ButtonAction::ToggleChaser { id } => s
+            .show
+            .chasers
+            .iter()
+            .find(|c| &c.id == id)
+            .map(|c| c.slots.iter().map(|sl| sl.fixture_id.clone()).collect()),
+        ButtonAction::ToggleMovement { id } => s
+            .show
+            .movements
+            .iter()
+            .find(|m| &m.id == id)
+            .map(|m| m.fixtures.iter().map(|sl| sl.fixture_id.clone()).collect()),
+        ButtonAction::RecallScene { id } => {
+            s.show.scenes.iter().find(|sc| &sc.id == id).map(|sc| {
+                sc.steps
+                    .iter()
+                    .flat_map(|st| st.fixtures.iter().map(|f| f.fixture_id.clone()))
+                    .collect()
+            })
+        }
+        _ => None,
+    }
+}
+
+/// A surface button went down (`pressed`) or up. `key` identifies the
+/// physical button so the release finds what the press did.
+pub fn button_event(
+    handles: &GenericHandles,
+    key: &str,
+    action: &ButtonAction,
+    mode: ButtonMode,
+    pressed: bool,
+) {
+    match mode {
+        ButtonMode::Toggle => {
+            // Both edges go through: `dispatch_action` fires latching
+            // actions on the press edge only, but Blind is momentary and
+            // needs the release (VirtualDJ sends on/off for every button).
+            dispatch_action(action.clone(), pressed, pressed, handles);
+        }
+        ButtonMode::Flash | ButtonMode::Swop => {
+            if pressed {
+                flash_down(handles, key, action, mode == ButtonMode::Swop);
+            } else {
+                flash_up(handles, key);
+            }
+        }
+    }
+}
+
+fn flash_down(handles: &GenericHandles, key: &str, action: &ButtonAction, swop: bool) {
+    let Some(action) = resolve_indexed(handles, action) else {
+        return;
+    };
+    crate::autopilot::note_manual_action(&action);
+    let restore = match &action {
+        ButtonAction::ToggleChaser { id } => {
+            let on = handles
+                .show
+                .read()
+                .show
+                .chasers
+                .iter()
+                .any(|c| &c.id == id && c.enabled);
+            if on {
+                Restore::Nothing
+            } else {
+                if let Err(err) = crate::commands::toggle_chaser_impl(
+                    &handles.app,
+                    &handles.show,
+                    &handles.chasers,
+                    id,
+                    true,
+                ) {
+                    tracing::warn!(?err, "flash chaser on failed");
+                }
+                Restore::ChaserOff(id.clone())
+            }
+        }
+        ButtonAction::ToggleMovement { id } => {
+            let on = handles
+                .show
+                .read()
+                .show
+                .movements
+                .iter()
+                .any(|m| &m.id == id && m.enabled);
+            if on {
+                Restore::Nothing
+            } else {
+                if let Err(err) = crate::commands::toggle_movement_impl(
+                    &handles.app,
+                    &handles.show,
+                    &handles.movement,
+                    id,
+                    true,
+                ) {
+                    tracing::warn!(?err, "flash movement on failed");
+                }
+                Restore::MovementOff(id.clone())
+            }
+        }
+        ButtonAction::ToggleSnapshot { id } => {
+            let prev = handles.snapshots.lock().active_id().map(|s| s.to_string());
+            if prev.as_deref() == Some(id.as_str()) {
+                Restore::Nothing
+            } else {
+                if let Err(err) = crate::commands::activate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                    id,
+                ) {
+                    tracing::warn!(?err, "flash snapshot failed");
+                }
+                Restore::Snapshot(prev)
+            }
+        }
+        ButtonAction::RecallScene { id } => {
+            let prev = handles
+                .scenes
+                .lock()
+                .active_scene_id()
+                .map(|s| s.to_string());
+            if prev.as_deref() == Some(id.as_str()) {
+                Restore::Nothing
+            } else {
+                if let Err(err) = crate::commands::recall_scene_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.scenes,
+                    id,
+                ) {
+                    tracing::warn!(?err, "flash scene failed");
+                }
+                Restore::Scene(prev)
+            }
+        }
+        ButtonAction::StartLoopGroup { id } => {
+            let prev = handles
+                .loops
+                .lock()
+                .active_group_id()
+                .map(|s| s.to_string());
+            if prev.as_deref() == Some(id.as_str()) {
+                Restore::Nothing
+            } else {
+                if let Err(err) = crate::commands::start_loop_group_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    id,
+                ) {
+                    tracing::warn!(?err, "flash loop failed");
+                }
+                Restore::Loop(prev)
+            }
+        }
+        ButtonAction::Blackout => {
+            let prev = handles.show.read().show.globals.blackout.active;
+            if !prev {
+                if let Err(err) = crate::commands::set_blackout_impl(
+                    &handles.app,
+                    &handles.show,
+                    &handles.globals,
+                    true,
+                ) {
+                    tracing::warn!(?err, "flash blackout failed");
+                }
+            }
+            Restore::Blackout(prev)
+        }
+        ButtonAction::ToggleAutopilot => {
+            let prev = crate::autopilot::is_enabled();
+            crate::autopilot::set_enabled_from_action(&handles.app, true);
+            Restore::Autopilot(prev)
+        }
+        ButtonAction::AutopilotBurst => {
+            crate::autopilot::burst_set(true);
+            Restore::Burst
+        }
+        ButtonAction::AutopilotHold => {
+            let prev = crate::autopilot::is_hold();
+            crate::autopilot::set_hold(true);
+            Restore::Hold(prev)
+        }
+        other => {
+            // Tap, energy pads, BPM nudges…: a press is the whole gesture.
+            dispatch_action(other.clone(), true, true, handles);
+            Restore::Nothing
+        }
+    };
+    if swop {
+        crate::fixture_test::set_exclusive(owned_fixtures(handles, &action));
+        crate::autopilot::set_muted(true);
+    }
+    held()
+        .lock()
+        .insert(key.to_string(), Held { restore, swop });
+}
+
+fn flash_up(handles: &GenericHandles, key: &str) {
+    let Some(h) = held().lock().remove(key) else {
+        return;
+    };
+    if h.swop {
+        crate::fixture_test::set_exclusive(None);
+        crate::autopilot::set_muted(false);
+    }
+    match h.restore {
+        Restore::ChaserOff(id) => {
+            let _ = crate::commands::toggle_chaser_impl(
+                &handles.app,
+                &handles.show,
+                &handles.chasers,
+                &id,
+                false,
+            );
+        }
+        Restore::MovementOff(id) => {
+            let _ = crate::commands::toggle_movement_impl(
+                &handles.app,
+                &handles.show,
+                &handles.movement,
+                &id,
+                false,
+            );
+        }
+        Restore::Snapshot(prev) => {
+            let _ = match prev {
+                Some(p) => crate::commands::activate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                    &p,
+                ),
+                None => crate::commands::deactivate_snapshot_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &handles.snapshots,
+                ),
+            };
+        }
+        Restore::Scene(prev) => match prev {
+            Some(p) => {
+                let _ = crate::commands::recall_scene_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.scenes,
+                    &p,
+                );
+            }
+            None => {
+                handles.scenes.lock().release(std::time::Instant::now());
+                let _ = tauri::Emitter::emit(
+                    &handles.app,
+                    crate::commands::SCENE_ACTIVE_EVENT,
+                    crate::commands::SceneActiveChange {
+                        active_scene_id: None,
+                        step_index: None,
+                    },
+                );
+            }
+        },
+        Restore::Loop(prev) => match prev {
+            Some(p) => {
+                let _ = crate::commands::start_loop_group_impl(
+                    &handles.app,
+                    &handles.engine,
+                    &handles.show,
+                    &handles.chasers,
+                    &handles.movement,
+                    &handles.globals,
+                    &handles.scenes,
+                    &handles.loops,
+                    &p,
+                );
+            }
+            None => {
+                crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops)
+            }
+        },
+        Restore::Blackout(prev) => {
+            let _ = crate::commands::set_blackout_impl(
+                &handles.app,
+                &handles.show,
+                &handles.globals,
+                prev,
+            );
+        }
+        Restore::Autopilot(prev) => crate::autopilot::set_enabled_from_action(&handles.app, prev),
+        Restore::Burst => crate::autopilot::burst_set(false),
+        Restore::Hold(prev) => crate::autopilot::set_hold(prev),
+        Restore::Nothing => {}
     }
 }
 

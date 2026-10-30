@@ -1,5 +1,6 @@
 import type { FixtureDefinition } from "@bindings/FixtureDefinition";
 import type { FixtureInstance } from "@bindings/FixtureInstance";
+import type { FixturePreset } from "@bindings/FixturePreset";
 import {
   DndContext,
   type DragEndEvent,
@@ -15,6 +16,7 @@ import { fixtureImageSrc } from "../lib/fixtureImage";
 import { chaserColor, movementColor } from "../lib/launchpadColors";
 import { useShowStore } from "../stores/show";
 import { ColorPicker2D } from "./ColorPicker2D";
+import { FixtureTestControl } from "./FixtureTestControl";
 import { PanTiltPad } from "./PanTiltPad";
 
 const GRID_SIZE = 32;
@@ -38,9 +40,12 @@ function StageFixture({
   effects,
   touchedLabels,
   flashStamp,
+  safeBoot,
   onSelect,
   onContextMenu,
   onUntouch,
+  testing,
+  outOfUse,
 }: {
   fixture: FixtureInstance;
   def: FixtureDefinition | undefined;
@@ -48,6 +53,10 @@ function StageFixture({
   barColor: string | null;
   selected: boolean;
   effects: FxHit[];
+  /** True while the fixture's footprint is being held at 0 for a safe
+   *  power-up. The card shows a pulsing badge so a held fixture can't
+   *  be forgotten mid-show. */
+  safeBoot: boolean;
   /** Resolved channel labels currently touched on this fixture. Empty
    *  array → not touched. The card shows a halo + corner badge with the
    *  count, and lists the labels in the tooltip so the operator can
@@ -62,6 +71,10 @@ function StageFixture({
   /** Drop this fixture from the touched set. Called when the operator
    *  clicks the corner badge. Only wired when the helper is on. */
   onUntouch: (fixtureId: string) => void;
+  /** Pre-show fixture check: this is the fixture lit right now. */
+  testing: boolean;
+  /** Marked as not at this event: shown dimmed only when the operator asks for all. */
+  outOfUse: boolean;
 }) {
   const t = useT();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -81,7 +94,7 @@ function StageFixture({
     <button
       ref={setNodeRef}
       type="button"
-      className={`stage-fixture${selected ? " selected" : ""}${isDragging ? " dragging" : ""}${imageUrl ? " has-image" : ""}${isTouched ? " touched" : ""}`}
+      className={`stage-fixture${selected ? " selected" : ""}${isDragging ? " dragging" : ""}${imageUrl ? " has-image" : ""}${isTouched ? " touched" : ""}${safeBoot ? " safe-boot" : ""}${testing ? " testing" : ""}${outOfUse ? " out-of-use" : ""}`}
       onClick={(e) => onSelect(e)}
       onContextMenu={onContextMenu}
       title={tooltip}
@@ -122,6 +135,11 @@ function StageFixture({
           </div>
         ) : null}
       </span>
+      {safeBoot ? (
+        <span className="safe-boot-chip" title={t("stage.fixture.safeBootTitle")}>
+          INIT&nbsp;0
+        </span>
+      ) : null}
       {isTouched ? (
         // Re-keying on flashStamp restarts the CSS keyframe each time
         // the operator presses Localizar — even on already-touched
@@ -576,9 +594,11 @@ function FixtureChannelEditor({
   /// Manufacturers usually treat the midpoint of each range as the
   /// "canonical" value for that step (e.g. for "Red: 13–25" the wheel
   /// definitely sits on red at 19). Using that instead of `from` avoids
-  /// landing on a transition edge between two ranges.
+  /// landing on a transition edge between two ranges. The exception is
+  /// a range starting at 0 ("open", "no macro", "no strobe"): 0 itself
+  /// is the canonical off/neutral value, so send exactly 0.
   const valueForRange = (r: { from: number; to: number }): number =>
-    Math.round((r.from + r.to) / 2);
+    r.from === 0 ? 0 : Math.floor((r.from + r.to) / 2);
 
   const renderChannelControl = (entry: ChannelEntry) => {
     const iconColor = roleIconColor(entry.channel.role);
@@ -671,6 +691,24 @@ function FixtureChannelEditor({
     await writeRole("strobe", v);
   };
 
+  // Fixture presets (Freestyler-style one-click looks bundled in the
+  // definition). Only meaningful when every selected fixture shares the
+  // definition+mode, since the writes are raw channel indexes.
+  const modePresets: FixturePreset[] = sameDef ? (primary.mode.presets ?? []) : [];
+  /// Preset `values` use 1-based channel numbers (manual convention);
+  /// translate to 0-based indexes and drop anything out of bounds so a
+  /// definition edited by hand can't write past the mode's footprint.
+  const presetEntries = (p: FixturePreset): [number, number][] =>
+    Object.entries(p.values).flatMap(([k, v]) => {
+      const idx = Number(k) - 1;
+      return typeof v === "number" && idx >= 0 && idx < primary.mode.channels.length
+        ? [[idx, v] as [number, number]]
+        : [];
+    });
+  const applyPreset = async (p: FixturePreset) => {
+    await Promise.all(presetEntries(p).map(([idx, v]) => writeChannel(idx, v)));
+  };
+
   const primaryRGB = hasColor
     ? {
         r: primaryValues[primary.roleOffsets.red] ?? 0,
@@ -757,6 +795,38 @@ function FixtureChannelEditor({
           </section>
         );
       })()}
+
+      {modePresets.length > 0 ? (
+        <section className="editor-subsection">
+          <h5>{t("stage.editor.section.presets")}</h5>
+          <div className="editor-presets">
+            {modePresets.map((p) => {
+              const entries = presetEntries(p);
+              const active =
+                entries.length > 0 && entries.every(([idx, v]) => (primaryValues[idx] ?? 0) === v);
+              const thumb = fixtureImageSrc(p.image ?? p.image_path, libraryDir);
+              return (
+                <button
+                  key={p.name}
+                  type="button"
+                  className={`preset-tile${active ? " active" : ""}`}
+                  title={p.name}
+                  onClick={() => applyPreset(p)}
+                >
+                  {thumb ? (
+                    <img src={thumb} alt="" />
+                  ) : (
+                    <span className="preset-tile-fallback" aria-hidden="true">
+                      {p.name.slice(0, 2)}
+                    </span>
+                  )}
+                  <span className="preset-tile-label">{p.name}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
 
       {hasPanTilt || (hasColor && primaryRGB) ? (
         <div className="editor-grid">
@@ -1631,9 +1701,13 @@ function FixtureContextMenu({
   multi,
   count,
   touchedCount,
+  safeBootCount,
+  outOfUseCount,
   onClose,
   onCenterPanTilt,
   onPark,
+  onSafeBoot,
+  onToggleInUse,
   onFullIntensity,
   onBlackout,
   onRename,
@@ -1648,9 +1722,16 @@ function FixtureContextMenu({
   /** Of the targeted fixtures, how many are currently touched. The
    *  Untouch item is hidden when zero — there's nothing to do. */
   touchedCount: number;
+  /** Of the targeted fixtures, how many are held in safe boot. Governs
+   *  whether the menu offers to hold or to release. */
+  safeBootCount: number;
   onClose: () => void;
   onCenterPanTilt: () => void;
   onPark: () => void;
+  onSafeBoot: () => void;
+  /** Of the targeted fixtures, how many are marked as not at this event. */
+  outOfUseCount: number;
+  onToggleInUse: () => void;
   onFullIntensity: () => void;
   onBlackout: () => void;
   onRename: () => void;
@@ -1693,6 +1774,22 @@ function FixtureContextMenu({
       </button>
       <button type="button" className="fcm-item" onClick={onPark}>
         {t("stage.menu.park")}
+      </button>
+      <button
+        type="button"
+        className={`fcm-item${safeBootCount > 0 ? " active" : ""}`}
+        onClick={onSafeBoot}
+      >
+        {safeBootCount > 0 ? t("stage.menu.safeBootOff") : t("stage.menu.safeBootOn")}
+        {multi && safeBootCount > 0 ? ` (×${safeBootCount})` : ""}
+      </button>
+      <button
+        type="button"
+        className={`fcm-item${outOfUseCount > 0 ? " active" : ""}`}
+        onClick={onToggleInUse}
+      >
+        {outOfUseCount > 0 ? t("stage.menu.markInUse") : t("stage.menu.markOutOfUse")}
+        {multi && outOfUseCount > 0 ? ` (×${outOfUseCount})` : ""}
       </button>
       <div className="fcm-sep" aria-hidden="true" />
       <button type="button" className="fcm-item" onClick={onFullIntensity}>
@@ -1740,10 +1837,45 @@ export function StageView() {
   const addFixtures = useShowStore((s) => s.addFixtures);
   const programmerStatus = useShowStore((s) => s.programmerStatus);
   const programmerUntouch = useShowStore((s) => s.programmerUntouch);
+  const safeBootIds = useShowStore((s) => s.safeBootIds);
+  const setFixtureSafeBoot = useShowStore((s) => s.setFixtureSafeBoot);
+  const refreshSafeBoot = useShowStore((s) => s.refreshSafeBoot);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Pre-show fixture check: the tile lit right now (step mode).
+  const [testCurrentId, setTestCurrentId] = useState<string | null>(null);
+  // Fixtures that stayed home for this event are hidden unless the
+  // operator asks to see everything (remembered per machine).
+  const [showAll, setShowAll] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("stage.showAllFixtures") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem("stage.showAllFixtures", showAll ? "1" : "0");
+    } catch {
+      /* per-session only */
+    }
+  }, [showAll]);
+  const visibleFixtures = useMemo(
+    () => (show?.fixtures ?? []).filter((f) => showAll || f.in_use !== false),
+    [show, showAll],
+  );
+  const awayCount = useMemo(
+    () => (show?.fixtures ?? []).filter((f) => f.in_use === false).length,
+    [show],
+  );
   const [marquee, setMarquee] = useState<Marquee | null>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
+
+  // The safe-boot hold lives in backend runtime state; re-sync on mount
+  // so the INIT badges survive tab switches away from the Stage.
+  useEffect(() => {
+    refreshSafeBoot().catch(() => {});
+  }, [refreshSafeBoot]);
 
   // Per-fixture touched offsets, polled from the programmer. Drives the
   // halo + corner badge + tooltip on each card. Polling at 250ms is
@@ -1908,7 +2040,7 @@ export function StageView() {
   const groups = useMemo(() => {
     const order: string[] = [];
     const map = new Map<string, FixtureInstance[]>();
-    for (const f of show?.fixtures ?? []) {
+    for (const f of visibleFixtures) {
       let arr = map.get(f.definition_id);
       if (!arr) {
         arr = [];
@@ -1924,7 +2056,7 @@ export function StageView() {
         fixtures: map.get(id) ?? [],
       }))
       .filter((g) => g.def);
-  }, [show?.fixtures, libraryById]);
+  }, [visibleFixtures, libraryById]);
 
   const selectedFixtures = useMemo(() => {
     if (!show) return [];
@@ -2260,6 +2392,36 @@ export function StageView() {
     closeMenu();
   };
 
+  const actionSafeBoot = async () => {
+    const targets = targetsForAction();
+    // If any target is already held, this click releases; otherwise it
+    // holds. Mixed selections resolve toward "release" so one click
+    // always leaves the whole selection in a single, predictable state.
+    const anyHeld = targets.some((f) => safeBootIds.includes(f.id));
+    for (const f of targets) {
+      await setFixtureSafeBoot(f.id, !anyHeld);
+    }
+    closeMenu();
+  };
+
+  const actionToggleInUse = async () => {
+    const targets = targetsForAction();
+    // Mixed selections resolve toward "in use" so one click always leaves
+    // the whole selection in a single state.
+    const anyAway = targets.some((f) => f.in_use === false);
+    for (const f of targets) {
+      await updateFixture({ ...f, in_use: anyAway });
+    }
+    if (!anyAway && !showAll) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        for (const f of targets) next.delete(f.id);
+        return next;
+      });
+    }
+    closeMenu();
+  };
+
   const actionFullIntensity = async () => {
     await writeChannelToFixtures(targetsForAction(), "intensity", 255);
     closeMenu();
@@ -2357,9 +2519,25 @@ export function StageView() {
       <header className="page-head">
         <h2>{t("stage.title")}</h2>
         <span className="meta">
-          {t("stage.meta", { count: show.fixtures.length, grid: GRID_SIZE })}
+          {t("stage.meta", { count: show.fixtures.length - awayCount, grid: GRID_SIZE })}
+          {awayCount > 0 ? t("stage.metaAway", { n: String(awayCount) }) : ""}
           {selectedIds.size > 0 ? t("stage.metaSelected", { count: selectedIds.size }) : ""}
         </span>
+        <div className="actions">
+          {awayCount > 0 ? (
+            <button
+              type="button"
+              className={`stage-pill-btn${showAll ? " active" : ""}`}
+              onClick={() => setShowAll((v) => !v)}
+              title={t("stage.inUse.hint")}
+            >
+              {showAll
+                ? t("stage.inUse.onlyInUse")
+                : t("stage.inUse.showAll", { n: String(awayCount) })}
+            </button>
+          ) : null}
+          <FixtureTestControl selectedIds={Array.from(selectedIds)} onCurrent={setTestCurrentId} />
+        </div>
       </header>
       <div className="stage-and-panel">
         <aside className="stage-types">
@@ -2385,7 +2563,7 @@ export function StageView() {
         </aside>
         <DndContext sensors={sensors} onDragEnd={onDragEnd}>
           <div ref={stageRef} className="stage-canvas" onPointerDown={onCanvasPointerDown}>
-            {show.fixtures.map((f) => (
+            {visibleFixtures.map((f) => (
               <StageFixture
                 key={f.id}
                 fixture={f}
@@ -2393,6 +2571,8 @@ export function StageView() {
                 imageUrl={imageUrlByDef[f.definition_id] ?? null}
                 barColor={barColorByFixture[f.id] ?? null}
                 selected={selectedIds.has(f.id)}
+                testing={testCurrentId === f.id}
+                outOfUse={f.in_use === false}
                 effects={effectsByFixture[f.id] ?? []}
                 touchedLabels={
                   // Hide touched indicators unless the operator is in
@@ -2404,6 +2584,7 @@ export function StageView() {
                     : EMPTY_LABELS
                 }
                 flashStamp={flashStamp}
+                safeBoot={safeBootIds.includes(f.id)}
                 onSelect={(e) => onFixtureClick(f.id, e)}
                 onContextMenu={onFixtureContextMenu(f.id)}
                 onUntouch={handleUntouch}
@@ -2439,9 +2620,23 @@ export function StageView() {
                 : [menu.fixtureId]
               ).filter((id) => (touchedByFixture[id]?.length ?? 0) > 0).length
             }
+            safeBootCount={
+              (selectedIds.has(menu.fixtureId) && selectedIds.size > 1
+                ? Array.from(selectedIds)
+                : [menu.fixtureId]
+              ).filter((id) => safeBootIds.includes(id)).length
+            }
+            outOfUseCount={
+              (selectedIds.has(menu.fixtureId) && selectedIds.size > 1
+                ? Array.from(selectedIds)
+                : [menu.fixtureId]
+              ).filter((id) => show.fixtures.find((f) => f.id === id)?.in_use === false).length
+            }
             onClose={closeMenu}
             onCenterPanTilt={actionCenterPanTilt}
             onPark={actionPark}
+            onSafeBoot={actionSafeBoot}
+            onToggleInUse={actionToggleInUse}
             onFullIntensity={actionFullIntensity}
             onBlackout={actionBlackoutFixture}
             onRename={actionRename}

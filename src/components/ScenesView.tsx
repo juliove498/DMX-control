@@ -51,6 +51,7 @@ export function ScenesView() {
   const createScene = useShowStore((s) => s.createSceneFromState);
   const addStep = useShowStore((s) => s.addSceneStep);
   const removeStep = useShowStore((s) => s.removeSceneStep);
+  const setSnapshotFade = useShowStore((s) => s.setSnapshotFade);
   const updateStepFromState = useShowStore((s) => s.updateSceneStepFromState);
   const updateScene = useShowStore((s) => s.updateScene);
   const deleteScene = useShowStore((s) => s.deleteScene);
@@ -315,6 +316,14 @@ export function ScenesView() {
                     key={snap.id}
                     snapshot={snap}
                     isActive={snap.id === activeSnapshot}
+                    onChangeFade={async (ms) => {
+                      setError(null);
+                      try {
+                        await setSnapshotFade(snap.id, ms);
+                      } catch (e) {
+                        setError(stringifyError(e));
+                      }
+                    }}
                     onActivate={async () => {
                       setError(null);
                       try {
@@ -431,6 +440,7 @@ function SnapshotRow({
   onRecapture,
   onRename,
   onDelete,
+  onChangeFade,
 }: {
   snapshot: Snapshot;
   isActive: boolean;
@@ -439,10 +449,18 @@ function SnapshotRow({
   onRecapture: () => void;
   onRename: (name: string) => void;
   onDelete: () => void;
+  onChangeFade: (ms: number) => void;
 }) {
   const t = useT();
   const [name, setName] = useState(snapshot.name);
   useEffect(() => setName(snapshot.name), [snapshot.name]);
+  const [fade, setFade] = useState(snapshot.fade_in_ms);
+  useEffect(() => setFade(snapshot.fade_in_ms), [snapshot.fade_in_ms]);
+  const commitFade = () => {
+    const next = Math.max(0, Math.min(60000, Math.round(Number(fade) || 0)));
+    setFade(next);
+    if (next !== snapshot.fade_in_ms) onChangeFade(next);
+  };
 
   const commitName = () => {
     const next = name.trim();
@@ -477,6 +495,23 @@ function SnapshotRow({
           else if (e.key === "Escape") setName(snapshot.name);
         }}
       />
+      <label className="snapshot-fade" title={t("snapshots.fadeHint")}>
+        {t("snapshots.fade")}
+        <input
+          type="number"
+          min={0}
+          max={60000}
+          step={250}
+          placeholder="0"
+          value={fade}
+          onChange={(e) => setFade(Number(e.currentTarget.value))}
+          onBlur={commitFade}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitFade();
+          }}
+        />
+        {t("scenes.step.ms")}
+      </label>
       {isActive ? (
         <span className="snapshot-active-badge">{t("snapshots.activeBadge")}</span>
       ) : null}

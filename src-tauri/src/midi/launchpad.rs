@@ -151,11 +151,9 @@ struct LpHandles {
     app: AppHandle,
     midi: SharedMidi,
     chasers: SharedChasers,
-    movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
     loops: SharedLoopPlayback,
-    engine: EngineState,
     show: ShowState,
     snapshots: SharedSnapshotRuntime,
     blind_held: Arc<AtomicBool>,
@@ -202,11 +200,11 @@ pub fn start(
     app: AppHandle,
     midi: SharedMidi,
     chasers: SharedChasers,
-    movement: SharedMovement,
+    _movement: SharedMovement,
     globals: SharedGlobals,
     scenes: SharedScenePlayback,
     loops: SharedLoopPlayback,
-    engine: EngineState,
+    _engine: EngineState,
     show: ShowState,
     snapshots: SharedSnapshotRuntime,
 ) -> LaunchpadController {
@@ -215,11 +213,9 @@ pub fn start(
         app,
         midi: midi.clone(),
         chasers,
-        movement,
         globals: globals.clone(),
         scenes,
         loops,
-        engine,
         show,
         snapshots,
         blind_held: blind_held.clone(),
@@ -364,8 +360,107 @@ fn is_action_active(action: &ButtonAction, handles: &LpHandles) -> bool {
             .map(|a| a == id)
             .unwrap_or(false),
         // *ByIndex never gets here — resolved upstream.
+        ButtonAction::ToggleAutopilot => crate::autopilot::is_enabled(),
+        ButtonAction::AutopilotEnergy { level } => crate::autopilot::manual_energy_is(*level),
+        ButtonAction::AutopilotHold => crate::autopilot::is_hold(),
+        ButtonAction::AutopilotBurst => crate::autopilot::is_bursting(),
+        ButtonAction::AutopilotPalette { style } => {
+            handles.show.read().show.autopilot.palette == *style
+        }
+        ButtonAction::AutopilotMovement => handles.show.read().show.autopilot.allow_movement,
         _ => false,
     }
+}
+
+/// Beat-synced LED language for the Modo Mágico pads. `None` keeps the
+/// generic active/idle treatment.
+///
+/// - on/off pulses with the beat while the improviser runs and blinks
+///   (hardware flash) while it is ducked for the operator;
+/// - the three energy pads read as a meter lit up to the live energy,
+///   with the chosen preset steady bright;
+/// - "next" counts down: blinks per beat in the last bar, per sixteenth
+///   in the last beat; "back" lights when there is a look to go back to;
+/// - hold steady while holding; burst strobes white while running; drop
+///   flashes white during the drop;
+/// - palette pads: the setting bright, the look's resolved family
+///   blinking when Auto picked a different one;
+/// - movement bright while heads are allowed to move.
+fn magic_pad_state(
+    b: &LaunchpadBinding,
+    st: &crate::autopilot::AutopilotStatus,
+    palette: crate::autopilot::PaletteStyle,
+    allow_movement: bool,
+    manual_energy: f32,
+) -> Option<PadState> {
+    let on = st.enabled;
+    let phase = st.beat.rem_euclid(1.0);
+    let beat_blink = phase < 0.3;
+    let sixteenth = (st.beat * 4.0).rem_euclid(1.0) < 0.5;
+    let dim = PadState::OffDim(b.color_dim);
+    let bright = PadState::OffDim(b.color_bright);
+    let flash = PadState::OnFlash {
+        dim: b.color_dim,
+        bright: b.color_bright,
+    };
+    let pick = |cond: bool| if cond { bright } else { dim };
+    Some(match &b.action {
+        ButtonAction::ToggleAutopilot => {
+            if !on {
+                dim
+            } else if st.ducked_for > 0.0 {
+                flash
+            } else {
+                pick(beat_blink)
+            }
+        }
+        ButtonAction::AutopilotEnergy { level } => {
+            let chosen = (manual_energy - level).abs() < 0.02;
+            pick(chosen || (on && st.energy >= *level - 0.05))
+        }
+        ButtonAction::AutopilotNudge { kind } => match kind {
+            crate::show::button_bindings::AutopilotNudgeKind::Next => {
+                if !on {
+                    dim
+                } else if st.next_change_in < 1.0 {
+                    pick(sixteenth)
+                } else if st.next_change_in < 4.0 {
+                    pick(beat_blink)
+                } else {
+                    dim
+                }
+            }
+            crate::show::button_bindings::AutopilotNudgeKind::Back => {
+                pick(on && !st.history.is_empty())
+            }
+        },
+        ButtonAction::AutopilotHold => pick(st.hold),
+        ButtonAction::AutopilotBurst => {
+            if st.burst && sixteenth {
+                PadState::OffDim(3)
+            } else {
+                dim
+            }
+        }
+        ButtonAction::AutopilotDrop => {
+            if st.drop {
+                PadState::OffDim(3)
+            } else {
+                dim
+            }
+        }
+        ButtonAction::AutopilotPalette { style } => {
+            if palette == *style {
+                bright
+            } else if on && st.look.as_ref().map(|l| l.style == *style).unwrap_or(false) {
+                flash
+            } else {
+                dim
+            }
+        }
+        ButtonAction::AutopilotMovement => pick(allow_movement),
+        _ => return None,
+    })
 }
 
 fn pad_state_for_binding(b: &LaunchpadBinding, handles: &LpHandles) -> PadState {
@@ -398,11 +493,10 @@ fn pad_state_for_binding(b: &LaunchpadBinding, handles: &LpHandles) -> PadState 
     }
 }
 
-fn dispatch_action(action: ButtonAction, vel: u8, handles: &LpHandles) {
+fn dispatch_action(binding: &LaunchpadBinding, vel: u8, handles: &LpHandles) {
     let pressed = vel > 0;
-    // Blind is the one momentary action: both press and release fire.
-    // Everything else latches on press (vel > 0).
-    if let ButtonAction::Blind = action {
+    // Blind is momentary and lives on the surface's own latch.
+    if let ButtonAction::Blind = binding.action {
         handles.blind_held.store(pressed, Ordering::Relaxed);
         handles.globals.lock().set_blind(pressed);
         let _ = tauri::Emitter::emit(
@@ -412,188 +506,15 @@ fn dispatch_action(action: ButtonAction, vel: u8, handles: &LpHandles) {
         );
         return;
     }
-    if !pressed {
-        return;
-    }
-    // Resolve *ByIndex variants once so the dispatch logic only deals
-    // with concrete id'd actions.
-    let Some(action) = resolve_indexed_action(handles, &action) else {
-        return;
-    };
-    match action {
-        ButtonAction::None => (),
-        ButtonAction::ToggleChaser { id } => {
-            let desired = !handles
-                .show
-                .read()
-                .show
-                .chasers
-                .iter()
-                .any(|c| c.id == id && c.enabled);
-            if let Err(err) = crate::commands::toggle_chaser_impl(
-                &handles.app,
-                &handles.show,
-                &handles.chasers,
-                &id,
-                desired,
-            ) {
-                tracing::warn!(?err, "launchpad action toggle_chaser failed");
-            }
-        }
-        ButtonAction::ToggleMovement { id } => {
-            let desired = !handles
-                .show
-                .read()
-                .show
-                .movements
-                .iter()
-                .any(|m| m.id == id && m.enabled);
-            if let Err(err) = crate::commands::toggle_movement_impl(
-                &handles.app,
-                &handles.show,
-                &handles.movement,
-                &id,
-                desired,
-            ) {
-                tracing::warn!(?err, "launchpad action toggle_movement failed");
-            }
-        }
-        ButtonAction::RecallScene { id } => {
-            let active_id = handles
-                .scenes
-                .lock()
-                .active_scene_id()
-                .map(|s| s.to_string());
-            if active_id.as_deref() == Some(id.as_str()) {
-                handles.scenes.lock().release(std::time::Instant::now());
-                let _ = tauri::Emitter::emit(
-                    &handles.app,
-                    crate::commands::SCENE_ACTIVE_EVENT,
-                    crate::commands::SceneActiveChange {
-                        active_scene_id: None,
-                        step_index: None,
-                    },
-                );
-                return;
-            }
-            if let Err(err) = crate::commands::recall_scene_impl(
-                &handles.app,
-                &handles.engine,
-                &handles.show,
-                &handles.chasers,
-                &handles.movement,
-                &handles.scenes,
-                &id,
-            ) {
-                tracing::warn!(?err, "launchpad action recall_scene failed");
-            }
-        }
-        ButtonAction::Blackout => {
-            let on = !handles.show.read().show.globals.blackout.active;
-            if let Err(err) = crate::commands::set_blackout_impl(
-                &handles.app,
-                &handles.show,
-                &handles.globals,
-                on,
-            ) {
-                tracing::warn!(?err, "launchpad action blackout failed");
-            }
-        }
-        ButtonAction::Blind => {
-            // Handled above — kept for completeness.
-        }
-        ButtonAction::Tap => {
-            match crate::commands::tap_overall_bpm_impl(
-                &handles.app,
-                &handles.show,
-                &handles.globals,
-            ) {
-                Ok(Some(bpm)) => tracing::info!(bpm, "launchpad action tap → bpm"),
-                Ok(None) => tracing::info!("launchpad action tap → first of window"),
-                Err(err) => tracing::warn!(?err, "launchpad action tap failed"),
-            }
-        }
-        ButtonAction::ToggleOverallBpm => {
-            let next = !handles.show.read().show.globals.overall_bpm_enabled;
-            if let Err(err) = crate::commands::set_overall_bpm_enabled_impl(
-                &handles.app,
-                &handles.show,
-                &handles.globals,
-                next,
-            ) {
-                tracing::warn!(?err, "launchpad action toggle overall bpm failed");
-            }
-        }
-        ButtonAction::BumpActiveChaserBpm { delta } => {
-            bump_active_chaser_bpm(handles, delta);
-        }
-        ButtonAction::StartLoopGroup { id } => {
-            let active = handles
-                .loops
-                .lock()
-                .active_group_id()
-                .map(|s| s.to_string());
-            if active.as_deref() == Some(id.as_str()) {
-                // Same group is playing — pressing again stops it.
-                crate::commands::stop_loop_group_impl(
-                    &handles.app,
-                    &handles.scenes,
-                    &handles.loops,
-                );
-                return;
-            }
-            if let Err(err) = crate::commands::start_loop_group_impl(
-                &handles.app,
-                &handles.engine,
-                &handles.show,
-                &handles.chasers,
-                &handles.movement,
-                &handles.globals,
-                &handles.scenes,
-                &handles.loops,
-                &id,
-            ) {
-                tracing::warn!(?err, "launchpad action start loop group failed");
-            }
-        }
-        ButtonAction::StopLoopGroup => {
-            crate::commands::stop_loop_group_impl(&handles.app, &handles.scenes, &handles.loops);
-        }
-        ButtonAction::ToggleSnapshot { id } => {
-            let active = handles.snapshots.lock().active_id().map(|s| s.to_string());
-            let result = if active.as_deref() == Some(id.as_str()) {
-                crate::commands::deactivate_snapshot_impl(
-                    &handles.app,
-                    &handles.engine,
-                    &handles.show,
-                    &handles.chasers,
-                    &handles.movement,
-                    &handles.globals,
-                    &handles.scenes,
-                    &handles.loops,
-                    &handles.snapshots,
-                )
-            } else {
-                crate::commands::activate_snapshot_impl(
-                    &handles.app,
-                    &handles.engine,
-                    &handles.show,
-                    &handles.chasers,
-                    &handles.movement,
-                    &handles.globals,
-                    &handles.scenes,
-                    &handles.loops,
-                    &handles.snapshots,
-                    &id,
-                )
-            };
-            if let Err(err) = result {
-                tracing::warn!(?err, "launchpad action toggle snapshot failed");
-            }
-        }
-        // *ByIndex were resolved upstream.
-        _ => (),
-    }
+    // Everything else takes the shared button-mode path (Toggle / Flash /
+    // Swop), the same one the Stream Deck and OS2L pads use.
+    let generic = crate::standalone_handles(&handles.app);
+    let key = format!(
+        "lp:{}:{}",
+        if binding.is_cc { "cc" } else { "n" },
+        binding.note
+    );
+    crate::midi::generic::button_event(&generic, &key, &binding.action, binding.mode, pressed);
 }
 
 fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
@@ -603,7 +524,7 @@ fn handle_note(msg: &MidiMessage, handles: &LpHandles) {
     let Some(binding) = bindings.iter().find(|b| !b.is_cc && b.note == note) else {
         return;
     };
-    dispatch_action(binding.action.clone(), vel, handles);
+    dispatch_action(binding, vel, handles);
 }
 
 fn handle_cc(msg: &MidiMessage, handles: &LpHandles) {
@@ -613,39 +534,53 @@ fn handle_cc(msg: &MidiMessage, handles: &LpHandles) {
     let Some(binding) = bindings.iter().find(|b| b.is_cc && b.note == cc) else {
         return;
     };
-    dispatch_action(binding.action.clone(), val, handles);
-}
-
-/// Find the currently-enabled chaser (exclusive activation guarantees at
-/// most one) and shift its tempo. No-op if no chaser is on — the operator
-/// then has to enable one before the arrows do anything, which matches
-/// the "tweak the active scene" mental model.
-fn bump_active_chaser_bpm(handles: &LpHandles, delta_bpm: f32) {
-    let active = {
-        let s = handles.show.read();
-        s.show.chasers.iter().find(|c| c.enabled).cloned()
-    };
-    let Some(mut chaser) = active else {
-        return;
-    };
-    let crate::chaser::TempoSource::Fixed { bpm } = chaser.tempo;
-    let new_bpm = (bpm + delta_bpm).clamp(BPM_MIN, BPM_MAX);
-    if (new_bpm - bpm).abs() < f32::EPSILON {
-        return;
-    }
-    chaser.tempo = crate::chaser::TempoSource::Fixed { bpm: new_bpm };
-    if let Err(err) =
-        crate::commands::update_chaser_impl(&handles.app, &handles.show, &handles.chasers, chaser)
-    {
-        tracing::warn!(?err, "launchpad BPM nudge failed");
-    }
+    dispatch_action(binding, val, handles);
 }
 
 fn compute_targets(handles: &LpHandles) -> LedTargets {
     let mut out = LedTargets::empty();
     let bindings = resolve_bindings(handles);
+    // Modo Mágico pads get their own beat-synced language; one status
+    // read per refresh tick serves all of them.
+    let magic_bound = bindings.iter().any(|b| {
+        matches!(
+            b.action,
+            ButtonAction::ToggleAutopilot
+                | ButtonAction::AutopilotEnergy { .. }
+                | ButtonAction::AutopilotNudge { .. }
+                | ButtonAction::AutopilotHold
+                | ButtonAction::AutopilotBurst
+                | ButtonAction::AutopilotDrop
+                | ButtonAction::AutopilotPalette { .. }
+                | ButtonAction::AutopilotMovement
+        )
+    });
+    let magic = if magic_bound {
+        let (palette, allow_movement, manual_energy) = {
+            let s = handles.show.read();
+            (
+                s.show.autopilot.palette,
+                s.show.autopilot.allow_movement,
+                s.show.autopilot.manual_energy,
+            )
+        };
+        Some((
+            crate::autopilot::status(None),
+            palette,
+            allow_movement,
+            manual_energy,
+        ))
+    } else {
+        None
+    };
     for b in &bindings {
-        let state = pad_state_for_binding(b, handles);
+        let magic_state = match (&magic, b.active_mode) {
+            (Some((st, palette, mv, energy)), ButtonActiveMode::Auto) => {
+                magic_pad_state(b, st, *palette, *mv, *energy)
+            }
+            _ => None,
+        };
+        let state = magic_state.unwrap_or_else(|| pad_state_for_binding(b, handles));
         if b.is_cc {
             out.ccs.insert(b.note, state);
         } else {

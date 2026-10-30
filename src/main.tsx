@@ -2,7 +2,13 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import { LanguageProvider } from "./i18n";
+import { installCompatShims } from "./lib/compat";
 import { installDocStubs } from "./lib/docMode";
+
+// Fill in APIs missing from older WebKit (Safari < 15.4 on the 2015 Intel
+// machine) before anything else runs — a missing global kills whatever
+// handler touches it, with no visible error.
+installCompatShims();
 
 // Install Tauri IPC stubs *before* React mounts so the first render's
 // effects (which call invoke) don't throw when running inside a plain

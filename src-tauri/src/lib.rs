@@ -1,14 +1,22 @@
 pub mod ai;
 pub mod audio_bpm;
+pub mod audio_tempo;
+pub mod audio_waveform;
+pub mod autopilot;
 pub mod bridge;
 pub mod chaser;
 pub mod commands;
 pub mod engine;
+pub mod fixture_test;
 pub mod globals;
+pub mod instance;
 pub mod midi;
+pub mod mirror;
 pub mod movement;
+pub mod os2l;
 pub mod output;
 pub mod power;
+pub mod presence;
 pub mod programmer;
 pub mod rdm;
 pub mod show;
@@ -96,7 +104,11 @@ fn init_tracing() {
 
     let env_filter =
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,dmx=debug"));
-    let stdout_layer = fmt::layer().with_target(false);
+    // Both sinks are non-blocking: a log line from the output or cue
+    // thread is a channel push, never a write to a pipe or a file.
+    let (stdout_writer, stdout_guard) = tracing_appender::non_blocking(std::io::stdout());
+    Box::leak(Box::new(stdout_guard));
+    let stdout_layer = fmt::layer().with_target(false).with_writer(stdout_writer);
     let registry = tracing_subscriber::registry()
         .with(env_filter)
         .with(stdout_layer);
@@ -143,6 +155,105 @@ fn init_tracing() {
             "file logging unavailable; tracing to stderr only — check ownership/permissions in the log directory"
         );
     }
+}
+
+/// Start the VirtualDJ-facing services (tempo poller, OS2L server, cue
+/// follower), each gated by its own persisted config flag. Called at boot on
+/// the live console and again on takeover; mirrors never run these.
+pub(crate) fn start_music_services(app: &tauri::AppHandle) {
+    let show_state = app.state::<ShowState>().inner().clone();
+
+    let vdj_cfg = show_state.read().show.vdj.clone();
+    if vdj_cfg.enabled {
+        crate::vdj::start_poller(
+            app.clone(),
+            show_state.clone(),
+            app.state::<crate::engine::output_thread::SharedGlobals>()
+                .inner()
+                .clone(),
+            app.state::<crate::engine::output_thread::SharedChasers>()
+                .inner()
+                .clone(),
+            app.state::<crate::engine::output_thread::SharedMovement>()
+                .inner()
+                .clone(),
+            app.state::<crate::vdj::VdjState>().inner().clone(),
+            vdj_cfg,
+        );
+        tracing::info!("vdj poller armed from persisted config");
+    }
+
+    let os2l_cfg = show_state.read().show.os2l.clone();
+    if os2l_cfg.enabled {
+        crate::os2l::start_server(
+            standalone_handles(app),
+            app.state::<crate::os2l::Os2lState>().inner().clone(),
+            os2l_cfg,
+        );
+        tracing::info!("os2l server armed from persisted config");
+    }
+
+    let vdj_cfg = show_state.read().show.vdj.clone();
+    if vdj_cfg.cue_follower_enabled {
+        crate::vdj::cues::start(
+            standalone_handles(app),
+            app.state::<crate::vdj::cues::CueFollower>().inner().clone(),
+            vdj_cfg,
+        );
+        tracing::info!("cue follower armed from persisted config");
+    }
+}
+
+/// Can a show file at this path be (re)written by THIS machine and user?
+/// Restored autosaves may carry a path from another machine's backup; probing
+/// up front (including a real write probe, which also surfaces macOS's
+/// Documents-access prompt) beats failing on every later save.
+fn usable_show_path(p: &std::path::Path) -> bool {
+    if p.exists() {
+        return std::fs::OpenOptions::new().append(true).open(p).is_ok();
+    }
+    let Some(parent) = p.parent() else {
+        return false;
+    };
+    if !parent.is_dir() {
+        return false;
+    }
+    let probe = parent.join(".dmx-path-probe");
+    match std::fs::write(&probe, b"ok") {
+        Ok(()) => {
+            let _ = std::fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// The bundle of shared runtime handles the VDJ services need to dispatch
+/// button actions outside a MIDI context.
+pub(crate) fn standalone_handles(app: &tauri::AppHandle) -> crate::midi::generic::GenericHandles {
+    crate::midi::generic::GenericHandles::standalone(
+        app.clone(),
+        app.state::<crate::engine::output_thread::SharedChasers>()
+            .inner()
+            .clone(),
+        app.state::<crate::engine::output_thread::SharedMovement>()
+            .inner()
+            .clone(),
+        app.state::<crate::engine::output_thread::SharedGlobals>()
+            .inner()
+            .clone(),
+        app.state::<crate::engine::scene_playback::SharedScenePlayback>()
+            .inner()
+            .clone(),
+        app.state::<crate::engine::loop_playback::SharedLoopPlayback>()
+            .inner()
+            .clone(),
+        app.state::<EngineState>().inner().clone(),
+        app.state::<ShowState>().inner().clone(),
+        app.state::<crate::snapshot::SharedSnapshotRuntime>()
+            .inner()
+            .clone(),
+    )
 }
 
 /// Resolve the log directory in a way that respects each platform's
@@ -202,6 +313,21 @@ pub fn run() {
 
     let (initial_show, initial_path) = match read_autosave() {
         Some((show, path)) => {
+            // The autosave may have been restored from another machine's
+            // backup, carrying a show-file path that doesn't exist (or isn't
+            // writable — macOS may deny Documents access) here. Keeping such
+            // a path would make every later persist fail; drop it and run in
+            // autosave-only mode instead. "Guardar como" re-establishes one.
+            let path = path.filter(|p| {
+                let ok = usable_show_path(p);
+                if !ok {
+                    tracing::warn!(
+                        path = %p.display(),
+                        "restored show path is not writable here; continuing on autosave only"
+                    );
+                }
+                ok
+            });
             tracing::info!(
                 fixtures = show.fixtures.len(),
                 outputs = show.outputs.bindings.len(),
@@ -265,10 +391,28 @@ pub fn run() {
     let sleep_inhibitor = crate::power::SleepInhibitor::new();
 
     tauri::Builder::default()
+        // Must be the first plugin. A second launch of the app (double-open
+        // from Finder, a copy still running from the mounted DMG, dev build
+        // alongside the packaged one…) would silently run TWO engines over
+        // the same config dir and the same outputs — two identical windows
+        // with diverging state, last writer wins. Instead, the new process
+        // exits and the running instance is brought to the front.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            use tauri::{Emitter, Manager};
+            tracing::warn!("second launch attempt; focusing the running instance");
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+            // Tell the UI why "nothing opened": the second process exited on
+            // purpose and this window is the only live instance.
+            let _ = app.emit("instances:second-launch", ());
+        }))
         .plugin(tauri_plugin_dialog::init())
         .manage(engine.clone())
         .manage(show_state.clone())
         .manage(OutputThreadState(Mutex::new(None)))
+        .manage(commands::SafeBootState::default())
         .manage(sleep_inhibitor)
         .manage(chasers_handle.clone())
         .manage(movement_handle.clone())
@@ -284,8 +428,26 @@ pub fn run() {
         .manage(midi_learn_handle.clone())
         .manage(bridge_state.clone())
         .manage(vdj_state.clone())
+        .manage(crate::os2l::Os2lState::new())
+        .manage(crate::vdj::cues::CueFollower::new())
+        .manage(crate::presence::PresenceState::default())
+        .manage(crate::mirror::MirrorState::new(crate::mirror::load_role()))
         .setup(move |app| {
             let app_handle = app.handle().clone();
+            // Live console = drives outputs and talks to VDJ; mirror = passive
+            // hot standby that replicates the show. Persisted per machine.
+            let boot_role = app.state::<crate::mirror::MirrorState>().role();
+
+            // Network collision radar: advertise this instance over mDNS and
+            // watch for other DMX Controls on the LAN (the mirrored laptop).
+            {
+                let presence_st: tauri::State<'_, crate::presence::PresenceState> = app.state();
+                crate::presence::start(
+                    app_handle.clone(),
+                    presence_st.inner().clone(),
+                    boot_role.as_str(),
+                );
+            }
             let engine_state: tauri::State<'_, EngineState> = app.state();
             let show_state_st: tauri::State<'_, ShowState> = app.state();
             let output_thread: tauri::State<'_, OutputThreadState> = app.state();
@@ -297,26 +459,32 @@ pub fn run() {
                 app.state();
             let scenes_st: tauri::State<'_, SharedScenePlayback> = app.state();
 
-            let (outputs, fixture_universes) = {
-                let s = show_state_st.read();
-                let outputs = s.show.outputs.clone();
-                let mut us: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
-                us.sort_unstable();
-                us.dedup();
-                (outputs, us)
-            };
-            if let Err(err) = apply_outputs(
-                &app_handle,
-                &engine_state,
-                &output_thread,
-                &chasers_st,
-                &movement_st,
-                &globals_st,
-                &scenes_st,
-                &outputs,
-                &fixture_universes,
-            ) {
-                tracing::warn!(?err, "failed to apply initial outputs");
+            if boot_role.is_live() {
+                let (outputs, fixture_universes) = {
+                    let s = show_state_st.read();
+                    let outputs = s.show.outputs.clone();
+                    let mut us: Vec<u16> = s.show.fixtures.iter().map(|f| f.universe).collect();
+                    us.sort_unstable();
+                    us.dedup();
+                    (outputs, us)
+                };
+                if let Err(err) = apply_outputs(
+                    &app_handle,
+                    &engine_state,
+                    &output_thread,
+                    &chasers_st,
+                    &movement_st,
+                    &globals_st,
+                    &scenes_st,
+                    &outputs,
+                    &fixture_universes,
+                ) {
+                    tracing::warn!(?err, "failed to apply initial outputs");
+                }
+            } else {
+                // Mirror boot: leave the output thread down (same state the
+                // suspend switch produces) until this console takes control.
+                tracing::info!("mirror mode: DMX outputs held down until takeover");
             }
             // Push the loaded show into the runtime engines so anything
             // persisted in the file resumes on launch.
@@ -429,24 +597,22 @@ pub fn run() {
                 tracing::debug!("no streamdeck devices found at launch");
             }
 
-            // VirtualDJ tempo bridge: if the saved show had the poller
-            // enabled at the last close, re-arm it now. Stays off
-            // until the operator turns it on via the VDJ tab,
-            // matching the bridge-server "manual start" UX.
-            let vdj_cfg_initial = show_state_st.read().show.vdj.clone();
-            if vdj_cfg_initial.enabled {
-                let vdj_st: tauri::State<'_, crate::vdj::VdjState> = app.state();
-                crate::vdj::start_poller(
-                    app_handle.clone(),
-                    show_state_st.inner().clone(),
-                    globals_st.inner().clone(),
-                    chasers_st.inner().clone(),
-                    movement_st.inner().clone(),
-                    vdj_st.inner().clone(),
-                    vdj_cfg_initial,
-                );
-                tracing::info!("vdj poller auto-armed from persisted config");
+            // VirtualDJ services (tempo poller, OS2L server, cue follower):
+            // only the LIVE console talks to VDJ; mirrors stay silent until
+            // they take control (per the operator's failover spec).
+            if boot_role.is_live() {
+                start_music_services(&app_handle);
             }
+
+            // Live/mirror replication engine (see mirror.rs).
+            crate::mirror::start(app_handle.clone());
+
+            // Modo Mágico: conductor thread + initial config/profiles.
+            crate::autopilot::install(standalone_handles(&app_handle));
+            crate::output::health::install(app_handle.clone());
+            crate::fixture_test::install(app_handle.clone());
+            crate::autopilot::sync_from_show(show_state_st.inner());
+            crate::fixture_test::sync_from_show(show_state_st.inner());
 
             // Background snapshot thread: every ~1.5 s we dump the live
             // engine state (universes + master) to disk. The output thread
@@ -455,6 +621,7 @@ pub fn run() {
             // worst-case data loss on a crash is whatever happened in the
             // last 1.5 s of slider movement.
             let engine_for_snapshot = engine_state.inner().clone();
+            let app_for_engine_save = app_handle.clone();
             std::thread::Builder::new()
                 .name("dmx-engine-autosave".into())
                 .spawn(move || loop {
@@ -473,9 +640,8 @@ pub fn run() {
                                 .collect(),
                         }
                     };
-                    if let Err(e) = write_engine_autosave(&snap) {
-                        tracing::warn!(error = %e, "engine autosave write failed");
-                    }
+                    let result = write_engine_autosave(&snap).map_err(|e| format!("engine.json: {e}"));
+                    commands::report_save_result(&app_for_engine_save, result);
                 })
                 .expect("spawn engine autosave thread");
 
@@ -569,6 +735,36 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            // Health
+            commands::config_health,
+            commands::repair_config_permissions,
+            presence::instance_peers,
+            // Live/mirror failover
+            mirror::mirror_status,
+            mirror::take_control,
+            mirror::become_mirror,
+            // Instance features (per-machine feature flags)
+            instance::instance_features,
+            instance::set_instance_features,
+            // Modo Mágico (autopilot)
+            autopilot::autopilot_get_config,
+            autopilot::autopilot_set_config,
+            autopilot::autopilot_set_enabled,
+            autopilot::autopilot_status,
+            autopilot::autopilot_nudge,
+            autopilot::autopilot_set_calibrate,
+            fixture_test::fixture_test_set,
+            fixture_test::fixture_test_status,
+            autopilot::autopilot_rig,
+            autopilot::autopilot_point_head,
+            // Cue editor
+            commands::save_track_cue_set,
+            commands::remove_track_cue_set,
+            commands::reorder_track_cue_sets,
+            commands::preview_action,
+            commands::resolve_music_path,
+            commands::estimate_track_grid,
+            commands::export_cue_sheet,
             // Direct DMX
             commands::set_channel,
             commands::set_master,
@@ -591,6 +787,23 @@ pub fn run() {
             commands::get_library_dir,
             commands::set_fixture_image,
             commands::set_channel_range_image,
+            commands::update_fixture_definition,
+            commands::set_fixture_safe_boot,
+            commands::list_safe_boot_fixtures,
+            commands::suspend_output,
+            commands::resume_output,
+            commands::output_suspended,
+            commands::output_health,
+            commands::os2l_status,
+            commands::os2l_apply_config,
+            commands::os2l_test_button,
+            commands::os2l_clear_recent,
+            commands::cue_follower_status,
+            commands::cue_follower_set_enabled,
+            commands::cue_follower_assume_file,
+            commands::set_track_cues,
+            commands::export_pois_to_vdj,
+            commands::waveform_for_file,
             commands::get_show,
             commands::get_show_path,
             commands::new_show,
@@ -638,6 +851,7 @@ pub fn run() {
             commands::capture_snapshot,
             commands::update_snapshot_from_state,
             commands::rename_snapshot,
+            commands::set_snapshot_fade,
             commands::delete_snapshot,
             commands::activate_snapshot,
             commands::deactivate_snapshot,
@@ -654,6 +868,7 @@ pub fn run() {
             commands::get_button_bindings,
             commands::update_button_bindings,
             commands::get_default_button_bindings,
+            commands::magic_launchpad_rows,
             // AI scene generation (POC)
             commands::get_ai_config,
             commands::set_ai_config,
@@ -708,6 +923,10 @@ pub fn run() {
             vdj::vdj_get_config,
             vdj::vdj_set_config,
             vdj::vdj_get_status,
+            vdj::vdj_scan,
+            vdj::vdj_probe_http,
+            vdj::vdj_select_instance,
+            vdj::vdj_set_instances,
             // Cross-machine config sync (private GitHub Gist)
             sync::sync_status,
             sync::sync_save_settings,

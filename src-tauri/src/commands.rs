@@ -3976,9 +3976,9 @@ pub fn config_health() -> Vec<String> {
 pub fn repair_config_permissions() -> Result<Vec<String>, CommandError> {
     #[cfg(not(target_os = "macos"))]
     {
-        return Err(CommandError::Other(
+        Err(CommandError::Other(
             "la reparación automática solo está disponible en macOS".into(),
-        ));
+        ))
     }
     #[cfg(target_os = "macos")]
     {

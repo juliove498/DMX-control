@@ -3,6 +3,12 @@
 
 Usage:
     python3 tools/convert_freestyler.py "path/to/Fixture.pff" [output.json]
+    python3 tools/convert_freestyler.py "Freestyler/Fixtures/Fixture.fxt" [output.json] [--root Freestyler]
+
+A bare .fxt (from an unpacked Freestyler folder or an .fbf backup) works
+too: its icon references ("mios\\gobo 1.gif", "Colores\\golden.gif") are
+resolved case-insensitively under <root>/Fixtures, Gobos, Colors and
+Images, where <root> defaults to the folder above the .fxt's directory.
 
 The .pff container is a simple sequence of entries:
     <name>\\0<decimal size>\\0<payload bytes>
@@ -50,6 +56,47 @@ def extract_pff(path):
         order.append(name)
         i = nul2 + 1 + size
     return entries, order
+
+
+class FolderEntries:
+    """Dict-like view over an unpacked Freestyler folder: the .fxt text
+    plus its icon references, which the .fxt names relative to
+    Fixtures/, Gobos/, Colors/ or Images/ (``mios\\gobo 1.gif`` lives in
+    Gobos/mios/). Lookups are case-insensitive — the files come from
+    Windows."""
+
+    BASES = ("fixtures/", "gobos/", "colors/", "images/", "")
+
+    def __init__(self, root, fxt_path):
+        self.fxt_name = os.path.basename(fxt_path)
+        self.fxt_bytes = open(fxt_path, "rb").read()
+        self.index = {}
+        for dp, _dirs, files in os.walk(root):
+            for f in files:
+                rel = os.path.relpath(os.path.join(dp, f), root).replace("\\", "/").lower()
+                self.index[rel] = os.path.join(dp, f)
+
+    def _resolve(self, ref):
+        r = ref.replace("\\", "/").lower().lstrip("/")
+        for b in self.BASES:
+            if b + r in self.index:
+                return self.index[b + r]
+        for k, path in self.index.items():
+            if k.endswith("/" + r):
+                return path
+        return None
+
+    def get(self, name):
+        if name == self.fxt_name:
+            return self.fxt_bytes
+        path = self._resolve(name)
+        return open(path, "rb").read() if path else None
+
+    def __getitem__(self, name):
+        v = self.get(name)
+        if v is None:
+            raise KeyError(name)
+        return v
 
 
 def data_url(entries, fs_path):
@@ -123,13 +170,23 @@ def gobo_label(path):
 
 
 def role_of(name):
-    n = name.lower()
+    n = name.lower().strip()
     ring = n.startswith(("aro", "ring", "led"))
 
     def other(tag):
         return {"other": tag}
 
-    if "pan" in n and "16" in n or ("pan" in n and "fine" in n):
+    # Numbered colour / axis channels ("Red 2", "Tilt 3"): the first set
+    # gets the real role, the rest stay visible as plain channels so the
+    # editor doesn't fold eight zones into one colour picker.
+    m = re.fullmatch(r"(red|green|blue|white|amber|uv|tilt|pan)\s*(\d+)", n)
+    if m:
+        base, num = m.group(1), int(m.group(2))
+        return base if num <= 1 else other(f"{base}_{num}")
+    # Speed channels before the pan/tilt tests: "PanTiltSpeed" is not a pan.
+    if "speed" in n and ("pan" in n or "tilt" in n or "xy" in n or "x y" in n):
+        return other("speed_xy")
+    if "pan" in n and ("16" in n or "fine" in n):
         return "pan_fine"
     if "tilt" in n and ("16" in n or "fine" in n):
         return "tilt_fine"
@@ -137,8 +194,6 @@ def role_of(name):
         return "pan"
     if n == "tilt" or n.startswith("tilt"):
         return "tilt"
-    if "speed" in n and ("xy" in n or "pan" in n):
-        return other("speed_xy")
     if ring and "red" in n or n == "aro red":
         return "red"
     if ring and ("green" in n or "verde" in n):
@@ -151,6 +206,20 @@ def role_of(name):
         return "green"
     if "blue" in n and not ring:
         return "blue"
+    if n in ("white", "ww", "w", "warm white", "warm") or n.startswith("white"):
+        return "white"
+    if n in ("cw", "cold white", "cool white"):
+        return other("cold_white")
+    if "amber" in n:
+        return "amber"
+    if n == "uv" or "ultra" in n:
+        return "uv"
+    if "cyan" in n:
+        return "cyan"
+    if "magenta" in n:
+        return "magenta"
+    if "yellow" in n:
+        return "yellow"
     if "frost" in n:
         return other("frost")
     if "shutter" in n:
@@ -163,6 +232,9 @@ def role_of(name):
         return "intensity"
     if "strobe" in n:
         return "strobe"
+    # A colour *macro* channel on an RGB fixture is not a colour wheel.
+    if "macro" in n:
+        return other("ring_macro" if ring else "macro")
     if "arco" in n or "rainbow" in n:
         return other("rainbow")
     if "color" in n or "colour" in n:
@@ -183,10 +255,10 @@ def role_of(name):
         return "zoom"
     if "iris" in n:
         return "iris"
-    if "reset" in n or "lamp" in n:
+    if "lamp" in n:
+        return other("lamp")
+    if "reset" in n:
         return other("reset")
-    if "macro" in n:
-        return other("ring_macro" if ring else "macro")
     if "auto" in n and "speed" in n:
         return other("speed")
     if "auto" in n:
@@ -196,12 +268,37 @@ def role_of(name):
     return other(re.sub(r"\W+", "_", n).strip("_") or "channel")
 
 
+# Roles that mean one physical thing per fixture: a second "pan" or
+# "color_wheel" (5r's "Color Wheel Effect", Mini Polar Fox's "Magic Ball
+# red") keeps its channel as `other:<role>_<n>`.
+SINGLETON_ROLES = {
+    "intensity", "red", "green", "blue", "white", "amber", "uv", "cyan", "magenta",
+    "yellow", "pan", "pan_fine", "tilt", "tilt_fine", "color_wheel", "gobo", "strobe",
+    "shutter", "zoom", "focus", "iris",
+}
+
+
+def dedupe_roles(channels):
+    seen = {}
+    for c in channels:
+        r = c["role"]
+        if isinstance(r, str) and r in SINGLETON_ROLES:
+            seen[r] = seen.get(r, 0) + 1
+            if seen[r] > 1:
+                c["role"] = {"other": f"{r}_{seen[r]}"}
+
+
 # ---- fxt parsing ------------------------------------------------------------
 
 
-def convert(pff_path, out_path=None):
-    entries, order = extract_pff(pff_path)
-    fxt_name = order[0]
+def convert(pff_path, out_path=None, root=None):
+    if pff_path.lower().endswith(".fxt"):
+        root = root or os.path.dirname(os.path.dirname(os.path.abspath(pff_path)))
+        entries = FolderEntries(root, pff_path)
+        fxt_name = entries.fxt_name
+    else:
+        entries, order = extract_pff(pff_path)
+        fxt_name = order[0]
     lines = entries[fxt_name].decode("latin-1").replace("\r\n", "\n").split("\n")
 
     manufacturer = lines[0].strip()
@@ -280,10 +377,20 @@ def convert(pff_path, out_path=None):
     if names is None:
         raise SystemExit("could not locate the channel-name block")
 
+    # Freestyler's own shutter knowledge sits right after the names:
+    # strobe channel, the value that opens it, and the strobe span.
+    # "0" on most LED pars (no strobe = open) but 20/30/72/140 on the
+    # mini movers — leaving the default at 0 would keep them dark.
+    def _int(sv):
+        return int(sv) if sv.lstrip("-").isdigit() else None
+
+    sp = [x.strip() for x in lines[k + channel_count : k + channel_count + 4]]
+    special = dict(zip(("strobe_ch", "open", "strobe_from", "strobe_to"), map(_int, sp)))
+
     # Macros.
     macros = []
-    if "Macros" in lines:
-        mi = lines.index("Macros")
+    if "Macros" in lines[k + channel_count :]:
+        mi = lines.index("Macros", k + channel_count)
         mc = int(lines[mi + 1].strip())
         j = mi + 2
         for _ in range(mc):
@@ -362,6 +469,27 @@ def convert(pff_path, out_path=None):
             c["ranges"] = mk(spans(pts))
         channels.append(c)
 
+    dedupe_roles(channels)
+    sc = special.get("strobe_ch")
+    if sc and 1 <= sc <= channel_count:
+        c = channels[sc - 1]
+        o = special.get("open")
+        if o is not None:
+            c["default"] = max(0, min(255, o))
+        if not c.get("ranges"):
+            o = o or 0
+            f, t = special.get("strobe_from"), special.get("strobe_to")
+            pts = []
+            if o > 0:
+                pts.append((0, "Cerrado", None))
+            pts.append((o, "Abierto", None))
+            if f is not None and t is not None and 0 < f <= t <= 255 and f > o:
+                pts.append((f, "Strobe lento → rápido", None))
+                if t < 255:
+                    pts.append((t + 1, "Abierto", None))
+            if len(pts) > 1:
+                c["ranges"] = mk(spans(pts))
+
     # Single-channel macros -> ranges on that channel (if it has none yet).
     # Multi-channel macros -> mode presets: one-click looks (the app
     # renders them as tiles in the Stage channel editor). `values` keys
@@ -424,7 +552,13 @@ def convert(pff_path, out_path=None):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    args = sys.argv[1:]
+    root = None
+    if "--root" in args:
+        k = args.index("--root")
+        root = args[k + 1]
+        del args[k : k + 2]
+    if not args:
         print(__doc__)
         sys.exit(1)
-    convert(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
+    convert(args[0], args[1] if len(args) > 1 else None, root=root)

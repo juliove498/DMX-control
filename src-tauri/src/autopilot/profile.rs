@@ -8,7 +8,10 @@ use std::collections::HashMap;
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::show::fixture::{ChannelRole, FixtureDefinition, FixtureInstance, PanTiltRange};
+use crate::show::fixture::{
+    ChannelDefinition, ChannelRange, ChannelRole, FixtureDefinition, FixtureInstance, FixtureMode,
+    PanTiltRange,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, TS)]
 #[ts(export, export_to = "../bindings/")]
@@ -52,6 +55,40 @@ pub struct FixtureProfile {
     /// Left-to-right rank among the participants (0 = leftmost), used by
     /// spatial programs (sweeps, chases).
     pub index: usize,
+    /// Colour wheel (heads without RGB mixing): the palette colour snaps
+    /// to the nearest slot.
+    pub color_wheel: Option<Wheel>,
+    /// Gobo wheel: static gobos only (rotation/shake ranges are skipped).
+    pub gobo: Option<Wheel>,
+    /// Prisms (one or two), with their rotation channel when there is one.
+    pub prisms: Vec<Prism>,
+}
+
+/// A labelled slot on a wheel channel (middle of its DMX range).
+#[derive(Debug, Clone, PartialEq)]
+pub struct WheelSlot {
+    pub value: u8,
+    pub label: String,
+    /// Nominal colour of a colour-wheel slot, read from its label.
+    pub rgb: Option<[u8; 3]>,
+}
+
+/// A wheel channel: where open/white sits and the slots worth using.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Wheel {
+    pub channel: usize,
+    pub open: u8,
+    pub slots: Vec<WheelSlot>,
+}
+
+/// A prism channel with its out/in values and an optional rotation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Prism {
+    pub channel: usize,
+    pub off: u8,
+    pub on: u8,
+    /// (channel, value for a slow rotation).
+    pub rot: Option<(usize, u8)>,
 }
 
 impl FixtureProfile {
@@ -135,9 +172,263 @@ fn resolve_one(
         tilt_range: mode.tilt_range_or_default(),
         position: f.position,
         index: 0,
+        color_wheel: wheel_at(mode, base, &ChannelRole::ColorWheel)
+            .and_then(|(ch, def)| colour_wheel(ch, def)),
+        gobo: wheel_at(mode, base, &ChannelRole::Gobo).and_then(|(ch, def)| gobo_wheel(ch, def)),
+        prisms: prisms_of(mode, base),
     };
     p.kind = classify(&p);
     Some(p)
+}
+
+// ---- Wheels and prisms --------------------------------------------------
+
+fn wheel_at<'a>(
+    mode: &'a FixtureMode,
+    base: usize,
+    role: &ChannelRole,
+) -> Option<(usize, &'a ChannelDefinition)> {
+    mode.channels
+        .iter()
+        .enumerate()
+        .find(|(_, c)| &c.role == role)
+        .map(|(i, c)| (base + i, c))
+}
+
+fn mid(r: &ChannelRange) -> u8 {
+    ((r.from as u16 + r.to as u16) / 2) as u8
+}
+
+/// Ranges that are effects (rotation, rainbow, shake, split colours,
+/// macros) rather than a static slot.
+fn is_effect_label(lower: &str) -> bool {
+    if lower.contains('/') || lower.contains('-') {
+        return true;
+    }
+    const FX: [&str; 17] = [
+        "rot",
+        "rotation",
+        "rotacion",
+        "rotación",
+        "cw",
+        "ccw",
+        "rainbow",
+        "arco",
+        "iris",
+        "shake",
+        "macro",
+        "mitad",
+        "half",
+        "split",
+        "misc",
+        "speed",
+        "stop",
+    ];
+    lower
+        .split(|c: char| !c.is_alphanumeric())
+        .filter(|t| !t.is_empty())
+        .any(|t| FX.contains(&t))
+}
+
+/// Nominal RGB for a colour-wheel slot label, in Spanish or English.
+/// Specific names come before generic ones ("light blue" before "blue").
+fn colour_from_label(lower: &str) -> Option<[u8; 3]> {
+    const TABLE: &[(&str, [u8; 3])] = &[
+        ("light blue", [90, 170, 255]),
+        ("azul claro", [90, 170, 255]),
+        ("celeste", [90, 170, 255]),
+        ("sky", [90, 170, 255]),
+        ("dark blue", [0, 0, 220]),
+        ("azul oscuro", [0, 0, 220]),
+        ("deep blue", [0, 0, 220]),
+        ("congo", [40, 0, 200]),
+        ("light green", [120, 255, 120]),
+        ("verde claro", [120, 255, 120]),
+        ("amarillo claro", [255, 255, 120]),
+        ("light yellow", [255, 255, 120]),
+        ("white", [255, 255, 255]),
+        ("blanco", [255, 255, 255]),
+        ("open", [255, 255, 255]),
+        ("abierto", [255, 255, 255]),
+        ("red", [255, 0, 0]),
+        ("rojo", [255, 0, 0]),
+        ("green", [0, 255, 0]),
+        ("verde", [0, 255, 0]),
+        ("blue", [0, 0, 255]),
+        ("azul", [0, 0, 255]),
+        ("yellow", [255, 255, 0]),
+        ("amarillo", [255, 255, 0]),
+        ("orange", [255, 120, 0]),
+        ("naranja", [255, 120, 0]),
+        ("magenta", [255, 0, 255]),
+        ("pink", [255, 80, 180]),
+        ("rosa", [255, 80, 180]),
+        ("cyan", [0, 255, 255]),
+        ("cian", [0, 255, 255]),
+        ("violet", [150, 0, 255]),
+        ("violeta", [150, 0, 255]),
+        ("purple", [150, 0, 255]),
+        ("purpura", [150, 0, 255]),
+        ("púrpura", [150, 0, 255]),
+        ("lila", [190, 120, 255]),
+        ("lavanda", [190, 120, 255]),
+        ("lavender", [190, 120, 255]),
+        ("uv", [120, 0, 255]),
+        ("amber", [255, 170, 0]),
+        ("ambar", [255, 170, 0]),
+        ("ámbar", [255, 170, 0]),
+        ("cto", [255, 200, 140]),
+        ("ctb", [200, 220, 255]),
+    ];
+    TABLE
+        .iter()
+        .find(|(k, _)| lower.contains(k))
+        .map(|(_, c)| *c)
+}
+
+fn colour_wheel(ch: usize, def: &ChannelDefinition) -> Option<Wheel> {
+    let mut slots = Vec::new();
+    let mut open: Option<u8> = None;
+    for r in &def.ranges {
+        let l = r.label.to_lowercase();
+        if is_effect_label(&l) {
+            continue;
+        }
+        let Some(rgb) = colour_from_label(&l) else {
+            continue;
+        };
+        let v = mid(r);
+        if rgb == [255, 255, 255] {
+            open.get_or_insert(v);
+        }
+        slots.push(WheelSlot {
+            value: v,
+            label: r.label.clone(),
+            rgb: Some(rgb),
+        });
+    }
+    (!slots.is_empty()).then(|| Wheel {
+        channel: ch,
+        open: open.unwrap_or(0),
+        slots,
+    })
+}
+
+fn gobo_wheel(ch: usize, def: &ChannelDefinition) -> Option<Wheel> {
+    let mut slots = Vec::new();
+    let mut open: Option<u8> = None;
+    for r in &def.ranges {
+        let l = r.label.to_lowercase();
+        if is_effect_label(&l) {
+            continue;
+        }
+        let v = mid(r);
+        if l.contains("open")
+            || l.contains("abierto")
+            || l.contains("sin gobo")
+            || l.contains("no gobo")
+        {
+            open.get_or_insert(v);
+            continue;
+        }
+        slots.push(WheelSlot {
+            value: v,
+            label: r.label.clone(),
+            rgb: None,
+        });
+    }
+    (!slots.is_empty()).then(|| Wheel {
+        channel: ch,
+        open: open.unwrap_or(0),
+        slots,
+    })
+}
+
+/// "prism2_rot" → "prism2", "prism_rot" → "prism", "prismrotation" → "prism".
+fn prism_stem(role: &str) -> String {
+    role.trim_end_matches("ation")
+        .trim_end_matches("rot")
+        .trim_end_matches(['_', '-', ' '])
+        .to_string()
+}
+
+fn prism_values(c: &ChannelDefinition) -> (u8, u8) {
+    if c.ranges.is_empty() {
+        return (0, 255);
+    }
+    let is_off = |l: &str| {
+        l.contains("off")
+            || l.contains("sin ")
+            || l.starts_with("no")
+            || l.contains("open")
+            || l.contains("abierto")
+    };
+    let off = c
+        .ranges
+        .iter()
+        .find(|r| is_off(&r.label.to_lowercase()))
+        .map(mid)
+        .unwrap_or(c.ranges[0].from);
+    let on = c
+        .ranges
+        .iter()
+        .find(|r| {
+            let l = r.label.to_lowercase();
+            !is_off(&l) && !is_effect_label(&l)
+        })
+        .map(mid)
+        .or_else(|| c.ranges.get(1).map(mid))
+        .unwrap_or(255);
+    (off, on)
+}
+
+/// A slow clockwise rotation, if the channel's ranges say where it is;
+/// unknown semantics leave the rotation alone.
+fn rotation_value(c: &ChannelDefinition) -> u8 {
+    let slow = c.ranges.iter().find(|r| {
+        let l = r.label.to_lowercase();
+        (l.contains("slow") || l.contains("lent")) && !l.contains("ccw")
+    });
+    slow.or_else(|| {
+        c.ranges.iter().find(|r| {
+            let l = r.label.to_lowercase();
+            l.contains("cw") && !l.contains("ccw")
+        })
+    })
+    .map(mid)
+    .unwrap_or(0)
+}
+
+fn prisms_of(mode: &FixtureMode, base: usize) -> Vec<Prism> {
+    let mut out = Vec::new();
+    for (i, c) in mode.channels.iter().enumerate() {
+        let ChannelRole::Other(role) = &c.role else {
+            continue;
+        };
+        let r = role.to_lowercase();
+        if !r.starts_with("prism") || r.contains("rot") {
+            continue;
+        }
+        let (off, on) = prism_values(c);
+        let rot = mode
+            .channels
+            .iter()
+            .enumerate()
+            .find(|(_, rc)| {
+                matches!(&rc.role, ChannelRole::Other(s) if {
+                    let s = s.to_lowercase();
+                    s.contains("rot") && prism_stem(&s) == r
+                })
+            })
+            .map(|(j, rc)| (base + j, rotation_value(rc)));
+        out.push(Prism {
+            channel: base + i,
+            off,
+            on,
+            rot,
+        });
+    }
+    out
 }
 
 /// Profiles for the chosen participants, ranked left-to-right by stage x.

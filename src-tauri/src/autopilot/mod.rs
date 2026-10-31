@@ -1846,6 +1846,9 @@ mod tests {
             tilt_range: crate::show::fixture::PanTiltRange::default_tilt(),
             position: [index as f32, 0.0],
             index,
+            color_wheel: None,
+            gobo: None,
+            prisms: Vec::new(),
         }
     }
 

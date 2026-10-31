@@ -1199,6 +1199,96 @@ fn set(overlay: &mut HashMap<u16, ChannelOverlay>, universe: u16, ch: Option<usi
     }
 }
 
+/// Wheel heads. Colour wheels snap, so they move at most every few beats
+/// (faster when the energy is up) and land on the slot nearest to the
+/// palette colour. Gobos change per phrase and breathe open now and
+/// then; prisms come in on bursts and on alternate phrases at high
+/// energy, one at a time when the head has two.
+fn paint_wheels(
+    out: &mut HashMap<u16, ChannelOverlay>,
+    look: &Look,
+    p: &FixtureProfile,
+    n: usize,
+    beat: f64,
+    energy: f32,
+    burst: bool,
+) {
+    if let Some(w) = &p.color_wheel {
+        if p.has_color() {
+            // RGB mixing wins: park the wheel on open so a macro left
+            // behind by a scene can't tint the mix.
+            set(out, p.universe, Some(w.channel), w.open);
+        } else {
+            let period = if energy >= 0.75 {
+                2.0
+            } else if energy >= 0.4 {
+                4.0
+            } else {
+                8.0
+            };
+            let qbeat = (beat / period).floor() * period;
+            let target = color_for(look, p, n, qbeat, energy);
+            set(out, p.universe, Some(w.channel), wheel_slot_for(w, target));
+        }
+    }
+    if let Some(g) = &p.gobo {
+        let value = if energy < 0.35 || g.slots.is_empty() {
+            g.open
+        } else {
+            let period = if energy >= 0.75 { 16.0 } else { 32.0 };
+            let phrase = (beat / period).floor() as i64;
+            if phrase.rem_euclid(3) == 2 && energy < 0.75 {
+                g.open
+            } else {
+                let idx = (look.seed as i64 + phrase + p.index as i64 * 7)
+                    .rem_euclid(g.slots.len() as i64) as usize;
+                g.slots[idx].value
+            }
+        };
+        set(out, p.universe, Some(g.channel), value);
+    }
+    if !p.prisms.is_empty() {
+        let phrase = (beat / 16.0).floor() as i64;
+        let on = burst || (energy >= 0.7 && phrase.rem_euclid(2) == 1);
+        let which = (phrase + look.seed as i64).rem_euclid(p.prisms.len() as i64) as usize;
+        for (k, pr) in p.prisms.iter().enumerate() {
+            let active = on && k == which;
+            set(
+                out,
+                p.universe,
+                Some(pr.channel),
+                if active { pr.on } else { pr.off },
+            );
+            if let Some((rc, rv)) = pr.rot {
+                set(out, p.universe, Some(rc), if active { rv } else { 0 });
+            }
+        }
+    }
+}
+
+/// The wheel slot nearest to `target`: whites go to open, anything
+/// saturated to the closest hue.
+fn wheel_slot_for(w: &crate::autopilot::profile::Wheel, target: Rgb) -> u8 {
+    let (th, ts, _) = rgb_to_hsv(target);
+    if ts < 0.25 {
+        return w.open;
+    }
+    let mut best = (f32::MAX, w.open);
+    for s in &w.slots {
+        let Some(c) = s.rgb else { continue };
+        let (h, sat, _) = rgb_to_hsv(c);
+        if sat < 0.3 {
+            continue;
+        }
+        let d = (th - h).abs();
+        let d = d.min(360.0 - d);
+        if d < best.0 {
+            best = (d, s.value);
+        }
+    }
+    best.1
+}
+
 fn zone_for(zones: &HashMap<String, HeadZone>, id: &str) -> HeadZone {
     zones.get(id).cloned().unwrap_or(HeadZone {
         fixture_id: id.to_string(),
@@ -1330,6 +1420,7 @@ pub fn evaluate(input: EvalInput<'_>) -> HashMap<u16, ChannelOverlay> {
                     }
                 }
             }
+            paint_wheels(&mut out, look, p, n, input.beat, input.energy, burst);
         }
         if input.allow_movement && p.is_mover() {
             let rank = mover_order.iter().position(|&j| j == i).unwrap_or(0);
@@ -1688,6 +1779,9 @@ mod tests {
             tilt_range: PanTiltRange::default_tilt(),
             position: [index as f32, 0.0],
             index,
+            color_wheel: None,
+            gobo: None,
+            prisms: Vec::new(),
         }
     }
 
